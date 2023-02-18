@@ -1,20 +1,7 @@
-# TODO
-- read a YAML configuration file with
-  - global
-    - timelapse_framerate: 30
-    - pic dir
-    - max pic dir size
-    - log dir
-    - tmp dir
-  - server
-    - port
-    - host
-  - cameras
-    - url
-    - name
-    - future
-      - tz
-      - coordinates
+# CamAREDN
 
-- one thread per capture
-- simple snap loop with diff interval
+Saves pictures of HTTP cameras in a structured directory, make daily timelapses and runs a web server. This is inspired by https://github.com/matfra/isitfoggy.today
+
+## TODO
+- timelapse
+- web server
