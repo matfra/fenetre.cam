@@ -16,6 +16,8 @@ from io import BytesIO
 from SSIM_PIL import compare_ssim
 
 from threading import Thread
+import http.server
+from functools import partial
 
 FLAGS = flags.FLAGS
 
@@ -90,6 +92,17 @@ def snap(camera_name, camera_config: Dict):
         previous_pic_fullpath = new_pic_fullpath
 
 
+def server_run():
+    server_class = http.server.ThreadingHTTPServer
+    handler_class = partial(
+        http.server.SimpleHTTPRequestHandler, directory=global_config["work_dir"]
+    )
+    server_address = (server_config["host"], server_config["port"])
+    logging.info(f"Starting HTTP Server on {server_address}")
+    httpd = server_class(server_address, handler_class)
+    httpd.serve_forever()
+
+
 def main(argv):
     del argv  # Unused.
 
@@ -99,9 +112,15 @@ def main(argv):
     )
     global server_config, cameras_config, global_config
     server_config, cameras_config, global_config = config_load(FLAGS.config)
+    global_config["pic_dir"] = os.path.join(global_config["work_dir"], "photos")
+
     logging.debug(
         f"Loaded config: server: {server_config} cameras: {cameras_config} global: {global_config}"
     )
+    server_thread = Thread(target=server_run, daemon=True, name="http_server")
+    logging.info(f"Starting thread {server_thread}")
+    server_thread.start()
+
     for cam in cameras_config:
         t = Thread(target=snap, daemon=True, name=cam, args=[cam, cameras_config[cam]])
         time.sleep(3)
@@ -110,6 +129,7 @@ def main(argv):
 
     while True:
         time.sleep(10)
+
 
 if __name__ == "__main__":
     app.run(main)

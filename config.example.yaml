@@ -1,8 +1,8 @@
 ---
 global:
   timelapse_framerate: 30
-  pic_dir: /Users/me/Photos/camaredn
-  picture_dir_max_size_GB: 10
+  work_dir: /Users/me/Photos/camaredn
+  work_dir_max_size_GB: 10
   timezone: "America/Los_Angeles"
 server:
   port: 8888

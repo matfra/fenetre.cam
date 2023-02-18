@@ -6,7 +6,7 @@ mock
 black
 pytest
 requests
-ffmpeg
+ffmpeg-python
 absl-py
 pillow
 # SSIM
