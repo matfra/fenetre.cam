@@ -1,0 +1,16 @@
+logzero  # see github.com/metachris/logzero
+pytz
+pyyaml
+#dev only
+mock
+black
+pytest
+requests
+ffmpeg
+absl-py
+pillow
+# SSIM
+SSIM-PIL
+numpi
+pyopencl
+python-daemon

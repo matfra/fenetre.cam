@@ -1,0 +1,14 @@
+---
+global:
+  timelapse_framerate: 30
+  pic_dir: /Users/me/Photos/camaredn
+  picture_dir_max_size_GB: 10
+  timezone: "America/Los_Angeles"
+server:
+  port: 8888
+  host: 0.0.0.0
+cameras:
+  cam1:
+    url: "http://example.com/cam1.jpg"
+  isitfoggy:
+    url: "http://isitfoggy.com/photos/latest.jpg"
