@@ -16,6 +16,7 @@ from io import BytesIO
 from SSIM_PIL import compare_ssim
 
 from threading import Thread
+import threading
 import http.server
 from functools import partial
 
@@ -36,10 +37,7 @@ def config_load(config_file_path: str) -> List[Dict]:
 
 
 def get_pic_from_url(url: str) -> Image:
-    try:
-        r = requests.get(url)
-    except:  # TODO: Maybe more specific handling?
-        return None
+    r = requests.get(url)
     return Image.open(BytesIO(r.content))
 
 
@@ -103,6 +101,21 @@ def server_run():
     httpd.serve_forever()
 
 
+def create_and_start_and_watch_thread(
+    f: callable, name: str, arguments: List[str] = [], exp_backoff_limit: int = 0
+) -> None:
+    failure_count = 0
+    while True:
+        running_threads_name = [t.name for t in threading.enumerate()]
+
+        if not name in running_threads_name:
+            t = Thread(target=f, daemon=False, name=name, args=arguments)
+            exp_backoff_delay = min(exp_backoff_limit, 2**failure_count)
+            failure_count += 1
+            time.sleep(exp_backoff_delay)
+            t.start()
+
+
 def main(argv):
     del argv  # Unused.
 
@@ -117,18 +130,30 @@ def main(argv):
     logging.debug(
         f"Loaded config: server: {server_config} cameras: {cameras_config} global: {global_config}"
     )
-    server_thread = Thread(target=server_run, daemon=True, name="http_server")
-    logging.info(f"Starting thread {server_thread}")
-    server_thread.start()
 
+    threads = []
+    threads.append(
+        Thread(
+            target=create_and_start_and_watch_thread,
+            daemon=True,
+            name=f"http_server_watchdog",
+            args=[server_run, "http_server"],
+        )
+    )
     for cam in cameras_config:
-        t = Thread(target=snap, daemon=True, name=cam, args=[cam, cameras_config[cam]])
-        time.sleep(3)
-        logging.info(f"Starting thread {t}")
+        threads.append(
+            Thread(
+                target=create_and_start_and_watch_thread,
+                daemon=True,
+                name=f"{cam}_watchdog",
+                args=[snap, cam, [cam, cameras_config[cam]], 86400],
+            )
+        )
+
+    for t in threads:
         t.start()
 
-    while True:
-        time.sleep(10)
+    time.sleep(20)
 
 
 if __name__ == "__main__":
