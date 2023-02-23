@@ -131,29 +131,18 @@ def main(argv):
         f"Loaded config: server: {server_config} cameras: {cameras_config} global: {global_config}"
     )
 
-    threads = []
-    threads.append(
+    for cam in cameras_config:
         Thread(
             target=create_and_start_and_watch_thread,
             daemon=True,
-            name=f"http_server_watchdog",
-            args=[server_run, "http_server"],
-        )
-    )
-    for cam in cameras_config:
-        threads.append(
-            Thread(
-                target=create_and_start_and_watch_thread,
-                daemon=True,
-                name=f"{cam}_watchdog",
-                args=[snap, cam, [cam, cameras_config[cam]], 86400],
-            )
-        )
+            name=f"{cam}_watchdog",
+            args=[snap, cam, [cam, cameras_config[cam]], 86400],
+        ).start()
 
-    for t in threads:
-        t.start()
-
-    time.sleep(20)
+    server_thread = Thread(target=server_run, daemon=True, name="http_server")
+    logging.info(f"Starting thread {server_thread}")
+    server_thread.start()
+    server_thread.join()
 
 
 if __name__ == "__main__":
