@@ -2,7 +2,7 @@ import sys
 import requests
 import yaml
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
 import pytz
 
@@ -37,7 +37,7 @@ def config_load(config_file_path: str) -> List[Dict]:
 
 
 def get_pic_from_url(url: str) -> Image:
-    r = requests.get(url)
+    r = requests.get(url, timeout=20)
     return Image.open(BytesIO(r.content))
 
 
@@ -48,10 +48,11 @@ def get_interval_from_pic(image1: Image, image2: Image):
             f"Could not get compute the difference between the last 2 pictures"
         )
         return 10
-    logging.debug(f"ssim: {x}")
+    if logging.level_debug():
+        logging.debug(f"ssim: {x}")
     return int(
-        120 * (max(x, 0.5) - 0.45)
-    )  # https://www.wolframalpha.com/input?i=120*%28max%28x%2C0.5%29-0.45%29
+        180 * (max(x, 0.5) - 0.45)
+    )  # https://www.wolframalpha.com/input?i=180*%28max%28x%2C0.5%29-0.45%29
 
 
 def get_pic_fullpath(camera_name: str) -> str:
@@ -67,7 +68,8 @@ def get_pic_fullpath(camera_name: str) -> str:
 
 def write_pic_to_disk(pic: Image, pic_path: str):
     os.makedirs(os.path.dirname(pic_path), exist_ok=True)
-    logging.debug(f"Saving picture {pic_path}")
+    if logging.level_debug():
+        logging.debug(f"Saving picture {pic_path}")
     pic.save(pic_path)
 
 
@@ -78,7 +80,8 @@ def snap(camera_name, camera_config: Dict):
     sleep_interval = 5
     while True:
         write_pic_to_disk(previous_pic, previous_pic_fullpath)
-        logging.debug(f"Sleeping {sleep_interval}s")
+        if logging.level_debug():
+            logging.debug(f"{camera_name}: Sleeping {sleep_interval}s")
         time.sleep(sleep_interval)
         new_pic_fullpath = get_pic_fullpath(camera_name)
         new_pic = get_pic_from_url(url)
@@ -105,15 +108,23 @@ def create_and_start_and_watch_thread(
     f: callable, name: str, arguments: List[str] = [], exp_backoff_limit: int = 0
 ) -> None:
     failure_count = 0
+    last_failure = datetime.now()
     while True:
         running_threads_name = [t.name for t in threading.enumerate()]
 
         if not name in running_threads_name:
             t = Thread(target=f, daemon=False, name=name, args=arguments)
             exp_backoff_delay = min(exp_backoff_limit, 2**failure_count)
+            # If the last failure is more than 90 seconds, reset the failure counter
+            if datetime.now() - last_failure > timedelta(0, 90, 000000):
+                failure_count = 0
             failure_count += 1
+            logging.info(
+                f"Failed {failure_count} times. Restarting the thread {name} in {exp_backoff_delay}s"
+            )
             time.sleep(exp_backoff_delay)
             t.start()
+        time.sleep(1)
 
 
 def main(argv):
@@ -127,9 +138,10 @@ def main(argv):
     server_config, cameras_config, global_config = config_load(FLAGS.config)
     global_config["pic_dir"] = os.path.join(global_config["work_dir"], "photos")
 
-    logging.debug(
-        f"Loaded config: server: {server_config} cameras: {cameras_config} global: {global_config}"
-    )
+    if logging.level_debug():
+        logging.debug(
+            f"Loaded config: server: {server_config} cameras: {cameras_config} global: {global_config}"
+        )
 
     for cam in cameras_config:
         Thread(
