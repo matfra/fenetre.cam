@@ -1,6 +1,6 @@
 ---
 global:
-  timelapse_framerate: 30
+  ffmpeg_options: "-framerate 60 -c:v libvpx-vp9 -b:v 5M"
   work_dir: /Users/me/Photos/camaredn
   work_dir_max_size_GB: 10
   timezone: "America/Los_Angeles"
@@ -12,3 +12,4 @@ cameras:
     url: "http://example.com/cam1.jpg"
   isitfoggy:
     url: "http://isitfoggy.com/photos/latest.jpg"
+    mozjpeg_optimize: True
