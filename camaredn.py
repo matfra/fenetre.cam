@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import sys
 import requests
 import yaml
@@ -6,6 +7,7 @@ from datetime import datetime, timedelta
 import os
 import pytz
 
+from math import exp
 from absl import app
 from absl import flags
 from absl import logging
@@ -20,11 +22,20 @@ import threading
 import http.server
 from functools import partial
 
+# For timelapse
+from collections import deque
+from timelapse import create_timelapse
+
 FLAGS = flags.FLAGS
 
 flags.DEFINE_string("config", None, "path to YAML config file")
 
 flags.mark_flag_as_required("config")
+
+# TODO: Add a CPU profiling tool
+# TODO: Add a PID controller for pic interval with 1 - SSIM as a signal
+# TODO: zone to take the SSIM from
+# TODO: zone to take the sky color from
 
 
 def config_load(config_file_path: str) -> List[Dict]:
@@ -51,17 +62,15 @@ def get_interval_from_pic(image1: Image, image2: Image):
     if logging.level_debug():
         logging.debug(f"ssim: {x}")
     return int(
-        180 * (max(x, 0.5) - 0.45)
-    )  # https://www.wolframalpha.com/input?i=180*%28max%28x%2C0.5%29-0.45%29
+        1.13 * 10**-3 * exp(11.6 * x)
+    )  # https://docs.google.com/spreadsheets/d/1XFxdl1HhEbwvzYwOooycr6lAqiGimR6r5DcT0zpNCbo/edit#gid=0
 
 
-def get_pic_fullpath(camera_name: str) -> str:
+def get_pic_dir_and_filename(camera_name: str) -> str:
     tz = pytz.timezone(global_config["timezone"])
     dt = tz.localize(datetime.now())
-    return os.path.join(
-        global_config["pic_dir"],
-        camera_name,
-        dt.strftime("%Y-%m-%d"),
+    return (
+        os.path.join(global_config["pic_dir"], camera_name, dt.strftime("%Y-%m-%d")),
         dt.strftime("%Y-%m-%dT%H-%M-%S%Z.jpg"),
     )
 
@@ -75,15 +84,23 @@ def write_pic_to_disk(pic: Image, pic_path: str):
 
 def snap(camera_name, camera_config: Dict):
     url = camera_config["url"]
-    previous_pic_fullpath = get_pic_fullpath(camera_name)
+    previous_pic_dir, previous_pic_filename = get_pic_dir_and_filename(camera_name)
+    previous_pic_fullpath = os.path.join(previous_pic_dir, previous_pic_filename)
     previous_pic = get_pic_from_url(url)
     sleep_interval = 5
     while True:
+        # Immediately save the previous pic to disk.
         write_pic_to_disk(previous_pic, previous_pic_fullpath)
         if logging.level_debug():
             logging.debug(f"{camera_name}: Sleeping {sleep_interval}s")
         time.sleep(sleep_interval)
-        new_pic_fullpath = get_pic_fullpath(camera_name)
+        new_pic_dir, new_pic_filename = get_pic_dir_and_filename(camera_name)
+        new_pic_fullpath = os.path.join(new_pic_dir, new_pic_filename)
+
+        if not previous_pic_dir == new_pic_dir:
+            # This is a new day. We can now process the previous day.
+            timelapse_q.append(previous_pic_dir)
+
         new_pic = get_pic_from_url(url)
         if new_pic is None:
             logging.warning(f"{camera_name}: Could not fetch picture from {url}")
@@ -116,7 +133,9 @@ def create_and_start_and_watch_thread(
             t = Thread(target=f, daemon=False, name=name, args=arguments)
             exp_backoff_delay = min(exp_backoff_limit, 2**failure_count)
             # If the last failure is more than 90 seconds, reset the failure counter
-            if datetime.now() - last_failure > timedelta(0, 90, 000000):
+            if datetime.now() - last_failure > timedelta(
+                0, 90, 000000
+            ):  # TODO, instead of using timedelta, switch to a simple consecutive failure system.
                 failure_count = 0
             failure_count += 1
             logging.info(
@@ -143,6 +162,10 @@ def main(argv):
             f"Loaded config: server: {server_config} cameras: {cameras_config} global: {global_config}"
         )
 
+    global timelapse_q
+    timelapse_q = deque()
+    timelapse_q.append("/mnt/ssd/camaredn/photos/w6pw-g3-flex-va/2023-02-24")
+
     for cam in cameras_config:
         Thread(
             target=create_and_start_and_watch_thread,
@@ -154,7 +177,38 @@ def main(argv):
     server_thread = Thread(target=server_run, daemon=True, name="http_server")
     logging.info(f"Starting thread {server_thread}")
     server_thread.start()
-    server_thread.join()
+    #   server_thread.join()
+
+    timelapse_thread = Thread(target=timelapse_loop, daemon=True, name="timelapse_loop")
+    logging.info(f"Starting thread {timelapse_loop}")
+    timelapse_thread.start()
+
+    while True:
+        time.sleep(5)
+
+
+def timelapse_loop():
+    """
+    This is a loop with a blocking Thread to create timelapses one at a time.
+    This prevent overloading the system by creating new daily timelapses for all the cameras at the same time.
+    """
+    while True:
+        if len(timelapse_q) > 0:
+            dir = timelapse_q.popleft()
+            result = False
+            try:
+                create_timelapse(
+                    dir=dir,
+                    overwrite=False,
+                    ffmpeg_options=global_config.get("ffmpeg_options", ""),
+                )
+            except FileExistsError:
+                logging.warning(f"Found an existing timelapse in dir {dir}, Skipping.")
+            if result is False:
+                logging.error(
+                    f"There was an error creating the timelapse for dir: {dir}"
+                )
+        time.sleep(10)
 
 
 if __name__ == "__main__":
