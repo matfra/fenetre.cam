@@ -46,7 +46,7 @@ def config_load(config_file_path: str) -> List[Dict]:
     with open(config_file_path, "r") as f:
         config = yaml.safe_load(f)
         res = []
-        for section in ["server", "cameras", "global"]:
+        for section in ["http_server", "cameras", "global"]:
             res.append(config[section])
         return res
 
@@ -106,7 +106,7 @@ def snap(camera_name, camera_config: Dict):
         write_pic_to_disk(
             previous_pic,
             previous_pic_fullpath,
-            camera_config.get["mozjpeg_optimize", False],
+            camera_config.get("mozjpeg_optimize", False),
         )
         if logging.level_debug():
             logging.debug(f"{camera_name}: Sleeping {sleep_interval}s")
@@ -191,11 +191,10 @@ def main(argv):
             args=[snap, cam, [cam, cameras_config[cam]], 86400],
         ).start()
 
-    # TODO Make the server optional to allow 3rd party prod webserver.
-    server_thread = Thread(target=server_run, daemon=True, name="http_server")
-    logging.info(f"Starting thread {server_thread}")
-    server_thread.start()
-    #   server_thread.join()
+    if server_config.get("enabled", False):
+        server_thread = Thread(target=server_run, daemon=True, name="http_server")
+        logging.info(f"Starting thread {server_thread}")
+        server_thread.start()
 
     timelapse_thread = Thread(target=timelapse_loop, daemon=True, name="timelapse_loop")
     logging.info(f"Starting thread {timelapse_loop}")
