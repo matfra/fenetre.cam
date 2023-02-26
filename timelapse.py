@@ -59,7 +59,7 @@ if __name__ == "__main__":
     flags.DEFINE_bool("overwrite", False, "Overwrite existing timelapse")
     flags.DEFINE_string(
         "ffmpeg_options",
-        "-framerate 30",
+        "-vf format=yuv420p -framerate 30",
         "Options passed directly to FFMPEG between input and output",
     )
     flags.mark_flag_as_required("dir")

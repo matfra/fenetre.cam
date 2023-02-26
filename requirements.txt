@@ -14,3 +14,5 @@ SSIM-PIL
 numpi
 pyopencl
 python-daemon
+#Pictures
+mozjpeg-lossless-optimization

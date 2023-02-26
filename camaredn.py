@@ -26,6 +26,10 @@ from functools import partial
 from collections import deque
 from timelapse import create_timelapse
 
+# Optional MozJPEG opimization
+import mozjpeg_lossless_optimization
+from io import BytesIO
+
 FLAGS = flags.FLAGS
 
 flags.DEFINE_string("config", None, "path to YAML config file")
@@ -75,11 +79,20 @@ def get_pic_dir_and_filename(camera_name: str) -> str:
     )
 
 
-def write_pic_to_disk(pic: Image, pic_path: str):
+def write_pic_to_disk(pic: Image, pic_path: str, optimize: bool = False):
     os.makedirs(os.path.dirname(pic_path), exist_ok=True)
     if logging.level_debug():
         logging.debug(f"Saving picture {pic_path}")
-    pic.save(pic_path)
+    if optimize is True:
+        jpeg_io = BytesIO()
+        pic.convert("RGB").save(jpeg_io, format="JPEG", quality=90)
+        jpeg_io.seek(0)
+        jpeg_bytes = jpeg_io.read()
+        optimized_jpeg_bytes = mozjpeg_lossless_optimization.optimize(jpeg_bytes)
+        with open(pic_path, "wb") as output_file:
+            output_file.write(optimized_jpeg_bytes)
+    else:
+        pic.save(pic_path)
 
 
 def snap(camera_name, camera_config: Dict):
@@ -90,7 +103,11 @@ def snap(camera_name, camera_config: Dict):
     sleep_interval = 5
     while True:
         # Immediately save the previous pic to disk.
-        write_pic_to_disk(previous_pic, previous_pic_fullpath)
+        write_pic_to_disk(
+            previous_pic,
+            previous_pic_fullpath,
+            camera_config.get["mozjpeg_optimize", False],
+        )
         if logging.level_debug():
             logging.debug(f"{camera_name}: Sleeping {sleep_interval}s")
         time.sleep(sleep_interval)
@@ -164,7 +181,7 @@ def main(argv):
 
     global timelapse_q
     timelapse_q = deque()
-    timelapse_q.append("/mnt/ssd/camaredn/photos/w6pw-g3-flex-va/2023-02-24")
+    timelapse_q.append("/mnt/ssd/camaredn/photos/w6pw-g3-flex-va/2023-02-25")
 
     for cam in cameras_config:
         Thread(
@@ -199,8 +216,8 @@ def timelapse_loop():
             try:
                 create_timelapse(
                     dir=dir,
-                    overwrite=False,
-                    ffmpeg_options=global_config.get("ffmpeg_options", ""),
+                    overwrite=True,
+                    ffmpeg_options=global_config.get("ffmpeg_options", "-framerate 30"),
                 )
             except FileExistsError:
                 logging.warning(f"Found an existing timelapse in dir {dir}, Skipping.")
