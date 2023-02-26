@@ -170,6 +170,7 @@ def main(argv):
         "Running under Python {0[0]}.{0[1]}.{0[2]}".format(sys.version_info),
         file=sys.stderr,
     )
+    # TODO: Re-evaluate the globality of these vars
     global server_config, cameras_config, global_config
     server_config, cameras_config, global_config = config_load(FLAGS.config)
     global_config["pic_dir"] = os.path.join(global_config["work_dir"], "photos")
@@ -181,7 +182,6 @@ def main(argv):
 
     global timelapse_q
     timelapse_q = deque()
-    timelapse_q.append("/mnt/ssd/camaredn/photos/w6pw-g3-flex-va/2023-02-25")
 
     for cam in cameras_config:
         Thread(
@@ -191,6 +191,7 @@ def main(argv):
             args=[snap, cam, [cam, cameras_config[cam]], 86400],
         ).start()
 
+    # TODO Make the server optional to allow 3rd party prod webserver.
     server_thread = Thread(target=server_run, daemon=True, name="http_server")
     logging.info(f"Starting thread {server_thread}")
     server_thread.start()
