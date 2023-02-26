@@ -11,7 +11,7 @@ from math import exp
 from absl import app
 from absl import flags
 from absl import logging
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 from PIL import Image
 from io import BytesIO
@@ -122,9 +122,17 @@ def snap(camera_name, camera_config: Dict):
         if new_pic is None:
             logging.warning(f"{camera_name}: Could not fetch picture from {url}")
             continue
-        sleep_interval = get_interval_from_pic(previous_pic, new_pic)
+        if get_ssim_for_area(previous_pic, new_pic, camera_config.get("ssim_area", None)) < camera_config.get("ssim_setpoint", 0.93):
+            sleep_interval -= 2
+        else:
+            sleep_interval += 2
         previous_pic = new_pic
         previous_pic_fullpath = new_pic_fullpath
+
+def get_ssim_for_area(image1: Image, image2: Image, area: Tuple[int])->float:
+    if area is None:
+        return compare_ssim(image1, image2)
+    return compare_ssim(image1.crop(area), image2.crop(area))
 
 
 def server_run():
