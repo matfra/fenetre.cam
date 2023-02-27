@@ -1,34 +1,29 @@
 #!/usr/bin/env python3
-import sys
+import http.server
+import os
+import threading
+import time
+from collections import deque
+from datetime import datetime
+from datetime import timedelta
+from functools import partial
+from io import BytesIO
+from threading import Thread
+from typing import Dict
+from typing import List
+from typing import Tuple
+
+import mozjpeg_lossless_optimization
+import pytz
 import requests
 import yaml
-import time
-from datetime import datetime, timedelta
-import os
-import pytz
-
-from math import exp
 from absl import app
 from absl import flags
 from absl import logging
-from typing import Dict, List, Tuple
-
 from PIL import Image
-from io import BytesIO
 from SSIM_PIL import compare_ssim
 
-from threading import Thread
-import threading
-import http.server
-from functools import partial
-
-# For timelapse
-from collections import deque
 from timelapse import create_timelapse
-
-# Optional MozJPEG opimization
-import mozjpeg_lossless_optimization
-from io import BytesIO
 
 FLAGS = flags.FLAGS
 
@@ -37,9 +32,6 @@ flags.DEFINE_string("config", None, "path to YAML config file")
 flags.mark_flag_as_required("config")
 
 # TODO: Add a CPU profiling tool
-# TODO: Add a PID controller for pic interval with 1 - SSIM as a signal
-# TODO: zone to take the SSIM from
-# TODO: zone to take the sky color from
 
 
 def config_load(config_file_path: str) -> List[Dict]:
@@ -80,12 +72,14 @@ def write_pic_to_disk(pic: Image, pic_path: str, optimize: bool = False):
     else:
         pic.save(pic_path)
 
-def update_latest_link(pic_path:str):
+
+def update_latest_link(pic_path: str):
     cam_dir = os.path.join(os.path.dirname(pic_path), "..")
     tmp_link = os.path.join(cam_dir, "new.jpg")
     latest_link = os.path.join(cam_dir, "latest.jpg")
     os.symlink(pic_path, tmp_link)
     os.rename(tmp_link, latest_link)
+
 
 def snap(camera_name, camera_config: Dict):
     url = camera_config["url"]
@@ -168,9 +162,7 @@ def create_and_start_and_watch_thread(
             t = Thread(target=f, daemon=False, name=name, args=arguments)
             exp_backoff_delay = min(exp_backoff_limit, 2**failure_count)
             # If the last failure is more than 90 seconds, reset the failure counter
-            if datetime.now() - last_failure > timedelta(
-                0, 90, 000000
-            ):  # TODO, instead of using timedelta, switch to a simple consecutive failure system.
+            if datetime.now() - last_failure > timedelta(0, 90, 000000):
                 failure_count = 0
             failure_count += 1
             logging.info(
@@ -184,10 +176,6 @@ def create_and_start_and_watch_thread(
 def main(argv):
     del argv  # Unused.
 
-    print(
-        "Running under Python {0[0]}.{0[1]}.{0[2]}".format(sys.version_info),
-        file=sys.stderr,
-    )
     # TODO: Re-evaluate the globality of these vars
     global server_config, cameras_config, global_config
     server_config, cameras_config, global_config = config_load(FLAGS.config)

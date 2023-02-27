@@ -1,13 +1,13 @@
-import ffmpeg
 import os
-
-import subprocess
 import re
+import subprocess
+from typing import Dict
+from typing import List
 
+import ffmpeg
 from absl import app
 from absl import flags
 from absl import logging
-from typing import Dict, List
 
 
 def create_timelapse(
