@@ -51,23 +51,9 @@ def config_load(config_file_path: str) -> List[Dict]:
         return res
 
 
-def get_pic_from_url(url: str) -> Image:
-    r = requests.get(url, timeout=20)
+def get_pic_from_url(url: str, timeout: int) -> Image:
+    r = requests.get(url, timeout=timeout)
     return Image.open(BytesIO(r.content))
-
-
-def get_interval_from_pic(image1: Image, image2: Image):
-    x = compare_ssim(image1, image2)
-    if not isinstance(x, float):
-        logging.warning(
-            f"Could not get compute the difference between the last 2 pictures"
-        )
-        return 10
-    if logging.level_debug():
-        logging.debug(f"ssim: {x}")
-    return int(
-        1.13 * 10**-3 * exp(11.6 * x)
-    )  # https://docs.google.com/spreadsheets/d/1XFxdl1HhEbwvzYwOooycr6lAqiGimR6r5DcT0zpNCbo/edit#gid=0
 
 
 def get_pic_dir_and_filename(camera_name: str) -> str:
@@ -94,12 +80,19 @@ def write_pic_to_disk(pic: Image, pic_path: str, optimize: bool = False):
     else:
         pic.save(pic_path)
 
+def update_latest_link(pic_path:str):
+    cam_dir = os.path.join(os.path.dirname(pic_path), "..")
+    tmp_link = os.path.join(cam_dir, "new.jpg")
+    latest_link = os.path.join(cam_dir, "latest.jpg")
+    os.symlink(pic_path, tmp_link)
+    os.rename(tmp_link, latest_link)
 
 def snap(camera_name, camera_config: Dict):
     url = camera_config["url"]
+    timeout = camera_config.get("timeout_s", 20)
     previous_pic_dir, previous_pic_filename = get_pic_dir_and_filename(camera_name)
     previous_pic_fullpath = os.path.join(previous_pic_dir, previous_pic_filename)
-    previous_pic = get_pic_from_url(url)
+    previous_pic = get_pic_from_url(url, timeout)
     sleep_interval = 5
     while True:
         # Immediately save the previous pic to disk.
@@ -108,6 +101,7 @@ def snap(camera_name, camera_config: Dict):
             previous_pic_fullpath,
             camera_config.get("mozjpeg_optimize", False),
         )
+        update_latest_link(previous_pic_fullpath)
         if logging.level_debug():
             logging.debug(f"{camera_name}: Sleeping {sleep_interval}s")
         time.sleep(sleep_interval)
@@ -118,21 +112,37 @@ def snap(camera_name, camera_config: Dict):
             # This is a new day. We can now process the previous day.
             timelapse_q.append(previous_pic_dir)
 
-        new_pic = get_pic_from_url(url)
+        new_pic = get_pic_from_url(url, timeout)
         if new_pic is None:
             logging.warning(f"{camera_name}: Could not fetch picture from {url}")
             continue
-        if get_ssim_for_area(previous_pic, new_pic, camera_config.get("ssim_area", None)) < camera_config.get("ssim_setpoint", 0.93):
-            sleep_interval -= 2
+        ssim = get_ssim_for_area(
+            previous_pic, new_pic, camera_config.get("ssim_area", None)
+        )
+        ssim_setpoint = camera_config.get("ssim_setpoint", 0.90)
+        if ssim < ssim_setpoint:
+            sleep_interval = sleep_interval / 2
         else:
             sleep_interval += 2
+        if logging.level_debug():
+            logging.debug(
+                f"{camera_name}: ssim {ssim}, setpoint: {ssim_setpoint}, new sleep interval: {sleep_interval}s"
+            )
         previous_pic = new_pic
         previous_pic_fullpath = new_pic_fullpath
 
-def get_ssim_for_area(image1: Image, image2: Image, area: Tuple[int])->float:
+
+def get_ssim_for_area(image1: Image, image2: Image, area: str) -> float:
     if area is None:
         return compare_ssim(image1, image2)
-    return compare_ssim(image1.crop(area), image2.crop(area))
+    crop_points = [int(i) for i in area.split(",")]
+    logging.debug(f"{crop_points}")
+    return compare_ssim(
+        image1.crop(crop_points).resize(
+            (50, 50)
+        ),  # Resize 50x50 gets rid of the noise at night.
+        image2.crop(crop_points).resize((50, 50)),
+    )
 
 
 def server_run():
