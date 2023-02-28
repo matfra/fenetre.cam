@@ -11,7 +11,6 @@ from io import BytesIO
 from threading import Thread
 from typing import Dict
 from typing import List
-from typing import Tuple
 
 import mozjpeg_lossless_optimization
 import pytz
@@ -74,7 +73,7 @@ def write_pic_to_disk(pic: Image, pic_path: str, optimize: bool = False):
 
 
 def update_latest_link(pic_path: str):
-    cam_dir = os.path.join(os.path.dirname(pic_path), "..")
+    cam_dir = os.path.join(os.path.dirname(pic_path), os.pardir)
     tmp_link = os.path.join(cam_dir, "new.jpg")
     latest_link = os.path.join(cam_dir, "latest.jpg")
     os.symlink(pic_path, tmp_link)
@@ -123,6 +122,7 @@ def snap(camera_name, camera_config: Dict):
                 f"{camera_name}: ssim {ssim}, setpoint: {ssim_setpoint}, new sleep interval: {sleep_interval}s"
             )
         previous_pic = new_pic
+        previous_pic_dir = new_pic_dir
         previous_pic_fullpath = new_pic_fullpath
 
 
