@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import http.server
 import os
+import subprocess
 import threading
 import time
 from collections import deque
@@ -80,15 +81,30 @@ def update_latest_link(pic_path: str):
     os.rename(tmp_link, latest_link)
 
 
+def get_pic_from_local_command(cmd: str, timeout_s: int) -> Image:
+    s = subprocess.run(cmd.split(" "), stdout=subprocess.PIPE, timeout=timeout_s)
+    return Image.open(BytesIO(s.stdout))
+
+
 def snap(camera_name, camera_config: Dict):
-    url = camera_config["url"]
+    url = camera_config.get("url")
     timeout = camera_config.get("timeout_s", 20)
+    local_command = camera_config.get("local_command")
+
+    def capture() -> Image:
+        if url is not None:
+            return get_pic_from_url(url, timeout)
+        if local_command is not None:
+            return get_pic_from_local_command(local_command, timeout)
+
     previous_pic_dir, previous_pic_filename = get_pic_dir_and_filename(camera_name)
     previous_pic_fullpath = os.path.join(previous_pic_dir, previous_pic_filename)
-    previous_pic = get_pic_from_url(url, timeout)
+    previous_pic = capture()
     fixed_snap_interval = camera_config.get("snap_interval_s", None)
     if not camera_name in sleep_intervals:
-        sleep_intervals[camera_name] = 10 if fixed_snap_interval is None else fixed_snap_interval #Start at 10 unless manually specified
+        sleep_intervals[camera_name] = (
+            10 if fixed_snap_interval is None else fixed_snap_interval
+        )  # Start at 10 unless manually specified
     while True:
         # Immediately save the previous pic to disk.
         write_pic_to_disk(
@@ -107,22 +123,22 @@ def snap(camera_name, camera_config: Dict):
             # This is a new day. We can now process the previous day.
             timelapse_q.append(previous_pic_dir)
 
-        new_pic = get_pic_from_url(url, timeout)
+        new_pic = capture()
         if new_pic is None:
             logging.warning(f"{camera_name}: Could not fetch picture from {url}")
             continue
-        if fixed_snap_interval is None: 
+        if fixed_snap_interval is None:
             ssim = get_ssim_for_area(
                 previous_pic, new_pic, camera_config.get("ssim_area", None)
             )
             ssim_setpoint = camera_config.get("ssim_setpoint", 0.90)
             if ssim < ssim_setpoint:
                 # We need to capture more frequently to get interesting things.
-                #sleep_intervals[camera_name] -= 100*(ssim_setpoint-ssim)
-                sleep_intervals[camera_name] = max(0, sleep_intervals[camera_name]-1)
+                # sleep_intervals[camera_name] -= 100*(ssim_setpoint-ssim)
+                sleep_intervals[camera_name] = max(0, sleep_intervals[camera_name] - 1)
             else:
                 # We slow down the pace progressively (to make the timelapse less boring)
-                #sleep_intervals[camera_name] += 2
+                # sleep_intervals[camera_name] += 2
                 sleep_intervals[camera_name] += 1
             if logging.level_debug():
                 logging.debug(
@@ -163,12 +179,11 @@ def create_and_start_and_watch_thread(
     failure_count = 0
     last_failure = datetime.now()
     global sleep_intervals
-    sleep_intervals={} # Store the sleep time outside of the thread (which can die)
+    sleep_intervals = {}  # Store the sleep time outside of the thread (which can die)
     while True:
         running_threads_name = [t.name for t in threading.enumerate()]
 
         if not name in running_threads_name:
-            
             t = Thread(target=f, daemon=False, name=name, args=arguments)
             exp_backoff_delay = min(exp_backoff_limit, 2**failure_count)
             # If the last failure is more than 90 seconds, reset the failure counter

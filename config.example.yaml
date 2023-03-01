@@ -1,6 +1,5 @@
----
 global:
-  ffmpeg_options: "-framerate 60 -c:v libvpx-vp9 -b:v 5M"
+  ffmpeg_options: "-framerate 30 -c:v libvpx-vp9 -b:v 5M"
   work_dir: /Users/me/Photos/camaredn
   work_dir_max_size_GB: 10
   timezone: "America/Los_Angeles"
@@ -8,8 +7,23 @@ server:
   port: 8888
   host: 0.0.0.0
 cameras:
-  cam1:
-    url: "http://example.com/cam1.jpg"
-  isitfoggy:
-    url: "http://isitfoggy.com/photos/latest.jpg"
-    mozjpeg_optimize: True
+  a-cool-http-cam-with-clouds:
+    url: "https://isitfoggy.com/photos/latest.jpg"
+    sky_area: 0,80,1920,400
+    # In order to fast forward the boring days and capture the beautiful sky motion,
+    # we can calculate a dynamic interval based on the difference between the last 2 pictures.
+    ssim_area: 0,80,1920,700
+    ssim_setpoint: 0.93
+    timeout_s: 20 # Default value is not specified
+  a-boring-cam:
+    url: "http://boring.example.com/pic.jpg"
+    sky_area: 1200,0,1920,300 #Top right sky corner only
+    #If defined, overrides all the ssim based settings.
+    snap_interval_s: 45
+  a-video-feed:
+    #Need to output a jpeg file on stdout (stderr can still output other things)
+    local_command: "ffmpeg -hide_banner -loglevel warning -i http://video.feed.url.cool.com:8081/ -frames:v 1 -q:v 2 -f singlejpeg -"
+    # resolution: 1056 × 704
+    sky_area: 0,0,1056,300
+    ssim_area: 0,0,1056,300
+    ssim_setpoint: 0.90
