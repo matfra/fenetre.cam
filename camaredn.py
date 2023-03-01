@@ -86,7 +86,9 @@ def snap(camera_name, camera_config: Dict):
     previous_pic_dir, previous_pic_filename = get_pic_dir_and_filename(camera_name)
     previous_pic_fullpath = os.path.join(previous_pic_dir, previous_pic_filename)
     previous_pic = get_pic_from_url(url, timeout)
-    sleep_interval = 5
+    fixed_snap_interval = camera_config.get("snap_interval_s", None)
+    if not camera_name in sleep_intervals:
+        sleep_intervals[camera_name] = 10 if fixed_snap_interval is None else fixed_snap_interval #Start at 10 unless manually specified
     while True:
         # Immediately save the previous pic to disk.
         write_pic_to_disk(
@@ -96,8 +98,8 @@ def snap(camera_name, camera_config: Dict):
         )
         update_latest_link(previous_pic_fullpath)
         if logging.level_debug():
-            logging.debug(f"{camera_name}: Sleeping {sleep_interval}s")
-        time.sleep(sleep_interval)
+            logging.debug(f"{camera_name}: Sleeping {sleep_intervals[camera_name]}s")
+        time.sleep(sleep_intervals[camera_name])
         new_pic_dir, new_pic_filename = get_pic_dir_and_filename(camera_name)
         new_pic_fullpath = os.path.join(new_pic_dir, new_pic_filename)
 
@@ -109,18 +111,23 @@ def snap(camera_name, camera_config: Dict):
         if new_pic is None:
             logging.warning(f"{camera_name}: Could not fetch picture from {url}")
             continue
-        ssim = get_ssim_for_area(
-            previous_pic, new_pic, camera_config.get("ssim_area", None)
-        )
-        ssim_setpoint = camera_config.get("ssim_setpoint", 0.90)
-        if ssim < ssim_setpoint:
-            sleep_interval = sleep_interval / 2
-        else:
-            sleep_interval += 2
-        if logging.level_debug():
-            logging.debug(
-                f"{camera_name}: ssim {ssim}, setpoint: {ssim_setpoint}, new sleep interval: {sleep_interval}s"
+        if fixed_snap_interval is None: 
+            ssim = get_ssim_for_area(
+                previous_pic, new_pic, camera_config.get("ssim_area", None)
             )
+            ssim_setpoint = camera_config.get("ssim_setpoint", 0.90)
+            if ssim < ssim_setpoint:
+                # We need to capture more frequently to get interesting things.
+                #sleep_intervals[camera_name] -= 100*(ssim_setpoint-ssim)
+                sleep_intervals[camera_name] = max(0, sleep_intervals[camera_name]-1)
+            else:
+                # We slow down the pace progressively (to make the timelapse less boring)
+                #sleep_intervals[camera_name] += 2
+                sleep_intervals[camera_name] += 1
+            if logging.level_debug():
+                logging.debug(
+                    f"{camera_name}: ssim {ssim}, setpoint: {ssim_setpoint}, new sleep interval: {sleep_intervals[camera_name]}s"
+                )
         previous_pic = new_pic
         previous_pic_dir = new_pic_dir
         previous_pic_fullpath = new_pic_fullpath
@@ -155,10 +162,13 @@ def create_and_start_and_watch_thread(
 ) -> None:
     failure_count = 0
     last_failure = datetime.now()
+    global sleep_intervals
+    sleep_intervals={} # Store the sleep time outside of the thread (which can die)
     while True:
         running_threads_name = [t.name for t in threading.enumerate()]
 
         if not name in running_threads_name:
+            
             t = Thread(target=f, daemon=False, name=name, args=arguments)
             exp_backoff_delay = min(exp_backoff_limit, 2**failure_count)
             # If the last failure is more than 90 seconds, reset the failure counter
