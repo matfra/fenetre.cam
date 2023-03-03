@@ -135,11 +135,11 @@ def snap(camera_name, camera_config: Dict):
             if ssim < ssim_setpoint:
                 # We need to capture more frequently to get interesting things.
                 # sleep_intervals[camera_name] -= 100*(ssim_setpoint-ssim)
-                sleep_intervals[camera_name] = max(0, sleep_intervals[camera_name] - 1)
+                sleep_intervals[camera_name] = sleep_intervals[camera_name] * 0.9
             else:
                 # We slow down the pace progressively (to make the timelapse less boring)
                 # sleep_intervals[camera_name] += 2
-                sleep_intervals[camera_name] += 1
+                sleep_intervals[camera_name] += 0.5
             if logging.level_debug():
                 logging.debug(
                     f"{camera_name}: ssim {ssim}, setpoint: {ssim_setpoint}, new sleep interval: {sleep_intervals[camera_name]}s"
