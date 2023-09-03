@@ -193,6 +193,7 @@ def create_and_start_and_watch_thread(
             logging.info(
                 f"Failed {failure_count} times. Restarting the thread {name} in {exp_backoff_delay}s"
             )
+            last_failure = datetime.now()
             time.sleep(exp_backoff_delay)
             t.start()
         time.sleep(1)
@@ -249,6 +250,9 @@ def timelapse_loop():
                     dir=dir,
                     overwrite=True,
                     ffmpeg_options=global_config.get("ffmpeg_options", "-framerate 30"),
+                    two_pass=global_config.get("ffmpeg_2pass", False),
+                    file_ext=global_config.get("timelapse_file_extension", "mp4"),
+                    tmp_dir=global_config.get("tmp_dir")
                 )
             except FileExistsError:
                 logging.warning(f"Found an existing timelapse in dir {dir}, Skipping.")
