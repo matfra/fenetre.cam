@@ -39,7 +39,7 @@ def create_day_band(pic_dir: str, sky_area: str) -> bool:
     logging.debug(f"Crop zone of ({left},{top}),({right},{bottom})")
 
     minute = 0
-    #TODO(feature) Start with the previous day's last pixel
+    # TODO(feature) Start with the previous day's last pixel
     last_pixel_rgb_bytes = b"\x00\x00\x00"  # Start with an almost black pixel
     dayband = bytearray()
     previous_pic_minute = -1
@@ -85,12 +85,18 @@ def create_day_band(pic_dir: str, sky_area: str) -> bool:
 
 def create_month_band(main_pic_dir: str, yearmonth: Tuple[int]) -> str:
     """Aggregates all the day bands from a given month"""
-    day=1
+    day = 1
     year, month = yearmonth
     date_tracker = datetime(year=year, month=month, day=day)
+    month_string = date_tracker.strftime("%m")
     monthband = bytearray()
-    last_day_rgb_bytes=Image.new(size=(1, 1440), color=(0, 0, 0), mode="RGB").tobytes()
-    for dayband_path in glob.glob(os.path.join(main_pic_dir, "*", "daylight.png")):
+    last_day_rgb_bytes = Image.new(
+        size=(1, 1440), color=(0, 0, 0), mode="RGB"
+    ).tobytes()
+    for dayband_path in glob.glob(
+        os.path.join(main_pic_dir, f"{year}-{month_string}-*", "daylight.png")
+    ):
+        logging.info(f"Aggregating: {dayband_path}")
         pic_day = int(os.path.dirname(dayband_path).split("-")[-1])
         while pic_day > day:
             monthband += last_day_rgb_bytes
@@ -102,14 +108,14 @@ def create_month_band(main_pic_dir: str, yearmonth: Tuple[int]) -> str:
             if date_tracker.month > month:
                 break
         # We found a data for the month
-        monthband+=Image.open(dayband_path).tobytes()
+        monthband += Image.open(dayband_path).tobytes()
 
-    img = Image.frombytes(size=(day, 1440), data=bytes(monthband), mode="RGB")
-    month_string=date_tracker.strftime("%m")
+    img = Image.frombytes(size=(1440, day), data=bytes(monthband), mode="RGB")
+
     if not os.path.exists(os.path.join(main_pic_dir, "daylight")):
         os.makedirs(os.path.join(main_pic_dir, "daylight"), exist_ok=True)
-    img.save(os.path.join(main_pic_dir, "daylight", f"{year}-{month_string}.png"))        
-
+    a = img.rotate(90, expand=True)
+    a.save(os.path.join(main_pic_dir, "daylight", f"{year}-{month_string}.png"))
 
 
 def iso_day_to_dt(d: str) -> datetime:
@@ -119,24 +125,27 @@ def iso_day_to_dt(d: str) -> datetime:
 def main(argv):
     del argv  # Unused.
     current_day, end_day = map(iso_day_to_dt, FLAGS.range_days.split(","))
-    created_daybands_for_yearmonths=[]
+    created_daybands_for_yearmonths = []
     while current_day <= end_day:
         current_yearmonth = (current_day.year, current_day.month)
         pic_dir = os.path.join(FLAGS.dir, current_day.strftime("%Y-%m-%d"))
         if not os.path.exists(pic_dir):
-            logging.warning(f"{current_day}: Skipping non-existent directory: {pic_dir}.")
+            logging.warning(
+                f"{current_day}: Skipping non-existent directory: {pic_dir}."
+            )
             current_day += timedelta(days=1)
             continue
-        if not os.path.exists(os.path.join(pic_dir, "daylight.png")) and FLAGS.overwrite is False:
+        if (
+            not os.path.exists(os.path.join(pic_dir, "daylight.png"))
+            and FLAGS.overwrite is False
+        ):
             logging.info(f"{current_day}: Creating dayband.")
-            create_day_band(
-                pic_dir, FLAGS.sky_area
-            )
-            if not current_yearmonth in created_daybands_for_yearmonths:
-                created_daybands_for_yearmonths.append(current_yearmonth)
+            create_day_band(pic_dir, FLAGS.sky_area)
         else:
             logging.info(f"Not overwriting " + os.path.join(pic_dir, "daylight.png"))
         current_day += timedelta(days=1)
+        if not current_yearmonth in created_daybands_for_yearmonths:
+            created_daybands_for_yearmonths.append(current_yearmonth)
         current_yearmonth = (current_day.year, current_day.month)
 
     for yearmonth in created_daybands_for_yearmonths:
