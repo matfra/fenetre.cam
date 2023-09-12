@@ -24,14 +24,14 @@ from PIL import Image
 from SSIM_PIL import compare_ssim
 
 from timelapse import create_timelapse
+from daylight import run_end_of_day
 
 FLAGS = flags.FLAGS
 
 flags.DEFINE_string("config", None, "path to YAML config file")
 
 flags.mark_flag_as_required("config")
-
-# TODO: Add a CPU profiling tool
+DEFAULT_SKY_AREA = "100,0,400,50"
 
 
 def config_load(config_file_path: str) -> List[Dict]:
@@ -59,7 +59,7 @@ def get_pic_dir_and_filename(camera_name: str) -> str:
 
 def write_pic_to_disk(pic: Image, pic_path: str, optimize: bool = False):
     os.makedirs(os.path.dirname(pic_path), exist_ok=True)
-    os.chmod(os.path.dirname(pic_path), 33277) # rwxrwxr-x
+    os.chmod(os.path.dirname(pic_path), 33277)  # rwxrwxr-x
     if logging.level_debug():
         logging.debug(f"Saving picture {pic_path}")
     if optimize is True:
@@ -109,9 +109,9 @@ def snap(camera_name, camera_config: Dict):
         sleep_intervals[camera_name] = (
             10 if fixed_snap_interval is None else fixed_snap_interval
         )  # Start at 10 unless manually specified
-    
+
     # daylight_metadata is a map of picture filename and their average sky color
-    daylight_metadata={}
+    daylight_metadata = {}
 
     # Capture loop
     while True:
@@ -131,7 +131,13 @@ def snap(camera_name, camera_config: Dict):
         if not previous_pic_dir == new_pic_dir:
             # This is a new day. We can now process the previous day.
             timelapse_q.append(previous_pic_dir)
-            daylight_q.append(previous_pic_dir)
+            daylight_q.append(
+                (
+                    camera_name,
+                    previous_pic_dir,
+                    camera_config.get("sky_area", DEFAULT_SKY_AREA),
+                )
+            )
 
         new_pic = capture()
         if new_pic is None:
@@ -222,10 +228,9 @@ def main(argv):
             f"Loaded config: server: {server_config} cameras: {cameras_config} global: {global_config}"
         )
 
-    global timelapse_q,daylight_q
+    global timelapse_q, daylight_q
     timelapse_q = deque()
     daylight_q = deque()
-
 
     for cam in cameras_config:
         Thread(
@@ -243,6 +248,10 @@ def main(argv):
     timelapse_thread = Thread(target=timelapse_loop, daemon=True, name="timelapse_loop")
     logging.info(f"Starting thread {timelapse_loop}")
     timelapse_thread.start()
+
+    daylight_thread = Thread(target=daylight_loop, daemon=True, name="daylight_loop")
+    logging.info(f"Starting thread {daylight_loop}")
+    daylight_thread.start()
 
     while True:
         time.sleep(5)
@@ -264,7 +273,7 @@ def timelapse_loop():
                     ffmpeg_options=global_config.get("ffmpeg_options", "-framerate 30"),
                     two_pass=global_config.get("ffmpeg_2pass", False),
                     file_ext=global_config.get("timelapse_file_extension", "mp4"),
-                    tmp_dir=global_config.get("tmp_dir")
+                    tmp_dir=global_config.get("tmp_dir"),
                 )
             except FileExistsError:
                 logging.warning(f"Found an existing timelapse in dir {dir}, Skipping.")
@@ -272,6 +281,20 @@ def timelapse_loop():
                 logging.error(
                     f"There was an error creating the timelapse for dir: {dir}"
                 )
+        time.sleep(10)
+
+
+def daylight_loop():
+    """
+    This is a loop generating the daylight bands, one at a time.
+    """
+    while True:
+        if len(daylight_q) > 0:
+            camera_name, daily_pic_dir, sky_area = daylight_q.popleft()
+            logging.info(
+                f"Running daylight in {daily_pic_dir} with sky_area {sky_area}"
+            )
+            run_end_of_day(camera_name, daily_pic_dir, sky_area)
         time.sleep(10)
 
 
