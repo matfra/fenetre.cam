@@ -61,6 +61,7 @@ def main(argv):
             daydir = os.path.join(camera_dir, subdirectory)
             # Check if the subdirectory contains a file named archived.
             if os.path.isfile(os.path.join(daydir, "archived")):
+                logging.info(f"{daydir} is already archived: ")
                 # Continue to the next subdirectory.
                 continue
 

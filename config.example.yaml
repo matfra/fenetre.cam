@@ -13,6 +13,7 @@ cameras:
     sky_area: 0,80,1920,400
     # In order to fast forward the boring days and capture the beautiful sky motion,
     # we can calculate a dynamic interval based on the difference between the last 2 pictures.
+    # try to grab the biggest area containing things not susceptible to the wind like shaking tree.
     ssim_area: 0,80,1920,700
     ssim_setpoint: 0.93
     timeout_s: 20 # Default value is not specified

@@ -70,7 +70,7 @@ def apply_average_color_to_monthly_directory(directory: str, area: Tuple[int]):
 
 def get_minute_of_day_from_filename(filename: str) -> int:
     """This is pretty bad. I'm so sorry. It will return the minute of the day, from 0 to 1439 based on the filename assuming the hour is the 7 and 8 digit and the minute is 9 and 10th."""
-    a = re.match("\d{4}[^\d]*\d{2}[^\d]*\d{2}[^\d]*(\d{2})[^\d]*(\d{2})", filename)
+    a = re.match(r"\d{4}[^\d]*\d{2}[^\d]*\d{2}[^\d]*(\d{2})[^\d]*(\d{2})", filename)
     try:
         hours, minutes = map(int, a.groups())
     except AttributeError:

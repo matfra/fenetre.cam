@@ -50,7 +50,7 @@ def get_pic_from_url(url: str, timeout: int) -> Image:
 
 def get_pic_dir_and_filename(camera_name: str) -> str:
     tz = pytz.timezone(global_config["timezone"])
-    dt = tz.localize(datetime.now())
+    dt = datetime.now(tz)
     return (
         os.path.join(global_config["pic_dir"], camera_name, dt.strftime("%Y-%m-%d")),
         dt.strftime("%Y-%m-%dT%H-%M-%S%Z.jpg"),
@@ -78,7 +78,8 @@ def update_latest_link(pic_path: str):
     cam_dir = os.path.join(os.path.dirname(pic_path), os.pardir)
     tmp_link = os.path.join(cam_dir, "new.jpg")
     latest_link = os.path.join(cam_dir, "latest.jpg")
-    os.symlink(pic_path, tmp_link)
+    relative_path = os.path.relpath(pic_path, cam_dir)
+    os.symlink(relative_path, tmp_link)
     os.rename(tmp_link, latest_link)
 
 

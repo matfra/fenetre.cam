@@ -16,3 +16,5 @@ pyopencl
 python-daemon
 #Pictures
 mozjpeg-lossless-optimization
+opencv-python
+siphash24

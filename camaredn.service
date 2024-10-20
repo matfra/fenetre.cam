@@ -1,0 +1,12 @@
+[Unit]
+Description=Fetch images and build timelapses
+
+[Service]
+ExecStart=/home/mathieu/srv/camaredn/venv/bin/python /home/mathieu/srv/camaredn/camaredn.py --config=/home/mathieu/srv/camaredn/config.yaml
+User=camaredn
+Restart=always
+Environment=TZ=America/Los_Angeles
+
+[Install]
+WantedBy=multi-user.target
+Alias=canaredn.service
