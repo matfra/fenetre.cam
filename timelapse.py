@@ -54,11 +54,11 @@ def create_timelapse(
         ffmpeg_cmd_first_pass.append(timelapse_filepath)
         ffmpeg_cmd.append("2")
         #ffmpeg_cmd_first_pass.extend("-an -f null /dev/null".split(" "))
-        logging.info("Running FFmpeg first pass: {}".format(" ".join(ffmpeg_cmd_first_pass)))
+        logging.info("Running ffmpeg first pass: {}".format(" ".join(ffmpeg_cmd_first_pass)))
         subprocess.run(ffmpeg_cmd_first_pass, cwd=tmp_dir)
 
     ffmpeg_cmd.append(timelapse_filepath)
-    logging.info("Running {}".format(" ".join(ffmpeg_cmd)))
+    logging.info("Running ffmpeg second pass: {}".format(" ".join(ffmpeg_cmd)))
     subprocess.run(ffmpeg_cmd, cwd=tmp_dir)
 
     return os.path.exists(timelapse_filepath)
