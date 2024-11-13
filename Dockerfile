@@ -17,7 +17,7 @@ COPY requirements.txt /app/
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the local files into the container
-COPY camaredn.py timelapse.py daylight.py archive.py /app/
+COPY camaredn.py timelapse.py daylight.py archive.py index.html /app/
 
 # Set entrypoint to allow dynamic config.yaml file specification
 ENTRYPOINT ["python", "camaredn.py", "--config"]

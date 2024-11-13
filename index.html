@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>CamAREDN</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <style>
+        #map { height: 600px; width: 100%; }
+        .thumbnail-icon {
+            width: 160px;
+            height: 90px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+        }
+        body {
+            background-color: black;
+            color: white; /* Optional: Set text color to white for better visibility */
+        }
+    </style>
+</head>
+<body>
+    <h1>CamAREDN Map</h1>
+    <div id="map"></div>
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script>
+        // Initialize the map with a temporary center and zoom level
+        var map = L.map('map').setView([0, 0], 2);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 18,
+        }).addTo(map);
+
+        // Function to load cameras from JSON and add thumbnails as markers
+        function loadCameras() {
+            fetch('cameras.json')
+                .then(response => response.json())
+                .then(cameras => {
+                    // Clear existing markers
+                    map.eachLayer(function(layer) {
+                        if (layer instanceof L.Marker) {
+                            map.removeLayer(layer);
+                        }
+                    });
+
+                    // Create an array to store LatLng objects for fitting bounds
+                    var cameraLatLngs = [];
+
+                    // Add new markers with thumbnail icons
+                    cameras.forEach(function(camera) {
+                        var latLng = [camera.lat, camera.lon];
+                        cameraLatLngs.push(latLng);
+
+                        // Create a custom icon using the camera image
+                        var thumbnailIcon = L.icon({
+                            iconUrl: camera.image,
+                            iconSize: [160, 90], // set thumbnail size to 160x90
+                            className: 'thumbnail-icon'
+                        });
+
+                        // Add marker with custom icon to map and bind a popup with title and link
+                        var marker = L.marker(latLng, { icon: thumbnailIcon }).addTo(map);
+                        marker.bindPopup(
+                            `<b>${camera.title}</b><br><a href="${camera.url}" target="_blank">View Camera Directory</a>`
+                        );
+
+                        marker.on('click', function() {
+                            marker.openPopup(); // Open popup on click
+                        });
+                    });
+
+                    // Calculate the map bounds to fit all cameras
+                    if (cameraLatLngs.length > 0) {
+                        var bounds = L.latLngBounds(cameraLatLngs);
+                        map.fitBounds(bounds, { padding: [50, 50] }); // Adds padding around the markers
+                    }
+                })
+                .catch(error => console.error('Error loading cameras:', error));
+        }
+
+        // Load cameras initially and then every minute
+        loadCameras();
+        setInterval(loadCameras, 60000); // 60000 ms = 1 minute
+    </script>
+</body>
+</html>

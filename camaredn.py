@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 import http.server
+import json
 import os
+import shutil
 import subprocess
 import threading
 import time
@@ -215,6 +217,38 @@ def create_and_start_and_watch_thread(
             t.start()
         time.sleep(1)
 
+def link_html_file(work_dir: str):
+    current_dir = os.getcwd()
+    shutil.copy(os.path.join(current_dir, "index.html"), os.path.join(work_dir, "index.html"))
+
+def update_cameras_metadata(cameras_configs: Dict, work_dir: str):
+    """ cameras.json is a public file describing info about the cameras used to power the map view.
+    We add to this file, never delete, but we do update the cameras if their info (i.e. coordinates) changed.
+    """
+
+    updated_cameras_metadata = []
+
+    json_filepath = os.path.join(work_dir, "cameras.json")
+    with open(json_filepath, 'r') as json_file:
+        cameras_public_metadata = json.load(json_file)
+
+        for camera_metadata in cameras_public_metadata:
+            if camera_metadata['title'] not in cameras_config:
+                logging.warning(f"Camera {camera_metadata['title']} is not configured anymore. Delete it from {json_filepath} manually if you want to.")
+                updated_cameras_metadata.append(camera_metadata)
+
+    for cam in cameras_config:
+        metadata={}
+        metadata['title'] = cam
+        metadata['url'] = os.path.join( 'photos', cam)
+        metadata['image'] = os.path.join( 'photos', cam, 'latest.jpg')
+        metadata['lat'] = cameras_config[cam].get('lat', None)
+        metadata['lon'] = cameras_config[cam].get('lon', None)
+        updated_cameras_metadata.append(metadata)
+
+    with open(json_filepath, 'w') as json_file:
+        json.dump(updated_cameras_metadata, json_file, indent=4)
+
 
 def main(argv):
     del argv  # Unused.
@@ -232,6 +266,10 @@ def main(argv):
     global timelapse_q, daylight_q
     timelapse_q = deque()
     daylight_q = deque()
+
+    # HTML Interface
+    link_html_file(global_config["work_dir"])
+    update_cameras_metadata(cameras_config, global_config["work_dir"])
 
     for cam in cameras_config:
         Thread(
