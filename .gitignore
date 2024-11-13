@@ -2,3 +2,4 @@ data
 config.yaml
 venv
 *.pyc
+ssl
