@@ -5,11 +5,20 @@ services:
       dockerfile: Dockerfile
     container_name: camaredn_app
     shm_size: '256m'
+    devices:
+      - /dev/dri/renderD128:/dev/dri/renderD128
+      - /dev/dri/card1:/dev/dri/card1
+    group_add:
+      - video # For Intel OpenCL
+      - 993 # render
+        #      - render # For Intel OpenCL
     volumes:
       # Mount the local config.yaml to the container's /app/config.yaml
       - ./config.yaml:/app/config.yaml
       # Mount the local directory /srv/camaredn/data to /app/data in the container
       - /srv/camaredn/data:/app/data
+      # OpenCL
+      - /etc/OpenCL/vendors:/etc/OpenCL/vendors
     command: /app/config.yaml
   nginx:
     image: nginx:alpine
