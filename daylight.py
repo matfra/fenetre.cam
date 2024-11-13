@@ -181,12 +181,11 @@ def concatenate_daily_images_into_monthly_image(
         # Concatenate the daily image to the monthly image.
         monthly_image = np.concatenate((monthly_image, daily_image), axis=1)
 
-    
-    daylight_path=os.path.join(main_pic_dir, "daylight")
+    daylight_path = os.path.join(main_pic_dir, "daylight")
     if not os.path.exists(daylight_path):
         os.mkdir(daylight_path)
-                          
-    output_path=os.path.join(daylight_path, f"{year}-{month_string}.png")
+
+    output_path = os.path.join(daylight_path, f"{year}-{month_string}.png")
 
     logging.info(f"Writing {output_path}")
 
@@ -207,14 +206,26 @@ def run_end_of_day(camera_name, pic_dir, sky_area):
     create_day_band(pic_dir, tuple(map(int, sky_area.split(","))))
     year, month, day = os.path.split(pic_dir)[-1].split("-")
     yearmonth = (int(year), int(month))
-    return concatenate_daily_images_into_monthly_image(os.path.join(pic_dir, ".."), yearmonth)
+    return concatenate_daily_images_into_monthly_image(
+        os.path.join(pic_dir, ".."), yearmonth
+    )
+
 
 def main(argv):
     del argv  # Unused.
     start_day, end_day = map(iso_day_to_dt, FLAGS.range_days.split(","))
-    generate_bands_for_time_range(start_day, end_day, FLAGS.dir, FLAGS.sky_area, FLAGS.overwrite)
+    generate_bands_for_time_range(
+        start_day, end_day, FLAGS.dir, FLAGS.sky_area, FLAGS.overwrite
+    )
 
-def generate_bands_for_time_range(start_day:datetime, end_day:datetime, camera_dir: str, sky_area_str:str , overwrite: bool):
+
+def generate_bands_for_time_range(
+    start_day: datetime,
+    end_day: datetime,
+    camera_dir: str,
+    sky_area_str: str,
+    overwrite: bool,
+):
     current_day = start_day
     created_daybands_for_yearmonths = []
     while current_day <= end_day:
@@ -231,7 +242,7 @@ def generate_bands_for_time_range(start_day:datetime, end_day:datetime, camera_d
             or overwrite is True
         ):
             logging.info(f"{current_day}: Creating dayband.")
-            left, top, right, bottom = map(int, sky_area_str.split(','))
+            left, top, right, bottom = map(int, sky_area_str.split(","))
             logging.debug(f"Crop zone of ({left},{top}),({right},{bottom})")
             sky_area = (left, top, right, bottom)
             create_day_band(pic_dir, sky_area)
@@ -244,8 +255,12 @@ def generate_bands_for_time_range(start_day:datetime, end_day:datetime, camera_d
 
     for yearmonth in created_daybands_for_yearmonths:
         logging.info(f"{yearmonth}: Creating monthband.")
-        month_png_path = concatenate_daily_images_into_monthly_image(camera_dir, yearmonth)
-        generate_month_html(monthband_path=month_png_path , camera_name=os.path.basename(camera_dir))
+        month_png_path = concatenate_daily_images_into_monthly_image(
+            camera_dir, yearmonth
+        )
+        generate_month_html(
+            monthband_path=month_png_path, camera_name=os.path.basename(camera_dir)
+        )
         generate_html_browser(camera_dir=camera_dir)
 
 
@@ -284,7 +299,7 @@ def generate_html_browser(camera_dir: str):
     """
 
     # Camera name should be the name of the directory
-    camera_name= os.path.basename(camera_dir)
+    camera_name = os.path.basename(camera_dir)
 
     # Build the list of all daylight monthly files
     daylight_monthly_bands = glob.glob(os.path.join(camera_dir, "*.png"))
@@ -292,7 +307,8 @@ def generate_html_browser(camera_dir: str):
     # Generate the HTML
     HTML_FILE = os.path.join(camera_dir, "daylight.html")
     with open(HTML_FILE, "w") as f:
-        f.write("""
+        f.write(
+            """
         <!DOCTYPE html>
         <html>
         <head>
@@ -351,25 +367,31 @@ def generate_html_browser(camera_dir: str):
         </head>
         <body>
             <div class="right">
-                """)
+                """
+        )
 
         for i in range(24):
-            f.write(f"""
+            f.write(
+                f"""
                 <div class="timebox{(i % 2) + 1}">{i % 12} AM</div>
-                """)
+                """
+            )
 
-        f.write("""
+        f.write(
+            """
             </div>
             <div class="bands">
-            """)
+            """
+        )
 
         for month_band in daylight_monthly_bands:
-            month_band_nopath=os.path.basename(month_band)
+            month_band_nopath = os.path.basename(month_band)
             width = cv2.imread(month_band).shape[0]
             year_month = month_band.split(".")[0]
             month_pretty_name = get_month_pretty_name_html(year_month)
 
-            f.write(f"""
+            f.write(
+                f"""
                 <div class="band" style="flex-grow:{width};">
                     <div class="band_img_and_link">
                         <a class="month_link" href="{year_month}.html">
@@ -378,21 +400,23 @@ def generate_html_browser(camera_dir: str):
                     </div>
                     <div class="month"><p>{month_pretty_name}</p></div>
                 </div>
-                """)
+                """
+            )
 
-        f.write("""
+        f.write(
+            """
             </div>
         </body>
         </html>
-        """)
+        """
+        )
 
 
-def get_month_pretty_name_html(year_month:str) -> str:
-    datetime.strptime(
-                year_month , "%Y-%m"
-            ).strftime("%b<br>%Y")
+def get_month_pretty_name_html(year_month: str) -> str:
+    datetime.strptime(year_month, "%Y-%m").strftime("%b<br>%Y")
 
-def generate_month_html(monthband_path:str, camera_name:str):
+
+def generate_month_html(monthband_path: str, camera_name: str):
     """Generates an HTML page for the specified month.
 
     Stretch the month band to the whole screen and create clickable zones for each day.
@@ -404,14 +428,11 @@ def generate_month_html(monthband_path:str, camera_name:str):
         None
     """
     # Grab the filename without the extension
-    year_month=os.path.basename(monthband_path).split('.')[0] 
+    year_month = os.path.basename(monthband_path).split(".")[0]
 
     # Grab the path where to generate the HTML file
-    html_outfile=os.path.join(
-        os.path.dirname(monthband_path),
-        f"{year_month}.html"
-        )
-   
+    html_outfile = os.path.join(os.path.dirname(monthband_path), f"{year_month}.html")
+
     logging.info(f"Generating HTML page for {monthband_path} ")
 
     # Get the width of the month image
@@ -419,21 +440,25 @@ def generate_month_html(monthband_path:str, camera_name:str):
 
     # Write the HTML header
     with open(html_outfile, "w") as f:
-        f.write(f"""
+        f.write(
+            f"""
         <!DOCTYPE html>
         <html>
         <head>
             <title>{camera_name} - {year_month}</title>
         </head>
-        """)
+        """
+        )
 
     # Write the body of the HTML file
     with open(html_outfile, "a") as f:
-        f.write(f"""
+        f.write(
+            f"""
         <body>
             <img src="{year_month}.png" usemap="#daylight" width="{width}" height="1440">
             <map name="daylight">
-        """)
+        """
+        )
 
         # Iterate over the days in the month and generate an area tag for each day
         x = 0
@@ -443,24 +468,26 @@ def generate_month_html(monthband_path:str, camera_name:str):
 
             isodate = f"{year_month}-{day}"
             dirlink = f"/photos/{camera_name}/{isodate}/"
-            
-            f.write(f"""
+
+            f.write(
+                f"""
                 <area shape="rect" coords="{x},0,{x + 1},1439" alt="{isodate}" href="{dirlink}">
-            """)
+            """
+            )
 
             x += 1
 
         # Write the rest of the HTML file
-        f.write("""
+        f.write(
+            """
             </map>
             <script src="/lib/jquery.min.js"></script>
             <script src="/lib/jquery.rwdImageMaps.min.js"></script>
             <script>$(document).ready(function(e) { $("img[usemap]").rwdImageMaps();});</script>
         </body>
         </html>
-        """)
-
-
+        """
+        )
 
 
 if __name__ == "__main__":

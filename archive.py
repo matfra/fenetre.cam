@@ -20,6 +20,7 @@ import shutil
 # - Make the queue for daylight and timelapse a file on the FS (use async read/write if necessary?)
 # Read config and look for the correct type of timelapse video extension.
 
+
 def keep_only_a_subset_of_jpeg_files(
     directory: str, dry_run=True, image_ext="jpg", video_ext="webm", files_to_keep=48
 ):
