@@ -12,6 +12,13 @@ from absl import logging
 import os
 import shutil
 
+# TODO:
+# - Make an archival loop instead of relying one external crontab
+# for d in $(ls -1 /srv/camaredn/data/photos/) ; do /srv/camaredn/venv/bin/python /srv/camaredn/archive.py --camera_dir=/srv/camaredn/data/photos/$d --dry_run=False ; done
+# - mark for archiving and only archive after N days
+# - If missing timelapses and daylight are found, offer to add the in the queue
+# - Make the queue for daylight and timelapse a file on the FS (use async read/write if necessary?)
+# Read config and look for the correct type of timelapse video extension.
 
 def keep_only_a_subset_of_jpeg_files(
     directory: str, dry_run=True, image_ext="jpg", video_ext="webm", files_to_keep=48
@@ -31,26 +38,32 @@ def keep_only_a_subset_of_jpeg_files(
     num_jpeg_files = len(jpeg_files)
     keep_interval = int(num_jpeg_files / files_to_keep)
 
+    if keep_interval == 0:
+        logging.warning(
+            f"{directory} has only {num_jpeg_files} out of {files_to_keep} pictures to keep. Nothing to do there. Perhaps this is an incomplete day?"
+        )
+        return
+    delete_count = 0
     for i in range(num_jpeg_files):
         if i % keep_interval == 0:
-            logging.info(f"Keeping {jpeg_files[i]}")
+            logging.debug(f"Keeping {jpeg_files[i]}")
             continue
-        logging.info(f"Deleting {jpeg_files[i]}")
+        logging.debug(f"Deleting {jpeg_files[i]}")
         if dry_run:
             continue
         os.remove(jpeg_files[i])
-        archive_filepath = os.path.join(directory, "archived")
-        with open(archive_filepath, "w") as f:
-            logging.debug(f"Writing archived file: {archive_filepath}")
-            pass
+        delete_count += 1
+    logging.info(f"Deleted {delete_count}/{num_jpeg_files} files in {directory}.")
+    archive_filepath = os.path.join(directory, "archived")
+    with open(archive_filepath, "w") as f:
+        logging.debug(f"Writing archived file: {archive_filepath}")
+        pass
 
 
-def main(argv):
-    del argv  # Unused.
-
-    camera_dir = FLAGS.camera_dir
+def list_unarchived_dirs(camera_dir, archived_marker_file="archived"):
+    res = []
     # Iterate over all the subdirectories.
-    for subdirectory in os.listdir(camera_dir):
+    for subdirectory in camera_dir:
         # Check if the subdirectory is formatted with the name $year-$month-$day.
         if (
             len(subdirectory) == 10
@@ -60,31 +73,41 @@ def main(argv):
         ):
             daydir = os.path.join(camera_dir, subdirectory)
             # Check if the subdirectory contains a file named archived.
-            if os.path.isfile(os.path.join(daydir, "archived")):
-                logging.info(f"{daydir} is already archived: ")
+            if os.path.isfile(os.path.join(daydir, archived_marker_file)):
+                logging.info(f"{daydir} is already archived.")
                 # Continue to the next subdirectory.
                 continue
+            res.append(daydir)
+    return res
 
-            # Check if the subdirectory contains a file name daylight.png and a file named $year-$month-$day.webm.
-            if not os.path.isfile(
-                os.path.join(daydir, "daylight.png")
-            ) or not os.path.isfile(os.path.join(daydir, f"{subdirectory}.webm")):
-                logging.warning(
-                    f"{daydir} does not contain a timelapse or a daylight file"
-                )
-                # Continue to the next subdirectory.
-                continue
 
-            # Keep only 48 of the jpeg files in the subdirectory, distributed equally across all the existing files.
-            keep_only_a_subset_of_jpeg_files(daydir, dry_run=FLAGS.dry_run)
+def check_dir_has_timelapse_and_daylight(daydir):
+    subdirectory = os.path.basename(os.path.dirname(daydir))
+    return os.path.isfile(os.path.join(daydir, "daylight.png")) and (
+        os.path.isfile(os.path.join(daydir, f"{subdirectory}.webm"))
+        or os.path.isfile(os.path.join(daydir, f"{subdirectory}.mp4"))
+    )
+
+
+def main(argv):
+    del argv  # Unused.
+
+    camera_dir = FLAGS.camera_dir
+    for daydir in list_unarchived_dirs(camera_dir):
+        # Check if the subdirectory contains a file name daylight.png and a file named $year-$month-$day.webm.
+        if not check_dir_has_timelapse_and_daylight(daydir):
+            logging.warning(f"{daydir} does not contain a timelapse or a daylight file")
+            # Continue to the next subdirectory.
+            continue
+
+        # Keep only 48 of the jpeg files in the subdirectory, distributed equally across all the existing files.
+        keep_only_a_subset_of_jpeg_files(daydir, dry_run=FLAGS.dry_run)
 
 
 if __name__ == "__main__":
     FLAGS = flags.FLAGS
 
-    flags.DEFINE_string(
-        "camera_dir", None, "directory to cleanup"
-    )
+    flags.DEFINE_string("camera_dir", None, "directory to cleanup")
     flags.DEFINE_string("image_ext", "jpg", "video file extension")
     flags.DEFINE_string("video_ext", "webm", "video file extension")
     flags.DEFINE_bool("dry_run", True, "Do not delete the files")
