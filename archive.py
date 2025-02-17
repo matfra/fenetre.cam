@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import os
 import re
 import subprocess
@@ -5,12 +7,18 @@ from typing import Dict
 from typing import List
 import glob
 import ffmpeg
+import pytz
+from datetime import datetime
 from absl import app
 from absl import flags
 from absl import logging
 
+from camaredn import create_timelapse, config_load
+from daylight import run_end_of_day
+
 import os
 import shutil
+
 
 # TODO:
 # - Make an archival loop instead of relying one external crontab
@@ -64,7 +72,7 @@ def keep_only_a_subset_of_jpeg_files(
 def list_unarchived_dirs(camera_dir, archived_marker_file="archived"):
     res = []
     # Iterate over all the subdirectories.
-    for subdirectory in camera_dir:
+    for subdirectory in os.listdir(camera_dir):
         # Check if the subdirectory is formatted with the name $year-$month-$day.
         if (
             len(subdirectory) == 10
@@ -82,36 +90,94 @@ def list_unarchived_dirs(camera_dir, archived_marker_file="archived"):
     return res
 
 
-def check_dir_has_timelapse_and_daylight(daydir):
+def check_dir_has_timelapse(daydir):
     subdirectory = os.path.basename(os.path.dirname(daydir))
-    return os.path.isfile(os.path.join(daydir, "daylight.png")) and (
-        os.path.isfile(os.path.join(daydir, f"{subdirectory}.webm"))
-        or os.path.isfile(os.path.join(daydir, f"{subdirectory}.mp4"))
-    )
+    return os.path.isfile(
+        os.path.join(daydir, f"{subdirectory}.webm")
+    ) or os.path.isfile(os.path.join(daydir, f"{subdirectory}.mp4"))
+
+
+def check_dir_has_daylight_band(daydir):
+    subdirectory = os.path.basename(os.path.dirname(daydir))
+    return os.path.isfile(os.path.join(daydir, "daylight.png"))
+
+
+def get_today_date() -> str:
+    tz = pytz.timezone(global_config["timezone"])
+    dt = datetime.now(tz)
+    return dt.strftime("%Y-%m-%d")
 
 
 def main(argv):
     del argv  # Unused.
 
-    camera_dir = FLAGS.camera_dir
-    for daydir in list_unarchived_dirs(camera_dir):
-        # Check if the subdirectory contains a file name daylight.png and a file named $year-$month-$day.webm.
-        if not check_dir_has_timelapse_and_daylight(daydir):
-            logging.warning(f"{daydir} does not contain a timelapse or a daylight file")
-            # Continue to the next subdirectory.
-            continue
+    # TODO: Are global variable really necessary?
+    global server_config, cameras_config, global_config
+    server_config, cameras_config, global_config = config_load(FLAGS.config)
+    global_config["pic_dir"] = os.path.join(global_config["work_dir"], "photos")
 
-        # Keep only 48 of the jpeg files in the subdirectory, distributed equally across all the existing files.
-        keep_only_a_subset_of_jpeg_files(daydir, dry_run=FLAGS.dry_run)
+    today_date = get_today_date()
+    #import pdb; pdb.set_trace()
+    for cam in cameras_config:
+        camera_dir = os.path.join(global_config["pic_dir"], cam)
+        sky_area = cameras_config[cam].get("sky_area", None)
+        if sky_area is None:
+            logging.warning(f"No sky area defined for cam {cam}")
+        if not os.path.isdir(camera_dir):
+            logging.warning(f"Could not find directory {camera_dir} for camera: {cam}.")
+            continue
+        for daydir in list_unarchived_dirs(camera_dir):
+            if os.path.basename(daydir) == today_date:
+                logging.info(
+                    f"Skipping {daydir} as it's today and may still be in progress"
+                )
+                continue
+            logging.info(f"Processing {daydir}")
+            # Check if the subdirectory contains a file name daylight.png and a file named $year-$month-$day.webm.
+            if not check_dir_has_timelapse:
+                if FLAGS.create_timelapses:
+                    logging.info(f"Creating timelapse for {daydir}")
+                    create_timelapse(
+                        dir=dir,
+                        overwrite=True,
+                        ffmpeg_options=global_config.get(
+                            "ffmpeg_options", "-framerate 30"
+                        ),
+                        two_pass=global_config.get("ffmpeg_2pass", False),
+                        file_ext=global_config.get("timelapse_file_extension", "mp4"),
+                        tmp_dir=global_config.get("tmp_dir"),
+                        dry_run=FLAGS.dry_run,
+                    )
+                else:
+                    logging.warning(f"{daydir} does not contain a timelapse file.")
+
+            if not check_dir_has_daylight_band(daydir):
+                if FLAGS.create_daylight_bands:
+                    logging.info(f"Creating daylight band for {daydir}")
+                    run_end_of_day(
+                        cam,
+                        daydir,
+                        sky_area
+                    )
+
+                logging.warning(f"{daydir} does not contain a daylight file")
+                # Continue to the next subdirectory.
+                continue
+
+            # Keep only 48 of the jpeg files in the subdirectory, distributed equally across all the existing files.
+            keep_only_a_subset_of_jpeg_files(daydir, dry_run=FLAGS.dry_run)
 
 
 if __name__ == "__main__":
     FLAGS = flags.FLAGS
 
-    flags.DEFINE_string("camera_dir", None, "directory to cleanup")
-    flags.DEFINE_string("image_ext", "jpg", "video file extension")
-    flags.DEFINE_string("video_ext", "webm", "video file extension")
+    #    flags.DEFINE_string("camera_dir", None, "directory to cleanup")
+    #    flags.DEFINE_string("image_ext", "jpg", "video file extension")
+    #    flags.DEFINE_string("video_ext", "webm", "video file extension")
+    flags.DEFINE_bool("create_timelapses", False, "Create missing timelapses")
+    flags.DEFINE_bool("create_daylight_bands", False, "Create missing daylight")
     flags.DEFINE_bool("dry_run", True, "Do not delete the files")
-
-    flags.mark_flag_as_required("camera_dir")
+    flags.DEFINE_string("config", None, "path to YAML config file")
+    flags.mark_flag_as_required("config")
+    #    flags.mark_flag_as_required("camera_dir")
     app.run(main)

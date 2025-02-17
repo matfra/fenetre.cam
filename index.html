@@ -1,32 +1,72 @@
 <!DOCTYPE html>
 <html>
-<head>
-    <title>CamAREDN</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-    <style>
-        #map { height: 600px; width: 100%; }
-        .thumbnail-icon {
-            width: 160px;
-            height: 90px;
-            border-radius: 8px;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
-        }
-        body {
-            background-color: black;
-            color: white; /* Optional: Set text color to white for better visibility */
-        }
-    </style>
-</head>
+    <head>
+        <title>Camera Map - Mobile Friendly with Larger Popup</title>
+        <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+        <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.css" />
+        <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.Default.css" />
+        <style>
+            /* Make the body fill the entire screen */
+            body {
+                margin: 0;
+                padding: 0;
+                height: 100vh;
+                font-family: Arial, sans-serif;
+            }
+    
+            /* Responsive map size */
+            #map {
+                height: 66.67vh; /* 2/3 of the viewport height */
+                width: 100%; /* Full width */
+            }
+    
+            /* Adjust font size and layout for better readability on mobile */
+            h1 {
+                text-align: center;
+                font-size: 1.5em;
+                margin: 10px;
+            }
+    
+            .thumbnail-icon {
+                width: 160px;
+                height: 90px;
+                border-radius: 8px;
+                box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+            }
+    
+            /* Style for the larger popup image */
+            .popup-image {
+                width: 90%;
+                height: auto;
+                display: block;
+                margin: 10px auto; /* Center the image and add some space */
+            }
+    
+            /* Custom style for the Leaflet popup */
+            .leaflet-popup-content {
+                text-align: center;
+                font-size: 1em;
+            }
+    
+            .leaflet-popup {
+                max-width: 90vw; /* Set the maximum width to 90% of the viewport */
+            }
+        </style>
+    </head>
 <body>
     <h1>CamAREDN Map</h1>
     <div id="map"></div>
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.markercluster/dist/leaflet.markercluster.js"></script>
     <script>
         // Initialize the map with a temporary center and zoom level
         var map = L.map('map').setView([0, 0], 2);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 18,
         }).addTo(map);
+
+                // Create a marker cluster group
+                var markerCluster = L.markerClusterGroup();
 
         // Function to load cameras from JSON and add thumbnails as markers
         function loadCameras() {
@@ -58,7 +98,8 @@
                         // Add marker with custom icon to map and bind a popup with title and link
                         var marker = L.marker(latLng, { icon: thumbnailIcon }).addTo(map);
                         marker.bindPopup(
-                            `<b>${camera.title}</b><br><a href="${camera.url}" target="_blank">View Camera Directory</a>`
+                            `<img src="${camera.image}" class="popup-image" alt="Camera Image" width="100%"><br>
+                            <b>${camera.title}</b><br><a href="${camera.url}" target="_blank">View Camera Directory</a>`
                         );
 
                         marker.on('click', function() {

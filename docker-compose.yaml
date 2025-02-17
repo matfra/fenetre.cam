@@ -4,6 +4,7 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: camaredn_app
+    user: "1000:1000"
     shm_size: '256m'
     devices:
       - /dev/dri/renderD128:/dev/dri/renderD128
@@ -20,6 +21,11 @@ services:
       # OpenCL
       - /etc/OpenCL/vendors:/etc/OpenCL/vendors
     command: /app/config.yaml
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "1m"  # Maximum size of each log file
+        max-file: "3"    # Number of log files to keep
   nginx:
     image: nginx:alpine
     container_name: camaredn_webserver

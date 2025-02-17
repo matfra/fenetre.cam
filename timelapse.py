@@ -20,6 +20,7 @@ def create_timelapse(
     two_pass: bool = False,
     file_ext: str = "mp4",
     tmp_dir: str = "/dev/shm/camaredn",
+    dry_run: bool = False,
 ) -> bool:
     if not os.path.exists(dir):
         raise FileNotFoundError(dir)
@@ -58,11 +59,13 @@ def create_timelapse(
         logging.info(
             "Running ffmpeg first pass: {}".format(" ".join(ffmpeg_cmd_first_pass))
         )
-        subprocess.run(ffmpeg_cmd_first_pass, cwd=tmp_dir)
+        if not dry_run:
+            subprocess.run(ffmpeg_cmd_first_pass, cwd=tmp_dir)
 
     ffmpeg_cmd.append(timelapse_filepath)
     logging.info("Running ffmpeg second pass: {}".format(" ".join(ffmpeg_cmd)))
-    subprocess.run(ffmpeg_cmd, cwd=tmp_dir)
+    if not dry_run:
+        subprocess.run(ffmpeg_cmd, cwd=tmp_dir)
 
     return os.path.exists(timelapse_filepath)
 

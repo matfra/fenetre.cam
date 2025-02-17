@@ -28,11 +28,7 @@ from SSIM_PIL import compare_ssim
 from timelapse import create_timelapse
 from daylight import run_end_of_day
 
-FLAGS = flags.FLAGS
 
-flags.DEFINE_string("config", None, "path to YAML config file")
-
-flags.mark_flag_as_required("config")
 DEFAULT_SKY_AREA = "100,0,400,50"
 
 
@@ -45,8 +41,26 @@ def config_load(config_file_path: str) -> List[Dict]:
         return res
 
 
-def get_pic_from_url(url: str, timeout: int) -> Image:
-    r = requests.get(url, timeout=timeout)
+def get_pic_from_url(url: str, timeout: int, ua: str = None) -> Image:
+    headers = {
+        "Accept": "image/*,*"
+    }
+    if ua:
+        requests_version = requests.__version__
+        headers = {
+            "User-Agent": f"{ua} v{requests_version}"
+        }
+    r = requests.get(url, timeout=timeout, headers=headers)
+    if r.status_code != 200:
+        raise RuntimeError(
+            f"HTTP Request Failed!\n"
+            f"URL: {url}\n"
+            f"Status Code: {r.status_code}\n"
+            f"Request Headers: {r.request.headers}\n"
+            f"Response Headers: {r.headers}\n"
+            f"Response Content (first 500 bytes): {r.content[:500]}"
+        )
+    
     return Image.open(BytesIO(r.content))
 
 
@@ -97,7 +111,8 @@ def snap(camera_name, camera_config: Dict):
 
     def capture() -> Image:
         if url is not None:
-            return get_pic_from_url(url, timeout)
+            ua=global_config.get('user_agent', None)
+            return get_pic_from_url(url, timeout, ua)
         if local_command is not None:
             return get_pic_from_local_command(local_command, timeout)
         # Add more capture methods here
@@ -150,7 +165,7 @@ def snap(camera_name, camera_config: Dict):
             ssim = get_ssim_for_area(
                 previous_pic, new_pic, camera_config.get("ssim_area", None)
             )
-            ssim_setpoint = camera_config.get("ssim_setpoint", 0.90)
+            ssim_setpoint = camera_config.get("ssim_setpoint", 0.85)
             if ssim < ssim_setpoint:
                 # We need to capture more frequently to get interesting things.
                 # sleep_intervals[camera_name] -= 100*(ssim_setpoint-ssim)
@@ -259,7 +274,7 @@ def update_cameras_metadata(cameras_configs: Dict, work_dir: str):
 def main(argv):
     del argv  # Unused.
 
-    # TODO: Re-evaluate the globality of these vars
+    # TODO: Are global variable really necessary?
     global server_config, cameras_config, global_config
     server_config, cameras_config, global_config = config_load(FLAGS.config)
     global_config["pic_dir"] = os.path.join(global_config["work_dir"], "photos")
@@ -273,10 +288,11 @@ def main(argv):
     timelapse_q = deque()
     daylight_q = deque()
 
-    # HTML Interface
+    # HTML Interface.
     link_html_file(global_config["work_dir"])
     update_cameras_metadata(cameras_config, global_config["work_dir"])
 
+    # Start camera threads.
     for cam in cameras_config:
         Thread(
             target=create_and_start_and_watch_thread,
@@ -285,6 +301,7 @@ def main(argv):
             args=[snap, cam, [cam, cameras_config[cam]], 86400],
         ).start()
 
+    # Optional web server
     if server_config.get("enabled", False):
         server_thread = Thread(target=server_run, daemon=True, name="http_server")
         logging.info(f"Starting thread {server_thread}")
@@ -344,4 +361,8 @@ def daylight_loop():
 
 
 if __name__ == "__main__":
+    FLAGS = flags.FLAGS
+
+    flags.DEFINE_string("config", None, "path to YAML config file")
+    flags.mark_flag_as_required("config")
     app.run(main)
