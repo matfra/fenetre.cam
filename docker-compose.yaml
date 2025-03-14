@@ -4,6 +4,7 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: camaredn_app
+    restart: unless-stopped
     user: "1000:1000"
     shm_size: '256m'
     devices:
@@ -12,7 +13,6 @@ services:
     group_add:
       - video # For Intel OpenCL
       - 993 # render
-        #      - render # For Intel OpenCL
     volumes:
       # Mount the local config.yaml to the container's /app/config.yaml
       - ./config.yaml:/app/config.yaml
@@ -29,6 +29,7 @@ services:
   nginx:
     image: nginx:alpine
     container_name: camaredn_webserver
+    restart: unless-stopped
     ports:
       - "5802:80"  # Expose port 8080 on the host to port 80 in the container
       - "5803:443" # Expose port 5803 on the host to port 443 for HTTPS in the container

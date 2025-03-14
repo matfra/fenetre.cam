@@ -117,7 +117,6 @@ def main(argv):
     global_config["pic_dir"] = os.path.join(global_config["work_dir"], "photos")
 
     today_date = get_today_date()
-    #import pdb; pdb.set_trace()
     for cam in cameras_config:
         camera_dir = os.path.join(global_config["pic_dir"], cam)
         sky_area = cameras_config[cam].get("sky_area", None)
@@ -133,12 +132,22 @@ def main(argv):
                 )
                 continue
             logging.info(f"Processing {daydir}")
+
+            if not check_dir_has_daylight_band(daydir):
+                if FLAGS.create_daylight_bands:
+                    logging.info(f"Creating daylight band for {daydir}")
+                    run_end_of_day(cam, daydir, sky_area, dry_run=FLAGS.dry_run)
+
+                logging.warning(f"{daydir} does not contain a daylight file")
+                # Continue to the next subdirectory.
+                # continue
+
             # Check if the subdirectory contains a file name daylight.png and a file named $year-$month-$day.webm.
-            if not check_dir_has_timelapse:
+            if not check_dir_has_timelapse(daydir):
                 if FLAGS.create_timelapses:
                     logging.info(f"Creating timelapse for {daydir}")
                     create_timelapse(
-                        dir=dir,
+                        dir=daydir,
                         overwrite=True,
                         ffmpeg_options=global_config.get(
                             "ffmpeg_options", "-framerate 30"
@@ -150,19 +159,6 @@ def main(argv):
                     )
                 else:
                     logging.warning(f"{daydir} does not contain a timelapse file.")
-
-            if not check_dir_has_daylight_band(daydir):
-                if FLAGS.create_daylight_bands:
-                    logging.info(f"Creating daylight band for {daydir}")
-                    run_end_of_day(
-                        cam,
-                        daydir,
-                        sky_area
-                    )
-
-                logging.warning(f"{daydir} does not contain a daylight file")
-                # Continue to the next subdirectory.
-                continue
 
             # Keep only 48 of the jpeg files in the subdirectory, distributed equally across all the existing files.
             keep_only_a_subset_of_jpeg_files(daydir, dry_run=FLAGS.dry_run)

@@ -42,14 +42,10 @@ def config_load(config_file_path: str) -> List[Dict]:
 
 
 def get_pic_from_url(url: str, timeout: int, ua: str = None) -> Image:
-    headers = {
-        "Accept": "image/*,*"
-    }
+    headers = {"Accept": "image/*,*"}
     if ua:
         requests_version = requests.__version__
-        headers = {
-            "User-Agent": f"{ua} v{requests_version}"
-        }
+        headers = {"User-Agent": f"{ua} v{requests_version}"}
     r = requests.get(url, timeout=timeout, headers=headers)
     if r.status_code != 200:
         raise RuntimeError(
@@ -60,7 +56,7 @@ def get_pic_from_url(url: str, timeout: int, ua: str = None) -> Image:
             f"Response Headers: {r.headers}\n"
             f"Response Content (first 500 bytes): {r.content[:500]}"
         )
-    
+
     return Image.open(BytesIO(r.content))
 
 
@@ -111,7 +107,7 @@ def snap(camera_name, camera_config: Dict):
 
     def capture() -> Image:
         if url is not None:
-            ua=global_config.get('user_agent', None)
+            ua = global_config.get("user_agent", None)
             return get_pic_from_url(url, timeout, ua)
         if local_command is not None:
             return get_pic_from_local_command(local_command, timeout)

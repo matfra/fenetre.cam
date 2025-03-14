@@ -44,7 +44,7 @@ def create_timelapse(
         "-pattern_type",
         "glob",
         "-i",
-        "{}".format(os.path.join(dir, "*.jpg")),
+        "{}".format(os.path.join(os.path.abspath(dir), "*.jpg")),
     ]
     if overwrite:
         ffmpeg_cmd.append("-y")
@@ -53,7 +53,7 @@ def create_timelapse(
         ffmpeg_cmd.append("-pass")
         ffmpeg_cmd_first_pass = ffmpeg_cmd.copy()
         ffmpeg_cmd_first_pass.append("1")
-        ffmpeg_cmd_first_pass.append(timelapse_filepath)
+        ffmpeg_cmd_first_pass.append(os.path.abspath(timelapse_filepath))
         ffmpeg_cmd.append("2")
         # ffmpeg_cmd_first_pass.extend("-an -f null /dev/null".split(" "))
         logging.info(
@@ -62,7 +62,7 @@ def create_timelapse(
         if not dry_run:
             subprocess.run(ffmpeg_cmd_first_pass, cwd=tmp_dir)
 
-    ffmpeg_cmd.append(timelapse_filepath)
+    ffmpeg_cmd.append(os.path.abspath(timelapse_filepath))
     logging.info("Running ffmpeg second pass: {}".format(" ".join(ffmpeg_cmd)))
     if not dry_run:
         subprocess.run(ffmpeg_cmd, cwd=tmp_dir)
