@@ -339,8 +339,7 @@ def timelapse_loop():
                 logging.error(
                     f"There was an error creating the timelapse for dir: {dir}"
                 )
-        time.sleep(10)
-
+        time.sleep(30)
 
 def daylight_loop():
     """
