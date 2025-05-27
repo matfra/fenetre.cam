@@ -4,7 +4,8 @@ import glob
 from typing import Tuple
 from typing import List
 from PIL import Image
-
+from collections import defaultdict
+from PIL import ImageDraw
 
 from datetime import datetime
 from datetime import timedelta
@@ -15,15 +16,18 @@ from absl import logging
 import cv2
 import numpy as np
 import calendar
+from zoneinfo import ZoneInfo  # Python 3.9+
+
 
 # --- Configuration ---
 # TODO: Set this to the base directory containing all individual camera subdirectories
 ALL_CAMERAS_BASE_DIR = "data/photos"
 
 # TODO: Set this to the path of your YAML configuration file
-CONFIG_FILE_PATH = "config.yaml" # Assumes config.yaml is in the same dir as the script or ALL_CAMERAS_BASE_DIR
+CONFIG_FILE_PATH = "config.yaml"  # Assumes config.yaml is in the same dir as the script or ALL_CAMERAS_BASE_DIR
 
 DEFAULT_SKY_COLOR = (10, 10, 20)  # Dark blue-grey for missing minutes or errors
+DEFAULT_SKY_AREA = (0, 50, 600, 150)  # Default crop area for the sky in the pictures
 DAILY_BAND_HEIGHT = 1440  # 24 hours * 60 minutes
 
 
@@ -46,64 +50,6 @@ def get_average_color_of_area(
     return average_color.astype(np.uint8)  # Ensure uint8 for image data
 
 
-def apply_average_color_to_monthly_directory(directory: str, area: Tuple[int]):
-    """Applies the average color of an area of a picture to a monthly directory
-    containing many pictures.
-
-    Args:
-      directory: The path to the monthly directory containing the pictures.
-      area: A tuple of (x, y, width, height) representing the area of the image to
-        get the average color of.
-    """
-
-    average_colors = {}
-    for filename in os.listdir(directory):
-        if filename.split(".")[-1] != "jpg":
-            continue
-        minute = get_minute_of_day_from_filename(filename)
-        if minute in average_colors:
-            continue
-        image = cv2.imread(os.path.join(directory, filename))
-        average_colors[minute] = get_average_color_of_area(image, area)
-
-    # Stack the average colors in a vertical picture of 1 by 1440 pixels,
-    # representing the average color of the area for every minute of the day.
-    average_color_image = np.zeros((1440, 1, 3), dtype=np.uint8)
-    last_color = [0, 0, 0]
-    for i in range(1440):
-        if i in average_colors:
-            last_color = average_colors[i]
-        average_color_image[i, 0] = last_color
-
-    # Save the average color image.
-    cv2.imwrite(os.path.join(directory, "daylight.png"), average_color_image)
-
-
-def get_minute_of_day_from_filename(filename: str) -> int:
-    """Returns the minute of the day (0-1439) from a filename with format %Y-%m-%dT%H-%M-%S%Z.jpg.
-
-    Raises:
-        ValueError: If the filename doesn't match the expected format or contains invalid date/time values.
-    """
-    # Extract the date/time part from the filename using a regex
-    match = re.search(r"(\d{4}-\d{2}-\d{2}T\d{2}-\d{2}).*", filename)
-    if not match:
-        raise ValueError(
-            f"Filename '{filename}' does not contain a valid datetime string."
-        )
-
-    datetime_str = match.group(1)
-
-    try:
-        dt = datetime.strptime(datetime_str, "%Y-%m-%dT%H-%M")
-    except ValueError as e:
-        raise ValueError(
-            f"Invalid datetime string '{datetime_str}' in filename '{filename}': {e}"
-        ) from e
-
-    return dt.hour * 60 + dt.minute
-
-
 def get_avg_color_of_the_area(pic_file: str, crop_zone: Tuple[int]) -> bytes:
     full_img = Image.open(pic_file, mode="r")
     if full_img.mode != "RGB":
@@ -113,143 +59,204 @@ def get_avg_color_of_the_area(pic_file: str, crop_zone: Tuple[int]) -> bytes:
     return a.tobytes()
 
 
-def create_day_band(pic_dir: str, sky_area: Tuple[int, int, int, int]) -> bool:
-    """COnstruct a 1440 pixel tall, 1px wide png file with each pixel representing the average color of the sky_area for every minute of the day.
-
-    This implies the filename format is: 2023-09-04T16-42-16PDT
-    TODO(feature): Customize image naming format, or read time from metadata or use a sequence of image.
-    If there are multiple files for a given minute, only the first file is taken into account.
-    """
-    logging.debug(f"Creating a daylight band for {pic_dir}")
-
-    minute = 0
-    # TODO(feature) Start with the previous day's last pixel
-    last_pixel_rgb_bytes = b"\x00\x00\x00"  # Start with an almost black pixel
-    dayband = bytearray()
-    previous_pic_minute = -1
-
-    for pic_filepath in glob.glob(os.path.join(pic_dir, "*.jpg")):
-        pic_minute = get_minute_of_day_from_filename(os.path.basename(pic_filepath))
-        if pic_minute is None or pic_minute == -1:
-            logging.warning(
-                f"Skipping {pic_filepath}. Could not reliably figure out the minute of day."
-            )
-            continue
-        while pic_minute > minute:
-            dayband += last_pixel_rgb_bytes
-            logging.debug(
-                f"{minute}/1439 Filling with previous data {bytes(last_pixel_rgb_bytes)}"
-            )
-            minute += 1
-            if pic_minute >= 1440:
-                logging.warning(
-                    f"Skipping {pic_filepath} because pic_minute ({pic_minute}) is out of range."
-                )
-                continue
-        if (
-            previous_pic_minute == pic_minute
-        ):  # Ignore pictures for a minute we've already processed
-            logging.debug(
-                f"Ignoring {pic_filepath} as we already have data for minute {minute}"
-            )
-            continue
-        previous_pic_minute = minute
-        last_pixel_rgb_bytes = get_avg_color_of_the_area(pic_filepath, sky_area)
-        dayband += last_pixel_rgb_bytes
-        logging.debug(
-            f"{minute}/1439 Using {bytes(last_pixel_rgb_bytes)} from {pic_filepath}"
-        )
-        minute += 1
-
-    # We ran out of pictures but not reached the end of the day yet.
-    while minute < 1440:
-        dayband += last_pixel_rgb_bytes
-        logging.debug(
-            f"{minute}/1439 Filling with previous data {bytes(last_pixel_rgb_bytes)}"
-        )
-        minute += 1
-
-    logging.debug(f"Final image size: {len(dayband)} bytes (expected: {1440 * 3})")
-    img = Image.frombytes(size=(1, 1440), data=bytes(dayband), mode="RGB")
-    img.save(os.path.join(pic_dir, "daylight.png"))
-
-
-def concatenate_daily_images_into_monthly_image(
-    main_pic_dir: str, yearmonth: Tuple[int]
-) -> str:
-    """Concatenates daily images of 1 by 1440 pixels into one monthly image with a height of 1440 pixels and a width equal to the number of days in the month, filling with black if there are missing daily images.
-
-    Args:
-      main_pic_dir: The path to the directory containing the daily directories.
-      yearmonth: Tuple for year and month as int.
-
-    Returns:
-      The path to the created png file.
-    """
-
-    # Get the number of days in the month.
-    year, month = yearmonth
-    number_of_days_in_month = calendar.monthrange(year, month)[1]
-    # Create a numpy array to store the monthly image.
-    monthly_image = None
-
-    # Iterate over the days of the month.
-    for day in range(1, number_of_days_in_month + 1):
-        # Get the path to the daily image.
-        month_string = f"0{month}" if month < 10 else str(month)
-        day_string = f"0{day}" if day < 10 else str(day)
-        daily_image_path = os.path.join(
-            main_pic_dir, f"{year}-{month_string}-{day_string}", "daylight.png"
-        )
-        daylight_path = os.path.join(main_pic_dir, "daylight")
-        if not os.path.exists(daylight_path):
-            os.mkdir(daylight_path)
-        monthly_image_path = os.path.join(daylight_path, f"{year}-{month_string}.png")
-
-        # If the daily image exists, load it.
-        if os.path.exists(daily_image_path):
-            daily_image = cv2.imread(daily_image_path)
-        else:
-            # If the daily image does not exist, fill the corresponding area in the monthly image with black.
-            daily_image = np.zeros((1440, 1, 3), dtype=np.uint8)
-
-        # Open the monthly image and concatenate the daily image to it.
-        if not os.path.exists(monthly_image_path):
-            # Create an empty numpy array for the monthly image.
-            logging.info(f"Creating {monthly_image_path}")
-            monthly_image = np.zeros((4, 0, 3), dtype=np.uint8)
-        else:
-            monthly_image = cv2.imread(monthly_image_path)
-
-    monthly_image = np.concatenate((monthly_image, daily_image), axis=1)
-    monthly_image_rgb = cv2.cvtColor(monthly_image, cv2.COLOR_BGR2RGB)
-
-    logging.info(f"Writing {monthly_image_path}")
-
-    # Save the monthly image.
-    cv2.imwrite(
-        monthly_image_path,
-        monthly_image_rgb,
-    )
-
-    return monthly_image_path
-
-
 def iso_day_to_dt(d: str) -> datetime:
     return datetime(*list(map(int, d.split("-"))))
 
 
-def run_end_of_day(camera_name, pic_dir, sky_area, dry_run=False):
+def run_end_of_day(camera_name, day_dir_path, sky_area, dry_run=False):
     if sky_area is None:
-        sky_area = "0,50,600,150"  # take a 600x150 rectangle starting offset by 50px to avoid any timestamp mark
-    create_day_band(pic_dir, tuple(map(int, sky_area.split(","))), dry_run=dry_run)
-    year, month, day = os.path.split(pic_dir)[-1].split("-")
+        sky_area = DEFAULT_SKY_AREA
+    create_daily_band(day_dir_path, parse_sky_area(sky_area))
+    year, month, day = os.path.split(day_dir_path)[-1].split("-")
     yearmonth = (int(year), int(month))
-    return concatenate_daily_images_into_monthly_image(
-        os.path.join(pic_dir, ".."), yearmonth
+    create_monthly_image(f"{year}-{month}", os.path.join(day_dir_path, ".."))
+    generate_html(camera_dir=os.path.join(day_dir_path, ".."))
+
+
+
+def get_avg_color(image, crop_box):
+    """Crops image to crop_box and returns average RGB color."""
+    try:
+        sky_region = image.crop(crop_box)
+        avg_color_tuple = np.array(sky_region).mean(axis=(0, 1))
+        return tuple(int(c) for c in avg_color_tuple)
+    except Exception as e:
+        print(f"      Error getting average color: {e}")
+        return DEFAULT_SKY_COLOR
+
+
+def create_daily_band(day_dir_path, sky_coords):
+    """
+    Processes images in a daily directory to create a 1x1440 pixel band.
+    If no image for a minute, repeats the previous minute's color.
+    Saves it as 'daylight.png' in day_dir_path.
+    Returns the path to the saved band or None if failed.
+    """
+    minute_colors_accumulator = defaultdict(list)
+
+    image_files = sorted(
+        [f for f in os.listdir(day_dir_path) if f.lower().endswith(".jpg")]
     )
 
+    if not image_files:
+        print(f"      No JPG images found in {day_dir_path}.")
+        # Create a band with default color if no images
+        daily_band_image = Image.new("RGB", (1, DAILY_BAND_HEIGHT), DEFAULT_SKY_COLOR)
+        # Fill with default color (no "previous color" logic needed for an empty day)
+        band_save_path = os.path.join(day_dir_path, "daylight.png")
+        try:
+            daily_band_image.save(band_save_path)
+            print(f"      Saved empty daily band (no images) to {band_save_path}")
+            return band_save_path
+        except Exception as e:
+            print(f"      Error saving empty daily band {band_save_path}: {e}")
+            return None
 
+    time_pattern = re.compile(
+        r"(\d{4}-\d{2}-\d{2})T(\d{2}-\d{2}-\d{2})([A-Z]{3})?\.jpg", re.IGNORECASE
+    )
+
+    for filename in image_files:
+        match = time_pattern.match(filename)
+        if match:
+            time_str = match.group(2)
+            try:
+                img_time_obj = datetime.strptime(time_str, "%H-%M-%S").time()
+                minute_of_day = img_time_obj.hour * 60 + img_time_obj.minute
+                image_path = os.path.join(day_dir_path, filename)
+                with Image.open(image_path) as img:
+                    img_rgb = img.convert("RGB")
+                    avg_color = get_avg_color(img_rgb, sky_coords)
+                    if avg_color:
+                        minute_colors_accumulator[minute_of_day].append(avg_color)
+            except ValueError as ve:
+                print(f"      Could not parse time from filename {filename}: {ve}")
+            except FileNotFoundError:
+                print(f"      Image file not found: {image_path}")
+            except Exception as e:
+                print(f"      Error processing image {filename}: {e}")
+        else:
+            print(f"      Filename {filename} does not match expected pattern.")
+
+    final_minute_colors = {}
+    for minute, colors_list in minute_colors_accumulator.items():
+        if colors_list:
+            avg_r = int(sum(c[0] for c in colors_list) / len(colors_list))
+            avg_g = int(sum(c[1] for c in colors_list) / len(colors_list))
+            avg_b = int(sum(c[2] for c in colors_list) / len(colors_list))
+            final_minute_colors[minute] = (avg_r, avg_g, avg_b)
+
+    daily_band_image = Image.new("RGB", (1, DAILY_BAND_HEIGHT))
+    draw = ImageDraw.Draw(daily_band_image)
+    last_known_color = DEFAULT_SKY_COLOR
+
+    for minute in range(DAILY_BAND_HEIGHT):
+        if minute in final_minute_colors:
+            current_color = final_minute_colors[minute]
+            last_known_color = current_color
+        else:
+            current_color = last_known_color  # Use previous minute's color
+        draw.point((0, minute), fill=current_color)
+
+    band_save_path = os.path.join(day_dir_path, "daylight.png")
+    try:
+        daily_band_image.save(band_save_path)
+        print(f"      Saved daily band to {band_save_path}")
+        return band_save_path
+    except Exception as e:
+        print(f"      Error saving daily band {band_save_path}: {e}")
+        return None
+
+
+def create_monthly_image(year_month_str, camera_data_path):
+    """
+    Combines 'daylight.png' bands for a month from camera_data_path.
+    Saves composite as 'YYYY-MM.png' in camera_data_path/daylight/.
+    """
+    print(
+        f"    Creating/Updating monthly image for {year_month_str} in {camera_data_path}"
+    )
+    daily_band_paths = []
+    sorted_subdirs = sorted(os.listdir(camera_data_path))  # Ensure chronological order
+
+    for day_dir_name in sorted_subdirs:
+        if day_dir_name.startswith(year_month_str) and re.match(
+            r"^\d{4}-\d{2}-\d{2}$", day_dir_name
+        ):
+            band_path = os.path.join(camera_data_path, day_dir_name, "daylight.png")
+            if os.path.exists(band_path):
+                daily_band_paths.append(band_path)
+
+    if not daily_band_paths:
+        print(f"      No daily bands found for {year_month_str} in {camera_data_path}.")
+        return None
+
+    images_to_stitch = []
+    for band_path in daily_band_paths:  # Already sorted due to sorted_subdirs
+        try:
+            img = Image.open(band_path)
+            if img.width == 1 and img.height == DAILY_BAND_HEIGHT:
+                images_to_stitch.append(img)
+            else:
+                print(
+                    f"      Skipping band {band_path} due to incorrect dimensions: {img.size}"
+                )
+        except Exception as e:
+            print(f"      Error opening daily band {band_path}: {e}")
+
+    if not images_to_stitch:
+        print(f"      No valid daily band images to stitch for {year_month_str}.")
+        return None
+
+    total_width = len(images_to_stitch)
+    monthly_image = Image.new("RGB", (total_width, DAILY_BAND_HEIGHT))
+    x_offset = 0
+    for img in images_to_stitch:
+        monthly_image.paste(img, (x_offset, 0))
+        x_offset += img.width
+        # img.close() # Consider closing if many images are opened
+
+    # Create 'daylight' subdirectory for monthly images if it doesn't exist
+    monthly_output_dir = os.path.join(camera_data_path, "daylight")
+    os.makedirs(monthly_output_dir, exist_ok=True)
+
+    monthly_image_filename = f"{year_month_str}.png"
+    monthly_image_save_path = os.path.join(monthly_output_dir, monthly_image_filename)
+
+    try:
+        monthly_image.save(monthly_image_save_path)
+        print(
+            f"      Saved monthly image to {monthly_image_save_path} ({total_width} days)"
+        )
+        return monthly_image_save_path
+    except Exception as e:
+        print(f"      Error saving monthly image {monthly_image_save_path}: {e}")
+        return None
+
+
+def parse_sky_area(sky_area_str):
+    """Parses 'left,top,right,bottom' string into (int, int, int, int) tuple."""
+    if not sky_area_str:
+        return None
+    try:
+        parts = [int(p.strip()) for p in sky_area_str.split(",")]
+        if len(parts) == 4:
+            # Ensure left < right and top < bottom if necessary, though Pillow handles it
+            # For simplicity, assume valid coordinates are provided
+            return tuple(parts)  # (left, upper, right, lower)
+        else:
+            print(
+                f"      Warning: sky_area string '{sky_area_str}' must have 4 parts (left,top,right,bottom)."
+            )
+            return None
+    except ValueError:
+        print(
+            f"      Warning: Could not parse sky_area string '{sky_area_str}' into integers."
+        )
+        return None
+
+
+# TODO: Fix this
 def generate_bands_for_time_range(
     start_day: datetime,
     end_day: datetime,
@@ -265,10 +272,12 @@ def generate_bands_for_time_range(
         sky_area_str: A string representing the crop area (left, upper, right lower) of the picture representing the sky.
         overwrite: Whether to overwrite existing daybands.
     """
-    current_day = start_day
+    current_day = start_day  # .replace(tzinfo=ZoneInfo("America/Los_Angeles"))
+    end_day = end_day  # .replace(tzinfo=ZoneInfo("America/Los_Angeles"))
+    # Localize the current_day using the timezone in the config file
     created_daybands_for_yearmonths = []
     while current_day <= end_day:
-        current_yearmonth = (current_day.year, current_day.month)
+        current_yearmonth = current_day.strftime("%Y-%m")
         pic_dir = os.path.join(camera_dir, current_day.strftime("%Y-%m-%d"))
         if not os.path.exists(pic_dir):
             logging.warning(
@@ -281,16 +290,15 @@ def generate_bands_for_time_range(
             or overwrite is True
         ):
             logging.info(f"{current_day}: Creating dayband.")
-            left, top, right, bottom = map(int, sky_area_str.split(","))
-            logging.debug(f"Crop zone of ({left},{top}),({right},{bottom})")
-            sky_area = (left, top, right, bottom)
-            create_day_band(pic_dir, sky_area)
+            create_daily_band(pic_dir, parse_sky_area(sky_area_str))
         else:
             logging.info(f"Not overwriting " + os.path.join(pic_dir, "daylight.png"))
         current_day += timedelta(days=1)
         if not current_yearmonth in created_daybands_for_yearmonths:
             created_daybands_for_yearmonths.append(current_yearmonth)
-        current_yearmonth = (current_day.year, current_day.month)
+    for yearmonth in created_daybands_for_yearmonths:
+        logging.info(f"Creating monthly band for {yearmonth}.")
+        create_monthly_image(yearmonth, camera_dir)
 
 
 def dump_html_header(title, additional_headers=""):
@@ -552,7 +560,6 @@ def main(argv):
 
     logging.info(f"Processing camera directories: {camera_names}")
     for camera_name in camera_names:
-
         # Get sky area
         camera_config = config_data["cameras"].get(camera_name)
         if not camera_config:
@@ -584,7 +591,13 @@ def main(argv):
                 end_day = iso_day_to_dt(FLAGS.to_date)
             else:
                 end_day = iso_day_to_dt(available_days[-1])
-
+            # Cheap integration test doe run_end_of_day
+            if start_day == end_day:
+                run_end_of_day(
+                    camera_name,
+                    os.path.join(camera_dir, start_day.strftime("%Y-%m-%d")),
+                    sky_area_str,
+                )
             generate_bands_for_time_range(
                 start_day, end_day, camera_dir, sky_area_str, FLAGS.overwrite
             )
@@ -594,7 +607,9 @@ def main(argv):
 if __name__ == "__main__":
     FLAGS = flags.FLAGS
 
-    flags.DEFINE_string("dir", ALL_CAMERAS_BASE_DIR, "Directory containing all per camera directories.")
+    flags.DEFINE_string(
+        "dir", ALL_CAMERAS_BASE_DIR, "Directory containing all per camera directories."
+    )
     flags.DEFINE_string(
         "from_date",
         None,
@@ -625,5 +640,4 @@ if __name__ == "__main__":
         None,
         "Name of the camera. Used to find pictures in the subdirectory of the --dir argument and to looking the sky_area in the config. If not specified, all cameras in the directory are processed.",
     )
-    flags.mark_flags_as_required(["dir"])
     app.run(main)
