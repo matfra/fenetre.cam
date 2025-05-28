@@ -290,7 +290,8 @@ def main(argv):
 
     # Start camera threads.
     for cam in cameras_config:
-        if cameras_config[cam].get("disabled", True):
+        if cameras_config[cam].get("disabled", False) is True:
+            # If the camera is disabled, we skip it.
             logging.info(
                 f"Camera {cam} is disabled in the config. Skipping it."
             )
