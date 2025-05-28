@@ -75,24 +75,33 @@ def list_unarchived_dirs(camera_dir, archived_marker_file="archived"):
             and subdirectory[8:9].isdigit()
         ):
             daydir = os.path.join(camera_dir, subdirectory)
+            # Count the number of jpg files in the subdirectory.
+            photos_count = len(
+                glob.glob(os.path.join(daydir, "*.jpg"))
+            )
             # Check if the subdirectory contains a file named archived.
             if os.path.isfile(os.path.join(daydir, archived_marker_file)):
-                logging.info(f"{daydir} is already archived.")
-                # Continue to the next subdirectory.
-                continue
+                if photos_count > 48:
+                    logging.warning(
+                        f"{daydir} is archived but has {photos_count} photos. "
+                        "This is unexpected, please check the directory."
+                    )
+                else:
+                    logging.debug(f"{daydir} is already archived.")
+                    # Continue to the next subdirectory.
+                    continue
             res.append(daydir)
     return res
 
 
 def check_dir_has_timelapse(daydir):
-    subdirectory = os.path.basename(os.path.dirname(daydir))
+    subdirectory = os.path.basename(daydir)
     return os.path.isfile(
         os.path.join(daydir, f"{subdirectory}.webm")
     ) or os.path.isfile(os.path.join(daydir, f"{subdirectory}.mp4"))
 
 
 def check_dir_has_daylight_band(daydir):
-    subdirectory = os.path.basename(os.path.dirname(daydir))
     return os.path.isfile(os.path.join(daydir, "daylight.png"))
 
 
@@ -134,7 +143,7 @@ def main(argv):
 
                 logging.warning(f"{daydir} does not contain a daylight file")
                 # Continue to the next subdirectory.
-                # continue
+                continue
 
             # Check if the subdirectory contains a file name daylight.png and a file named $year-$month-$day.webm.
             if not check_dir_has_timelapse(daydir):
