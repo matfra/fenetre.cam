@@ -234,6 +234,16 @@ def link_html_file(work_dir: str):
     shutil.copy(
         os.path.join(current_dir, "index.html"), os.path.join(work_dir, "index.html")
     )
+    # Create the lib directory if it does not exist.
+    if not os.path.exists(os.path.join(work_dir, "lib")):
+        os.makedirs(os.path.join(work_dir, "lib"))
+    # Copy all the files in the lib directory from the current directory to the work_dir/lib directory.
+    for file in os.listdir(os.path.join(current_dir, "lib")):
+        if file.endswith(".js") or file.endswith(".css"):
+            shutil.copy(
+                os.path.join(current_dir, "lib", file),
+                os.path.join(work_dir, "lib", file),
+            )
 
 
 def update_cameras_metadata(cameras_configs: Dict, work_dir: str):
@@ -259,8 +269,8 @@ def update_cameras_metadata(cameras_configs: Dict, work_dir: str):
         metadata["title"] = cam
         metadata["url"] = os.path.join("photos", cam)
         metadata["image"] = os.path.join("photos", cam, "latest.jpg")
-        metadata["lat"] = cameras_config[cam].get("lat", None)
-        metadata["lon"] = cameras_config[cam].get("lon", None)
+        metadata["lat"] = cameras_config[cam].get("lat")
+        metadata["lon"] = cameras_config[cam].get("lon")
         updated_cameras_metadata.append(metadata)
 
     with open(json_filepath, "w") as json_file:

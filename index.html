@@ -86,6 +86,11 @@
                     // Add new markers with thumbnail icons
                     cameras.forEach(function(camera) {
                         var latLng = [camera.lat, camera.lon];
+                        // Skip the camera if it doesn't have valid coordinates
+                        if (!latLng[0] || !latLng[1]) {
+                            console.warn(`Skipping camera ${camera.title} due to missing coordinates.`);
+                            return;
+                        }
                         cameraLatLngs.push(latLng);
 
                         // Create a custom icon using the camera image
