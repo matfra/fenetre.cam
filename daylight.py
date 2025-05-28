@@ -64,6 +64,7 @@ def iso_day_to_dt(d: str) -> datetime:
 
 
 def run_end_of_day(camera_name, day_dir_path, sky_area, dry_run=False):
+    """Runs the end of day processing for a given camera and day directory. Typically it creates the daily band and updates the monthly image, regenerate all HTML files."""
     if sky_area is None:
         sky_area = DEFAULT_SKY_AREA
     create_daily_band(day_dir_path, parse_sky_area(sky_area))

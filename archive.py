@@ -1,12 +1,7 @@
 #!/usr/bin/env python3
 
 import os
-import re
-import subprocess
-from typing import Dict
-from typing import List
 import glob
-import ffmpeg
 import pytz
 from datetime import datetime
 from absl import app
@@ -17,7 +12,6 @@ from camaredn import create_timelapse, config_load
 from daylight import run_end_of_day
 
 import os
-import shutil
 
 
 # TODO:
