@@ -13,9 +13,9 @@ from absl import app
 from absl import flags
 from absl import logging
 
-import cv2
+import cv2 # Keep for generate_month_html, or remove if not used elsewhere by this function
 import numpy as np
-import calendar
+import calendar # Added for getting days in month
 from zoneinfo import ZoneInfo  # Python 3.9+
 
 
@@ -168,55 +168,64 @@ def create_daily_band(day_dir_path, sky_coords):
         return None
 
 
-def create_monthly_image(year_month_str, camera_data_path):
+def create_monthly_image(year_month_str: str, camera_data_path: str):
     """
     Combines 'daylight.png' bands for a month from camera_data_path.
+    Inserts bands of DEFAULT_SKY_COLOR for missing days.
     Saves composite as 'YYYY-MM.png' in camera_data_path/daylight/.
     """
     print(
         f"    Creating/Updating monthly image for {year_month_str} in {camera_data_path}"
     )
-    daily_band_paths = []
-    sorted_subdirs = sorted(os.listdir(camera_data_path))  # Ensure chronological order
-
-    for day_dir_name in sorted_subdirs:
-        if day_dir_name.startswith(year_month_str) and re.match(
-            r"^\d{4}-\d{2}-\d{2}$", day_dir_name
-        ):
-            band_path = os.path.join(camera_data_path, day_dir_name, "daylight.png")
-            if os.path.exists(band_path):
-                daily_band_paths.append(band_path)
-
-    if not daily_band_paths:
-        print(f"      No daily bands found for {year_month_str} in {camera_data_path}.")
+    try:
+        year, month = map(int, year_month_str.split('-'))
+    except ValueError:
+        print(f"      Invalid year_month_str format: {year_month_str}. Expected YYYY-MM.")
         return None
 
+    num_days_in_month = calendar.monthrange(year, month)[1]
     images_to_stitch = []
-    for band_path in daily_band_paths:  # Already sorted due to sorted_subdirs
-        try:
-            img = Image.open(band_path)
-            if img.width == 1 and img.height == DAILY_BAND_HEIGHT:
-                images_to_stitch.append(img)
-            else:
-                print(
-                    f"      Skipping band {band_path} due to incorrect dimensions: {img.size}"
-                )
-        except Exception as e:
-            print(f"      Error opening daily band {band_path}: {e}")
+    actual_days_with_data = 0
 
-    if not images_to_stitch:
-        print(f"      No valid daily band images to stitch for {year_month_str}.")
+    for day_num in range(1, num_days_in_month + 1):
+        day_str = f"{day_num:02d}" # Format day as DD (e.g., 01, 02, ..., 31)
+        day_dir_name = f"{year_month_str}-{day_str}"
+        band_path = os.path.join(camera_data_path, day_dir_name, "daylight.png")
+
+        if os.path.exists(band_path):
+            try:
+                img = Image.open(band_path)
+                if img.width == 1 and img.height == DAILY_BAND_HEIGHT:
+                    images_to_stitch.append(img)
+                    actual_days_with_data +=1
+                else:
+                    print(
+                        f"      Skipping band {band_path} due to incorrect dimensions: {img.size}. Using default color."
+                    )
+                    default_band = Image.new("RGB", (1, DAILY_BAND_HEIGHT), DEFAULT_SKY_COLOR)
+                    images_to_stitch.append(default_band)
+            except Exception as e:
+                print(f"      Error opening daily band {band_path}: {e}. Using default color.")
+                default_band = Image.new("RGB", (1, DAILY_BAND_HEIGHT), DEFAULT_SKY_COLOR)
+                images_to_stitch.append(default_band)
+        else:
+            # print(f"      No daily band found for {day_dir_name}. Using default color.") # Optional: less verbose
+            default_band = Image.new("RGB", (1, DAILY_BAND_HEIGHT), DEFAULT_SKY_COLOR)
+            images_to_stitch.append(default_band)
+
+    if not images_to_stitch: # Should not happen if we iterate through all days
+        print(f"      No daily bands (including defaults) to stitch for {year_month_str}.")
         return None
 
-    total_width = len(images_to_stitch)
+    # The total width will now always be the number of days in the month
+    total_width = num_days_in_month
     monthly_image = Image.new("RGB", (total_width, DAILY_BAND_HEIGHT))
     x_offset = 0
     for img in images_to_stitch:
         monthly_image.paste(img, (x_offset, 0))
         x_offset += img.width
-        # img.close() # Consider closing if many images are opened
+        # img.close() # Consider closing if many images are opened and memory is an issue
 
-    # Create 'daylight' subdirectory for monthly images if it doesn't exist
     monthly_output_dir = os.path.join(camera_data_path, "daylight")
     os.makedirs(monthly_output_dir, exist_ok=True)
 
@@ -226,7 +235,7 @@ def create_monthly_image(year_month_str, camera_data_path):
     try:
         monthly_image.save(monthly_image_save_path)
         print(
-            f"      Saved monthly image to {monthly_image_save_path} ({total_width} days)"
+            f"      Saved monthly image to {monthly_image_save_path} ({total_width} days, {actual_days_with_data} with data)"
         )
         return monthly_image_save_path
     except Exception as e:
@@ -275,28 +284,30 @@ def generate_bands_for_time_range(
     current_day = start_day  # .replace(tzinfo=ZoneInfo("America/Los_Angeles"))
     end_day = end_day  # .replace(tzinfo=ZoneInfo("America/Los_Angeles"))
     # Localize the current_day using the timezone in the config file
-    created_daybands_for_yearmonths = []
+    created_daybands_for_yearmonths = set() # Use set for unique yearmonths
     while current_day <= end_day:
         current_yearmonth = current_day.strftime("%Y-%m")
         pic_dir = os.path.join(camera_dir, current_day.strftime("%Y-%m-%d"))
         if not os.path.exists(pic_dir):
             logging.warning(
-                f"{current_day}: Skipping non-existent directory: {pic_dir}."
+                f"{current_day.strftime('%Y-%m-%d')}: Skipping non-existent directory: {pic_dir}."
             )
             current_day += timedelta(days=1)
+            created_daybands_for_yearmonths.add(current_yearmonth) # Add so month image is still attempted
             continue
         if (
             not os.path.exists(os.path.join(pic_dir, "daylight.png"))
             or overwrite is True
         ):
-            logging.info(f"{current_day}: Creating dayband.")
+            logging.info(f"{current_day.strftime('%Y-%m-%d')}: Creating dayband.")
             create_daily_band(pic_dir, parse_sky_area(sky_area_str))
         else:
             logging.info(f"Not overwriting " + os.path.join(pic_dir, "daylight.png"))
+        
+        created_daybands_for_yearmonths.add(current_yearmonth)
         current_day += timedelta(days=1)
-        if not current_yearmonth in created_daybands_for_yearmonths:
-            created_daybands_for_yearmonths.append(current_yearmonth)
-    for yearmonth in created_daybands_for_yearmonths:
+
+    for yearmonth in sorted(list(created_daybands_for_yearmonths)): # Sort for consistent processing order
         logging.info(f"Creating monthly band for {yearmonth}.")
         create_monthly_image(yearmonth, camera_dir)
 
@@ -344,8 +355,9 @@ def generate_html(camera_dir: str):
                 f"Skipping {yearmonth_file} as it does not match the expected format."
             )
             continue
-        yearmonth = yearmonth_re_matches.group(0)
-        logging.info(f"{yearmonth}: Creating monthband.")
+        # yearmonth = yearmonth_re_matches.group(0) # This would be "YYYY-MM.png"
+        yearmonth_str = yearmonth_re_matches.group(1) # This is "YYYY-MM"
+        logging.info(f"{yearmonth_str}: Creating monthband HTML.") # Corrected logging
         generate_month_html(
             monthband_path=yearmonth_file, camera_name=os.path.basename(camera_dir)
         )
@@ -364,31 +376,37 @@ def generate_html_browser(camera_dir: str):
 
     # Build the list of all daylight monthly files
     daylight_monthly_bands = glob.glob(os.path.join(camera_dir, "daylight", "*.png"))
-    print(f"Found {len(daylight_monthly_bands)} monthly bands in {camera_dir}")
+    print(f"Found {len(daylight_monthly_bands)} monthly bands in {camera_dir} for HTML browser")
 
     # Generate the HTML
     HTML_FILE = os.path.join(camera_dir, "daylight.html")
     with open(HTML_FILE, "w") as f:
         f.write(
             dump_html_header(
-                title="{camera_name} daylight browser",
+                title=f"{camera_name} daylight browser", # f-string for title
                 additional_headers="""
-            <style>
-            </style>""",
+                <style>
+                </style>""",
             )
             + f"""
-                                 
         <body>
             <div class="right">
                 """
         )
 
-        for i in range(24):
+        # Generate time labels (0 AM to 11 PM)
+        # Corrected loop for AM/PM display
+        for hour in range(24):
+            display_hour = hour % 12
+            if display_hour == 0: # Midnight and Noon
+                display_hour = 12
+            am_pm = "AM" if hour < 12 else "PM"
             f.write(
                 f"""
-                <div class="timebox{(i % 2) + 1}">{i % 12} AM</div>
+                <div class="timebox{(hour % 2) + 1}">{display_hour} {am_pm}</div>
                 """
             )
+
 
         f.write(
             """
@@ -399,7 +417,15 @@ def generate_html_browser(camera_dir: str):
 
         for month_band in sorted(daylight_monthly_bands, reverse=True):
             month_band_nopath = os.path.basename(month_band)
-            width = cv2.imread(month_band).shape[1]
+            try:
+                # Use Pillow to get image width to avoid issues if cv2 is not fully available
+                # or if the image is somehow corrupted in a way cv2 can't handle but Pillow can open.
+                with Image.open(month_band) as img_for_width:
+                    width = img_for_width.width
+            except Exception as e:
+                print(f"Could not read width for {month_band} using Pillow: {e}. Skipping in HTML.")
+                continue
+
             year_month = month_band_nopath.split(".")[0]
             month_pretty_name = get_month_pretty_name_html(year_month)
 
@@ -407,7 +433,8 @@ def generate_html_browser(camera_dir: str):
                 f"""
                 <div class="band">
                     <div class="band_img_and_link">
-                        <a class="month_link" href="daylight/{year_month}.html">                            <img class="month_band" height="1440px" width="{width}px" src="daylight/{month_band_nopath}" alt="{month_band_nopath}">
+                        <a class="month_link" href="daylight/{year_month}.html">
+                            <img class="month_band" height="{DAILY_BAND_HEIGHT}px" width="{width}px" src="daylight/{month_band_nopath}" alt="{month_band_nopath}">
                         </a>
                     </div>
                     <div class="month"><p>{month_pretty_name}</p></div>
@@ -446,10 +473,16 @@ def generate_month_html(monthband_path: str, camera_name: str):
     # Grab the path where to generate the HTML file
     html_outfile = os.path.join(os.path.dirname(monthband_path), f"{year_month}.html")
 
-    logging.info(f"Generating HTML page for {monthband_path} ")
+    logging.info(f"Generating HTML page for {monthband_path} -> {html_outfile}")
 
-    # Get the width of the month image
-    width = cv2.imread(monthband_path).shape[1]
+    # Get the width of the month image using Pillow for consistency
+    try:
+        with Image.open(monthband_path) as img_for_width:
+            width = img_for_width.width
+    except Exception as e:
+        logging.error(f"Could not read width for {monthband_path} using Pillow: {e}. Cannot generate month HTML.")
+        return
+
 
     # Write the HTML header
     with open(html_outfile, "w") as f:
@@ -471,27 +504,37 @@ def generate_month_html(monthband_path: str, camera_name: str):
         f.write(
             f"""
         <body>
-            <img src="{year_month}.png" usemap="#daylight" width="{width}" height="1440">
+            <img src="{os.path.basename(monthband_path)}" usemap="#daylight" width="{width}" height="{DAILY_BAND_HEIGHT}">
             <map name="daylight">
-        """
+        """ # Referenced image locally
         )
 
         # Iterate over the days in the month and generate an area tag for each day
-        x = 0
-        for day in range(1, width + 1):
-            if day < 10:
-                day = f"0{day}"
+        # The width of the image now directly corresponds to the number of days in the month
+        # due to the changes in create_monthly_image
+        num_days_in_image = width
+        current_year, current_month = map(int, year_month.split('-'))
 
-            isodate = f"{year_month}-{day}"
-            dirlink = f"/photos/{camera_name}/{isodate}/"
+        for day_index in range(num_days_in_image): # day_index is 0 to (width-1)
+            day_of_month = day_index + 1 # Day is 1 to num_days_in_image
+
+            # Ensure day is formatted with leading zero if needed for isodate
+            day_str_for_isodate = f"{day_of_month:02d}"
+            isodate = f"{year_month}-{day_str_for_isodate}"
+            dirlink = f"/photos/{camera_name}/{isodate}/" # Assumes this path structure
+
+            # Define the coordinates for the clickable area for this day's band
+            # x1 = current x-offset, y1 = 0
+            # x2 = current x-offset + width of the band (which is 1 pixel)
+            # y2 = height of the band
+            x1 = day_index
+            x2 = day_index + 1 # Each band is 1 pixel wide
 
             f.write(
                 f"""
-                <area shape="rect" coords="{x},0,{x + 1},1439" alt="{isodate}" href="{dirlink}">
+                <area shape="rect" coords="{x1},0,{x2},{DAILY_BAND_HEIGHT-1}" alt="{isodate}" href="{dirlink}" title="{isodate}">
             """
             )
-
-            x += 1
 
         # Write the rest of the HTML file
         f.write(
@@ -516,6 +559,9 @@ def list_valid_days_directories(d: str) -> List[str]:
         A list of valid day directories in the format YYYY-MM-DD.
     """
     valid_days = []
+    if not os.path.isdir(d): # Check if base directory exists
+        logging.warning(f"Base directory for listing days does not exist: {d}")
+        return valid_days
     for subdir in os.listdir(d):
         full_dir = os.path.join(d, subdir)
         if not os.path.isdir(full_dir):
@@ -528,14 +574,21 @@ def list_valid_days_directories(d: str) -> List[str]:
 def main(argv):
     """For ad-hoc execution."""
     del argv  # Unused.
-    CONFIG_FILE_PATH = (
-        "config.yaml"  # Assumes config.yaml is in the same dir as the script or
-    )
+    
+    # Ensure CONFIG_FILE_PATH is defined. If not using absl flags for this, define it here or ensure it's globally defined.
+    # global CONFIG_FILE_PATH # If it's truly global
+    # If FLAGS.config_file is defined:
+    # config_file_to_use = FLAGS.config_file if hasattr(FLAGS, 'config_file') and FLAGS.config_file else CONFIG_FILE_PATH
+    
+    # For simplicity, assuming CONFIG_FILE_PATH is correctly set globally or via FLAGS
+    # If you add a flag for config file:
+    # config_file_path = FLAGS.config_file if FLAGS.config_file else CONFIG_FILE_PATH
+
     # Load YAML configuration
     import yaml  # For reading YAML config
 
     try:
-        with open(CONFIG_FILE_PATH, "r") as f:
+        with open(CONFIG_FILE_PATH, "r") as f: # Use the globally defined CONFIG_FILE_PATH
             config_data = yaml.safe_load(f)
         if not config_data or "cameras" not in config_data:
             print(
@@ -549,18 +602,21 @@ def main(argv):
         print(f"Error parsing YAML configuration file {CONFIG_FILE_PATH}: {e}")
         return
 
-    if len(FLAGS.camera) == 0:
-        # If no cameras are specified, do all them.
+    if not FLAGS.camera: # Check if FLAGS.camera is empty list or None
         camera_names = []
-        for item in os.listdir(FLAGS.dir):
-            if os.path.isdir(os.path.join(FLAGS.dir, item)):
-                camera_names.append(item)
+        base_dir_for_cameras = FLAGS.dir if FLAGS.dir else ALL_CAMERAS_BASE_DIR
+        if os.path.exists(base_dir_for_cameras):
+            for item in os.listdir(base_dir_for_cameras):
+                if os.path.isdir(os.path.join(base_dir_for_cameras, item)):
+                    camera_names.append(item)
+        if not camera_names:
+            logging.warning(f"No camera subdirectories found in {base_dir_for_cameras}. Exiting.")
+            return
     else:
         camera_names = FLAGS.camera
 
     logging.info(f"Processing camera directories: {camera_names}")
     for camera_name in camera_names:
-        # Get sky area
         camera_config = config_data["cameras"].get(camera_name)
         if not camera_config:
             print(
@@ -568,39 +624,91 @@ def main(argv):
             )
             continue
 
-        sky_area_str = camera_config.get("sky_area")
-        if not sky_area_str:
+        sky_area_str_from_config = camera_config.get("sky_area") # Renamed to avoid conflict with flag
+        
+        # Prioritize flag sky_area if provided, otherwise use config
+        sky_area_to_use = FLAGS.sky_area if FLAGS.sky_area else sky_area_str_from_config
+
+        if not sky_area_to_use:
             print(
-                f"  'sky_area' not defined for camera '{camera_name}' in config. Skipping."
+                f"  'sky_area' not defined for camera '{camera_name}' in config or via flag. Skipping."
             )
             continue
 
-        camera_dir = os.path.join(FLAGS.dir, camera_name)
+        base_dir_for_cameras = FLAGS.dir if FLAGS.dir else ALL_CAMERAS_BASE_DIR
+        camera_dir = os.path.join(base_dir_for_cameras, camera_name)
         logging.info(f"Processing camera directory: {camera_dir}")
+
         if not os.path.exists(camera_dir):
-            logging.error(f"Camera directory {camera_dir} does not exist.")
-            return
-        # Date range handling
+            logging.error(f"Camera directory {camera_dir} does not exist. Skipping camera.")
+            continue
+            
         available_days = list_valid_days_directories(camera_dir)
-        if FLAGS.html_only is False:
-            if FLAGS.from_date is not None:
-                start_day = iso_day_to_dt(FLAGS.from_date)
-            else:
+        if not available_days and not FLAGS.html_only : # If no days and not just doing HTML, nothing to process
+             logging.warning(f"No valid day directories found in {camera_dir}. Skipping band generation.")
+             # Still generate HTML if requested, as it might show empty state or rely on pre-existing files
+             if FLAGS.html_only:
+                 generate_html(camera_dir=camera_dir)
+             continue
+
+
+        if not FLAGS.html_only:
+            if FLAGS.from_date:
+                try:
+                    start_day = iso_day_to_dt(FLAGS.from_date)
+                except ValueError:
+                    logging.error(f"Invalid from_date format: {FLAGS.from_date}. Expected YYYY-MM-DD.")
+                    return
+            elif available_days : # Only if available_days is not empty
                 start_day = iso_day_to_dt(available_days[0])
-            if FLAGS.to_date is not None:
-                end_day = iso_day_to_dt(FLAGS.to_date)
-            else:
+            else: # No available days and no from_date specified
+                logging.warning(f"No start date specified and no data found for camera {camera_name}. Skipping band generation.")
+                if FLAGS.html_only: # Fall through to generate HTML if that's all that's asked
+                    generate_html(camera_dir=camera_dir)
+                continue
+
+
+            if FLAGS.to_date:
+                try:
+                    end_day = iso_day_to_dt(FLAGS.to_date)
+                except ValueError:
+                    logging.error(f"Invalid to_date format: {FLAGS.to_date}. Expected YYYY-MM-DD.")
+                    return
+            elif available_days: # Only if available_days is not empty
                 end_day = iso_day_to_dt(available_days[-1])
-            # Cheap integration test doe run_end_of_day
-            if start_day == end_day:
-                run_end_of_day(
-                    camera_name,
-                    os.path.join(camera_dir, start_day.strftime("%Y-%m-%d")),
-                    sky_area_str,
-                )
+            else: # No available days and no to_date specified
+                logging.warning(f"No end date specified and no data found for camera {camera_name}. Skipping band generation.")
+                if FLAGS.html_only:
+                     generate_html(camera_dir=camera_dir)
+                continue
+            
+            if start_day > end_day:
+                logging.error(f"Start date {start_day.strftime('%Y-%m-%d')} is after end date {end_day.strftime('%Y-%m-%d')}. Skipping.")
+                continue
+
+
+            # Cheap integration test for run_end_of_day (only if a single specific day is processed)
+            # This logic seems a bit off if generate_bands_for_time_range is the main processor.
+            # Consider if run_end_of_day is still needed here or if its logic is covered by generate_bands_for_time_range.
+            # For now, keeping it as per original logic but it might be redundant if range includes single day.
+            if FLAGS.from_date and FLAGS.to_date and FLAGS.from_date == FLAGS.to_date:
+                 day_dir_path = os.path.join(camera_dir, start_day.strftime("%Y-%m-%d"))
+                 if os.path.exists(day_dir_path): # Check if the specific day directory exists
+                    logging.info(f"Running end of day for single specified day: {start_day.strftime('%Y-%m-%d')}")
+                    run_end_of_day( # This will create daily and then monthly for that day's month.
+                        camera_name,
+                        day_dir_path,
+                        sky_area_to_use, # Use the determined sky_area
+                    )
+                 else:
+                     logging.warning(f"Directory for single specified day {day_dir_path} does not exist. Skipping run_end_of_day.")
+            # Always run generate_bands_for_time_range if not html_only
+            # This will create daily bands and then call create_monthly_image for each relevant month.
             generate_bands_for_time_range(
-                start_day, end_day, camera_dir, sky_area_str, FLAGS.overwrite
+                start_day, end_day, camera_dir, sky_area_to_use, FLAGS.overwrite
             )
+        
+        # Always generate HTML after processing bands or if html_only
         generate_html(camera_dir=camera_dir)
 
 
@@ -627,17 +735,32 @@ if __name__ == "__main__":
     )
     flags.DEFINE_string(
         "sky_area",
-        None,
-        "Crop area of the picture representing the sky. Eg. 0,0,1000,300 for a 1000px wide, 300px tall rectangle from the top left corner of the picture.",
+        None, # Default to None, so config is used if this isn't set
+        "Crop area of the picture representing the sky. Eg. 0,0,1000,300. Overrides config if set.",
     )
     flags.DEFINE_bool(
         "html_only",
         False,
         "If true, only generate the HTML files and not the daylight bands.",
     )
-    flags.DEFINE_multi_string(
+    flags.DEFINE_multi_string( # 'camera' can be specified multiple times
         "camera",
-        None,
+        [], # Default to empty list
         "Name of the camera. Used to find pictures in the subdirectory of the --dir argument and to looking the sky_area in the config. If not specified, all cameras in the directory are processed.",
     )
-    app.run(main)
+    # It's good practice to also define a flag for the config file path if it's not hardcoded
+    flags.DEFINE_string("config_file", CONFIG_FILE_PATH, "Path to the YAML configuration file.")
+
+    # Update CONFIG_FILE_PATH based on flag if you want it to be overrideable
+    # This needs to happen before main if main directly uses the global.
+    # Or, pass FLAGS.config_file to main and use it there.
+    # For now, main() will use the global CONFIG_FILE_PATH which can be updated by the flag before app.run()
+    
+    def _main_wrapper(argv):
+        # Update global CONFIG_FILE_PATH if flag is used
+        global CONFIG_FILE_PATH
+        if FLAGS.config_file:
+             CONFIG_FILE_PATH = FLAGS.config_file
+        main(argv)
+
+    app.run(_main_wrapper)
