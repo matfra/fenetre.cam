@@ -1,129 +1,371 @@
 <!DOCTYPE html>
 <html>
-    <head>
-        <title>Camera Map - Mobile Friendly with Larger Popup</title>
-        <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-        <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.css" />
-        <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.Default.css" />
-        <style>
-            /* Make the body fill the entire screen */
-            body {
-                margin: 0;
-                padding: 0;
-                height: 100vh;
-                font-family: Arial, sans-serif;
-            }
-    
-            /* Responsive map size */
-            #map {
-                height: 66.67vh; /* 2/3 of the viewport height */
-                width: 100%; /* Full width */
-            }
-    
-            /* Adjust font size and layout for better readability on mobile */
-            h1 {
-                text-align: center;
-                font-size: 1.5em;
-                margin: 10px;
-            }
-    
-            .thumbnail-icon {
-                width: 160px;
-                height: 90px;
-                border-radius: 8px;
-                box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
-            }
-    
-            /* Style for the larger popup image */
-            .popup-image {
-                width: 90%;
-                height: auto;
-                display: block;
-                margin: 10px auto; /* Center the image and add some space */
-            }
-    
-            /* Custom style for the Leaflet popup */
-            .leaflet-popup-content {
-                text-align: center;
-                font-size: 1em;
-            }
-    
-            .leaflet-popup {
-                max-width: 90vw; /* Set the maximum width to 90% of the viewport */
-            }
-        </style>
-    </head>
+<head>
+    <title>Camera Map - Split Screen with Overlay (Updated Markers/Zoom)</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.Default.css" />
+    <style>
+        /* Make the body fill the entire screen and arrange panels */
+        body {
+            margin: 0;
+            padding: 0;
+            height: 100vh; /* Full viewport height */
+            font-family: Arial, sans-serif;
+            display: flex; /* Arrange child panels side-by-side */
+            overflow: hidden; /* Prevent scrollbars on body */
+        }
+
+        #left-panel {
+            width: 50%;
+            height: 100vh;
+            display: flex;
+            flex-direction: column; /* Stack title and map vertically */
+            border-right: 1px solid #ccc; /* Optional: visual separator */
+        }
+
+        #right-panel {
+            width: 50%;
+            height: 100vh;
+            display: flex; /* Use flex to manage header and list */
+            flex-direction: column; /* Stack header and list */
+            box-sizing: border-box;
+        }
+        
+        #right-panel-header {
+            padding: 15px 20px; /* Consistent padding */
+            background-color: #f8f8f8;
+            border-bottom: 1px solid #ddd;
+        }
+
+        #right-panel-header h2 { /* For "Cameras" list title */
+            text-align: left;
+            font-size: 1.3em;
+            margin: 0; /* Remove default margin */
+        }
+        
+        #camera-list-container {
+            flex-grow: 1; /* Allow list to take remaining space */
+            overflow-y: auto; /* Enable scrolling for the camera list */
+            padding: 0 10px 10px 10px;
+        }
+
+
+        /* Map takes available space in the left panel */
+        #map {
+            flex-grow: 1; /* Allows map to fill remaining vertical space */
+            width: 100%;
+            background-color: #f0f0f0; /* Optional: background for map area */
+        }
+
+        /* Title styling */
+        h1 { /* For "CamAREDN Map" */
+            text-align: center;
+            font-size: 1.5em;
+            margin: 0; /* Remove default margin */
+            padding: 15px 10px; /* Add padding */
+            background-color: #f8f8f8;
+            border-bottom: 1px solid #ddd;
+        }
+
+        /* Camera list styling */
+        #camera-list {
+            list-style-type: none;
+            padding: 0;
+            margin: 0; /* Remove default margin for ul */
+        }
+
+        #camera-list li {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            align-items: center;
+            font-size: 0.9em;
+        }
+        
+        #camera-list li:hover {
+            background-color: #e9e9e9;
+        }
+
+        #camera-list li img {
+            width: 120px; /* Increased thumbnail size */
+            height: 67.5px; /* Maintain 16:9 aspect ratio */
+            border-radius: 4px;
+            margin-right: 15px;
+            object-fit: cover;
+            background-color: #ddd;
+            cursor: pointer; /* Indicate image is clickable for overlay */
+        }
+        
+        #camera-list li .camera-title {
+            flex-grow: 1; /* Allow title to take remaining space */
+            cursor: pointer; /* Indicate title area is clickable for map interaction */
+        }
+
+        /* .thumbnail-icon CSS class is no longer used for map markers */
+
+        .popup-image {
+            width: 100%;
+            max-width: 280px;
+            height: auto;
+            display: block;
+            margin: 5px auto 10px auto;
+            border-radius: 4px;
+        }
+
+        .leaflet-popup-content {
+            text-align: center;
+            font-size: 1em;
+            margin: 10px !important;
+        }
+
+        .leaflet-popup-content-wrapper {
+            border-radius: 8px;
+        }
+        
+        .leaflet-popup {
+            max-width: 320px;
+        }
+        .leaflet-popup-close-button {
+            padding: 8px 8px 0 0 !important;
+        }
+
+        /* Image Overlay Styles */
+        #image-overlay {
+            display: none; /* Hidden by default */
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.85);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        #overlay-content {
+            position: relative;
+            background-color: #fff;
+            padding: 25px;
+            border-radius: 8px;
+            text-align: center;
+            max-width: 90vw;
+            max-height: 95vh; /* Adjusted for better fit */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+
+        #overlay-close {
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            font-size: 30px;
+            font-weight: bold;
+            color: #555;
+            cursor: pointer;
+            line-height: 1;
+        }
+        #overlay-close:hover {
+            color: #000;
+        }
+
+        #overlay-image {
+            max-width: 100%;
+            max-height: 65vh; /* Max height for the image, leaves space for links */
+            object-fit: contain;
+            margin-bottom: 20px;
+            border-radius: 4px;
+            border: 1px solid #eee;
+        }
+
+        #overlay-links a {
+            display: block;
+            margin: 10px 0;
+            padding: 12px 20px;
+            background-color: #007bff;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            font-size: 1em; /* Slightly larger font for links */
+            min-width: 250px; /* Ensure links have a decent width */
+            box-sizing: border-box;
+        }
+
+        #overlay-links a:hover {
+            background-color: #0056b3;
+        }
+
+    </style>
+</head>
 <body>
-    <h1>CamAREDN Map</h1>
-    <div id="map"></div>
+    <div id="left-panel">
+        <h1>CamAREDN Map</h1>
+        <div id="map"></div>
+    </div>
+    <div id="right-panel">
+        <div id="right-panel-header">
+            <h2>Cameras</h2>
+        </div>
+        <div id="camera-list-container">
+            <ul id="camera-list">
+                </ul>
+        </div>
+    </div>
+
+    <div id="image-overlay">
+        <div id="overlay-content">
+            <span id="overlay-close">&times;</span>
+            <img id="overlay-image" src="" alt="Full size camera image">
+            <div id="overlay-links">
+                <a id="link-today" href="#" target="_blank">Browse Today's Pictures</a>
+                <a id="link-timelapse" href="#" target="_blank">Yesterday's Timelapse</a>
+                <a id="link-history" href="#" target="_blank">All Time History</a>
+            </div>
+        </div>
+    </div>
+
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     <script src="https://unpkg.com/leaflet.markercluster/dist/leaflet.markercluster.js"></script>
     <script>
-        // Initialize the map with a temporary center and zoom level
         var map = L.map('map').setView([0, 0], 2);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 18,
+            maxZoom: 18, // Default maxZoom
+            minZoom: 0   // Default minZoom
         }).addTo(map);
 
-                // Create a marker cluster group
-                var markerCluster = L.markerClusterGroup();
+        var markerCluster = L.markerClusterGroup();
+        map.addLayer(markerCluster);
 
-        // Function to load cameras from JSON and add thumbnails as markers
+        var cameraMarkers = {};
+
+        // Overlay DOM elements
+        const overlay = document.getElementById('image-overlay');
+        const overlayImage = document.getElementById('overlay-image');
+        const overlayClose = document.getElementById('overlay-close');
+        const linkToday = document.getElementById('link-today');
+        const linkTimelapse = document.getElementById('link-timelapse');
+        const linkHistory = document.getElementById('link-history');
+
+        function formatDate(date) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        function showImageOverlay(camera) {
+            overlayImage.src = camera.image;
+            overlayImage.alt = `Full size image for ${camera.title}`;
+            const cameraNameForPath = encodeURIComponent(camera.title); 
+            const today = new Date();
+            const yesterday = new Date(today);
+            yesterday.setDate(today.getDate() - 1);
+            const todayStr = formatDate(today);
+            const yesterdayStr = formatDate(yesterday);
+
+            linkToday.href = `/photos/${cameraNameForPath}/${todayStr}`;
+            linkToday.textContent = `Today's Pictures (${todayStr})`;
+            linkTimelapse.href = `/photos/${cameraNameForPath}/${yesterdayStr}/${yesterdayStr}.webm`;
+            linkTimelapse.textContent = `Yesterday's Timelapse (${yesterdayStr})`;
+            linkHistory.href = `/photos/${cameraNameForPath}/daylight.html`;
+            linkHistory.textContent = `All Time History for ${camera.title}`;
+            overlay.style.display = 'flex';
+        }
+
+        overlayClose.addEventListener('click', () => {
+            overlay.style.display = 'none';
+        });
+        overlay.addEventListener('click', (event) => {
+            if (event.target === overlay) {
+                overlay.style.display = 'none';
+            }
+        });
+        
         function loadCameras() {
             fetch('cameras.json')
                 .then(response => response.json())
                 .then(cameras => {
-                    // Clear existing markers
-                    map.eachLayer(function(layer) {
-                        if (layer instanceof L.Marker) {
-                            map.removeLayer(layer);
-                        }
-                    });
-
-                    // Create an array to store LatLng objects for fitting bounds
+                    markerCluster.clearLayers();
+                    cameraMarkers = {};
+                    const cameraListElement = document.getElementById('camera-list');
+                    cameraListElement.innerHTML = ''; 
                     var cameraLatLngs = [];
 
-                    // Add new markers with thumbnail icons
-                    cameras.forEach(function(camera) {
+                    cameras.forEach(function(camera, index) {
                         var latLng = [camera.lat, camera.lon];
-                        // Skip the camera if it doesn't have valid coordinates
-                        if (!latLng[0] || !latLng[1]) {
-                            console.warn(`Skipping camera ${camera.title} due to missing coordinates.`);
+                        if (typeof latLng[0] !== 'number' || typeof latLng[1] !== 'number') {
+                            console.warn(`Skipping camera "${camera.title}" due to invalid or missing coordinates.`);
                             return;
                         }
                         cameraLatLngs.push(latLng);
 
-                        // Create a custom icon using the camera image
-                        var thumbnailIcon = L.icon({
-                            iconUrl: camera.image,
-                            iconSize: [160, 90], // set thumbnail size to 160x90
-                            className: 'thumbnail-icon'
-                        });
-
-                        // Add marker with custom icon to map and bind a popup with title and link
-                        var marker = L.marker(latLng, { icon: thumbnailIcon }).addTo(map);
+                        // Use default Leaflet marker (no custom thumbnail icon on map)
+                        var marker = L.marker(latLng); 
+                        
                         marker.bindPopup(
-                            `<img src="${camera.image}" class="popup-image" alt="Camera Image" width="100%"><br>
+                            `<img src="${camera.image}" class="popup-image" alt="Camera Image"><br>
                             <b>${camera.title}</b><br><a href="${camera.url}" target="_blank">View Camera Directory</a>`
                         );
 
-                        marker.on('click', function() {
-                            marker.openPopup(); // Open popup on click
+                        const markerId = `camera-${index}`;
+                        cameraMarkers[markerId] = marker;
+                        markerCluster.addLayer(marker);
+
+                        const listItem = document.createElement('li');
+                        const listImg = document.createElement('img');
+                        listImg.src = camera.image;
+                        listImg.alt = `${camera.title} thumbnail`;
+                        listImg.addEventListener('click', (event) => {
+                            event.stopPropagation();
+                            showImageOverlay(camera);
                         });
+
+                        const listTitleSpan = document.createElement('span');
+                        listTitleSpan.className = 'camera-title';
+                        listTitleSpan.textContent = camera.title;
+                        listTitleSpan.addEventListener('click', (event) => {
+                             listItem.click();
+                        });
+
+                        listItem.appendChild(listImg);
+                        listItem.appendChild(listTitleSpan);
+                        listItem.setAttribute('data-marker-id', markerId);
+
+                        listItem.addEventListener('click', function(event) {
+                            if (event.target !== listImg) {
+                                const clickedMarkerId = this.getAttribute('data-marker-id');
+                                const targetMarker = cameraMarkers[clickedMarkerId];
+                                if (targetMarker) {
+                                    markerCluster.zoomToShowLayer(targetMarker, function() {
+
+                                        targetMarker.openPopup(); // Open popup
+                                    });
+                                }
+                            }
+                        });
+                        cameraListElement.appendChild(listItem);
                     });
 
-                    // Calculate the map bounds to fit all cameras
                     if (cameraLatLngs.length > 0) {
                         var bounds = L.latLngBounds(cameraLatLngs);
-                        map.fitBounds(bounds, { padding: [50, 50] }); // Adds padding around the markers
+                        map.fitBounds(bounds, { padding: [50, 50] });
+                    } else if (cameras.length === 0) {
+                         map.setView([0,0], 2);
                     }
                 })
-                .catch(error => console.error('Error loading cameras:', error));
+                .catch(error => {
+                    console.error('Error loading cameras:', error);
+                    document.getElementById('camera-list').innerHTML = '<li>Error loading cameras.</li>';
+                });
         }
 
-        // Load cameras initially and then every minute
         loadCameras();
-        setInterval(loadCameras, 60000); // 60000 ms = 1 minute
+        setInterval(loadCameras, 60000);
     </script>
 </body>
 </html>
