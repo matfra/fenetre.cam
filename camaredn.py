@@ -111,7 +111,7 @@ def snap(camera_name, camera_config: Dict):
             return get_pic_from_url(url, timeout, ua)
         if local_command is not None:
             return get_pic_from_local_command(local_command, timeout)
-        # Add more capture methods here
+        # TODO(feature): Add more capture methods here
         return None
 
     # Initialization before the main loop
@@ -121,8 +121,8 @@ def snap(camera_name, camera_config: Dict):
     fixed_snap_interval = camera_config.get("snap_interval_s", None)
     if not camera_name in sleep_intervals:
         sleep_intervals[camera_name] = (
-            10 if fixed_snap_interval is None else fixed_snap_interval
-        )  # Start at 10 unless manually specified
+            float(fixed_snap_interval) if isinstance(fixed_snap_interval, (int, float)) else 60.0
+        )
 
     # daylight_metadata is a map of picture filename and their average sky color
     daylight_metadata = {}
@@ -136,8 +136,16 @@ def snap(camera_name, camera_config: Dict):
             camera_config.get("mozjpeg_optimize", False),
         )
         update_latest_link(previous_pic_fullpath)
-        if logging.level_debug():
-            logging.debug(f"{camera_name}: Sleeping {sleep_intervals[camera_name]}s")
+        metadata = {
+            # We want the relative path to the picture file, from the metadata file
+            "last_picture_url": os.path.relpath(previous_pic_fullpath, os.path.join(previous_pic_fullpath, os.path.pardir, os.path.pardir)),
+        }
+        metadata_path = os.path.join(previous_pic_dir, os.path.pardir, "metadata.json")
+        with open(metadata_path, "w") as f:
+            json.dump(metadata, f, indent=4)
+            logging.debug(f"{camera_name}: Updated metadata file {metadata_path}")
+
+        logging.debug(f"{camera_name}: Sleeping {sleep_intervals[camera_name]}s")
         time.sleep(sleep_intervals[camera_name])
         new_pic_dir, new_pic_filename = get_pic_dir_and_filename(camera_name)
         new_pic_fullpath = os.path.join(new_pic_dir, new_pic_filename)
@@ -268,6 +276,10 @@ def update_cameras_metadata(cameras_configs: Dict, work_dir: str):
         metadata = {}
         metadata["title"] = cam
         metadata["url"] = os.path.join("photos", cam)
+        metadata["livefeed_url"] = cameras_config[cam].get("url" or "local_command")
+        metadata["description"] = cameras_config[cam].get("description", "")
+        metadata["snap_interval_s"] = cameras_config[cam].get("snap_interval_s") or "dynamic"
+        metadata["dynamic_metadata"] = os.path.join("photos", cam, "metadata.json")
         metadata["image"] = os.path.join("photos", cam, "latest.jpg")
         metadata["lat"] = cameras_config[cam].get("lat")
         metadata["lon"] = cameras_config[cam].get("lon")
