@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Camera Map - Split Screen with Overlay (Updated Markers/Zoom)</title>
+    <title>Camera Map - Dynamic Metadata</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.Default.css" />
@@ -50,7 +50,6 @@
             padding: 0 10px 10px 10px;
         }
 
-
         /* Map takes available space in the left panel */
         #map {
             flex-grow: 1; /* Allows map to fill remaining vertical space */
@@ -95,14 +94,19 @@
             object-fit: cover;
             background-color: #ddd;
             cursor: pointer; /* Indicate image is clickable for overlay */
+            transition: filter 0.3s ease, opacity 0.3s ease; /* Smooth transition for greyscale */
         }
         
+        /* NEW: Style for stale (old) camera thumbnails */
+        #camera-list li.stale img {
+            filter: grayscale(100%);
+            opacity: 0.65;
+        }
+
         #camera-list li .camera-title {
             flex-grow: 1; /* Allow title to take remaining space */
             cursor: pointer; /* Indicate title area is clickable for map interaction */
         }
-
-        /* .thumbnail-icon CSS class is no longer used for map markers */
 
         .popup-image {
             width: 100%;
@@ -149,11 +153,11 @@
         #overlay-content {
             position: relative;
             background-color: #fff;
-            padding: 25px;
+            padding: 20px;
             border-radius: 8px;
             text-align: center;
             max-width: 90vw;
-            max-height: 95vh; /* Adjusted for better fit */
+            max-height: 95vh;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -173,26 +177,44 @@
         #overlay-close:hover {
             color: #000;
         }
+        
+        /* NEW: Title added to overlay */
+        #overlay-title {
+            margin: 0 0 15px 0;
+            font-size: 1.4em;
+            color: #333;
+        }
 
         #overlay-image {
             max-width: 100%;
-            max-height: 65vh; /* Max height for the image, leaves space for links */
+            max-height: 60vh; /* Adjusted to make space for filename */
             object-fit: contain;
-            margin-bottom: 20px;
+            margin-bottom: 10px;
             border-radius: 4px;
             border: 1px solid #eee;
+        }
+        
+        /* NEW: Filename display in overlay */
+        #overlay-filename {
+            margin: 0 0 15px 0;
+            font-family: 'Courier New', Courier, monospace;
+            color: #666;
+            background-color: #f5f5f5;
+            padding: 5px 10px;
+            border-radius: 3px;
+            font-size: 0.9em;
         }
 
         #overlay-links a {
             display: block;
-            margin: 10px 0;
-            padding: 12px 20px;
+            margin: 8px 0;
+            padding: 10px 20px;
             background-color: #007bff;
             color: white;
             text-decoration: none;
             border-radius: 5px;
-            font-size: 1em; /* Slightly larger font for links */
-            min-width: 250px; /* Ensure links have a decent width */
+            font-size: 0.9em;
+            min-width: 250px;
             box-sizing: border-box;
         }
 
@@ -220,7 +242,9 @@
     <div id="image-overlay">
         <div id="overlay-content">
             <span id="overlay-close">&times;</span>
+            <h3 id="overlay-title"></h3>
             <img id="overlay-image" src="" alt="Full size camera image">
+            <p id="overlay-filename"></p>
             <div id="overlay-links">
                 <a id="link-today" href="#" target="_blank">Browse Today's Pictures</a>
                 <a id="link-timelapse" href="#" target="_blank">Yesterday's Timelapse</a>
@@ -234,22 +258,111 @@
     <script>
         var map = L.map('map').setView([0, 0], 2);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 18, // Default maxZoom
-            minZoom: 0   // Default minZoom
+            maxZoom: 18,
+            minZoom: 0 
         }).addTo(map);
 
         var markerCluster = L.markerClusterGroup();
         map.addLayer(markerCluster);
 
-        var cameraMarkers = {};
+        var cameraMarkers = {}; // To store references to map markers
 
-        // Overlay DOM elements
+        // --- DOM Elements ---
         const overlay = document.getElementById('image-overlay');
+        const overlayTitle = document.getElementById('overlay-title');
         const overlayImage = document.getElementById('overlay-image');
+        const overlayFilename = document.getElementById('overlay-filename');
         const overlayClose = document.getElementById('overlay-close');
         const linkToday = document.getElementById('link-today');
         const linkTimelapse = document.getElementById('link-timelapse');
         const linkHistory = document.getElementById('link-history');
+
+        /**
+         * Parses a timestamp from an image filename.
+         * Example: "2025-05-31T11-00-24PDT.jpg" -> Date object
+         * Note: This is a simplified parser. It removes the timezone and assumes local time.
+         * For full timezone support, a library like date-fns-tz would be better.
+         */
+        function parseTimestampFromFilename(filename) {
+            try {
+                // Extracts "2025-05-31T11-00-24" from the filename
+                const match = filename.match(/(\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2})/);
+                if (match && match[1]) {
+                    // Replace the last dash with a colon for a valid ISO-like format
+                    const parsableString = match[1].replace(/-(\d{2})$/, ':$1');
+                    return new Date(parsableString);
+                }
+                return null; // Return null if no valid timestamp found
+            } catch (e) {
+                console.error("Error parsing timestamp from:", filename, e);
+                return null;
+            }
+        }
+
+        /**
+         * Fetches metadata for a single camera and updates its DOM elements.
+         */
+        function updateCameraMetadata(listItem) {
+            const metadataUrl = listItem.dataset.dynamicMetadata;
+            if (!metadataUrl) return;
+
+            fetch(metadataUrl)
+                .then(response => {
+                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                    return response.json();
+                })
+                .then(metadata => {
+                    const lastPictureUrl = metadata.last_picture_url;
+                    if (!lastPictureUrl) return;
+
+                    // Construct the full image URL
+                    // Assumes last_picture_url is relative to the metadata file's directory
+                    const basePath = metadataUrl.substring(0, metadataUrl.lastIndexOf('/'));
+                    const fullImageUrl = `${basePath}/${lastPictureUrl}`;
+
+                    // Extract filename for display
+                    const filename = lastPictureUrl.substring(lastPictureUrl.lastIndexOf('/') + 1);
+                    
+                    // Update data attributes for the overlay to use
+                    listItem.dataset.fullImageUrl = fullImageUrl;
+                    listItem.dataset.filename = filename;
+
+                    // Update the list thumbnail
+                    const listImg = listItem.querySelector('img');
+                    if(listImg) listImg.src = fullImageUrl;
+                    
+                    // Update the map popup content
+                    const marker = cameraMarkers[listItem.dataset.markerId];
+                    if (marker) {
+                        marker.setPopupContent(
+                            `<img src="${fullImageUrl}" class="popup-image" alt="Camera Image"><br>
+                            <b>${listItem.dataset.title}</b><br><a href="${listItem.dataset.url}" target="_blank">View Camera Directory</a>`
+                        );
+                    }
+
+                    // Check if the image is stale (older than 1 hour)
+                    const imageDate = parseTimestampFromFilename(filename);
+                    if (imageDate) {
+                        const now = new Date();
+                        const oneHourInMs = 60 * 60 * 1000;
+                        const isStale = (now - imageDate) > oneHourInMs;
+                        listItem.classList.toggle('stale', isStale);
+                    }
+                })
+                .catch(error => {
+                    console.error(`Failed to load metadata for ${listItem.dataset.title}:`, error);
+                    listItem.classList.add('stale'); // Mark as stale on error
+                });
+        }
+        
+        /**
+         * Iterates through all camera list items and triggers a metadata update.
+         */
+        function updateAllCameraMetadata() {
+            const cameraListItems = document.querySelectorAll('#camera-list li');
+            cameraListItems.forEach(updateCameraMetadata);
+            // console.log("Refreshed all camera metadata.");
+        }
 
         function formatDate(date) {
             const year = date.getFullYear();
@@ -258,22 +371,26 @@
             return `${year}-${month}-${day}`;
         }
 
-        function showImageOverlay(camera) {
-            overlayImage.src = camera.image;
-            overlayImage.alt = `Full size image for ${camera.title}`;
-            const cameraNameForPath = encodeURIComponent(camera.title); 
+        // The overlay now gets its info from the clicked list item's data attributes
+        function showImageOverlay(listItem) {
+            overlayTitle.textContent = listItem.dataset.title;
+            overlayImage.src = listItem.dataset.fullImageUrl || ''; // Use full image URL
+            overlayImage.alt = `Full size image for ${listItem.dataset.title}`;
+            overlayFilename.textContent = listItem.dataset.filename || 'N/A'; // Show filename
+
+            const cameraUrl = listItem.dataset.url;
             const today = new Date();
             const yesterday = new Date(today);
             yesterday.setDate(today.getDate() - 1);
             const todayStr = formatDate(today);
             const yesterdayStr = formatDate(yesterday);
 
-            linkToday.href = `/photos/${cameraNameForPath}/${todayStr}`;
+            linkToday.href = `${cameraUrl}/${todayStr}`;
             linkToday.textContent = `Today's Pictures (${todayStr})`;
-            linkTimelapse.href = `/photos/${cameraNameForPath}/${yesterdayStr}/${yesterdayStr}.webm`;
+            linkTimelapse.href = `${cameraUrl}/${yesterdayStr}/${yesterdayStr}.webm`;
             linkTimelapse.textContent = `Yesterday's Timelapse (${yesterdayStr})`;
-            linkHistory.href = `/photos/${cameraNameForPath}/daylight.html`;
-            linkHistory.textContent = `All Time History for ${camera.title}`;
+            linkHistory.href = `${cameraUrl}/daylight.html`;
+            linkHistory.textContent = `All Time History for ${listItem.dataset.title}`;
             overlay.style.display = 'flex';
         }
 
@@ -286,6 +403,9 @@
             }
         });
         
+        /**
+         * Loads the initial camera list and markers ONCE.
+         */
         function loadCameras() {
             fetch('cameras.json')
                 .then(response => response.json())
@@ -304,46 +424,44 @@
                         }
                         cameraLatLngs.push(latLng);
 
-                        // Use default Leaflet marker (no custom thumbnail icon on map)
                         var marker = L.marker(latLng); 
                         
-                        marker.bindPopup(
-                            `<img src="${camera.image}" class="popup-image" alt="Camera Image"><br>
-                            <b>${camera.title}</b><br><a href="${camera.url}" target="_blank">View Camera Directory</a>`
-                        );
+                        // Set initial popup content (will be updated by metadata refresh)
+                        marker.bindPopup(`<b>${camera.title}</b><br>Loading image...`);
 
                         const markerId = `camera-${index}`;
                         cameraMarkers[markerId] = marker;
                         markerCluster.addLayer(marker);
 
                         const listItem = document.createElement('li');
+                        // Store all necessary data on the list item itself
+                        listItem.dataset.markerId = markerId;
+                        listItem.dataset.title = camera.title;
+                        listItem.dataset.url = camera.url;
+                        listItem.dataset.dynamicMetadata = camera.dynamic_metadata;
+
                         const listImg = document.createElement('img');
-                        listImg.src = camera.image;
+                        listImg.src = ""; // Initially empty, will be populated by metadata refresh
                         listImg.alt = `${camera.title} thumbnail`;
                         listImg.addEventListener('click', (event) => {
                             event.stopPropagation();
-                            showImageOverlay(camera);
+                            showImageOverlay(listItem); // Pass the whole list item
                         });
 
                         const listTitleSpan = document.createElement('span');
                         listTitleSpan.className = 'camera-title';
                         listTitleSpan.textContent = camera.title;
-                        listTitleSpan.addEventListener('click', (event) => {
-                             listItem.click();
-                        });
-
+                        
                         listItem.appendChild(listImg);
                         listItem.appendChild(listTitleSpan);
-                        listItem.setAttribute('data-marker-id', markerId);
 
+                        // Click on list item pans map
                         listItem.addEventListener('click', function(event) {
                             if (event.target !== listImg) {
-                                const clickedMarkerId = this.getAttribute('data-marker-id');
-                                const targetMarker = cameraMarkers[clickedMarkerId];
+                                const targetMarker = cameraMarkers[this.dataset.markerId];
                                 if (targetMarker) {
                                     markerCluster.zoomToShowLayer(targetMarker, function() {
-
-                                        targetMarker.openPopup(); // Open popup
+                                        targetMarker.openPopup();
                                     });
                                 }
                             }
@@ -355,17 +473,23 @@
                         var bounds = L.latLngBounds(cameraLatLngs);
                         map.fitBounds(bounds, { padding: [50, 50] });
                     } else if (cameras.length === 0) {
-                         map.setView([0,0], 2);
+                        map.setView([0,0], 2);
                     }
+                    
+                    // --- TRIGGER FIRST DATA REFRESH ---
+                    updateAllCameraMetadata();
                 })
                 .catch(error => {
-                    console.error('Error loading cameras:', error);
-                    document.getElementById('camera-list').innerHTML = '<li>Error loading cameras.</li>';
+                    console.error('Error loading cameras.json:', error);
+                    document.getElementById('camera-list').innerHTML = '<li>Error loading initial camera list.</li>';
                 });
         }
 
-        loadCameras();
-        setInterval(loadCameras, 60000);
+        // --- SCRIPT EXECUTION ---
+        loadCameras(); // Load the static list once
+        // Set an interval to refresh the dynamic data every minute
+        setInterval(updateAllCameraMetadata, 60000); 
+
     </script>
 </body>
 </html>
