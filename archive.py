@@ -139,7 +139,7 @@ def main(argv):
             if not check_dir_has_daylight_band(daydir):
                 if FLAGS.create_daylight_bands:
                     logging.info(f"Creating daylight band for {daydir}")
-                    run_end_of_day(cam, daydir, sky_area, dry_run=FLAGS.dry_run)
+                    run_end_of_day(cam, daydir, sky_area)
 
                 logging.warning(f"{daydir} does not contain a daylight file")
                 # Continue to the next subdirectory.

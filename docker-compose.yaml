@@ -32,6 +32,7 @@ services:
     restart: unless-stopped
     ports:
       - "5802:80"  # Expose port 8080 on the host to port 80 in the container
+      - "5803:443" # Expose port 5803 on the host to port 443 for HTTPS in the container
     volumes:
       # Mount the same data directory to the Nginx container to serve it
       - /srv/camaredn/data:/usr/share/nginx/html:ro
