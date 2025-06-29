@@ -35,3 +35,10 @@ cameras:
     sky_area: 0,0,1056,300
     ssim_area: 0,0,1056,300
     ssim_setpoint: 0.90
+  a-gopro-camera:
+    gopro_ip: "10.5.5.9"
+    gopro_root_ca: |
+      -----BEGIN CERTIFICATE-----
+      YOUR-GOPRO-ROOT-CA
+      -----END CERTIFICATE-----
+    sky_area: 0,0,1920,500
