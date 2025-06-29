@@ -27,6 +27,7 @@ from SSIM_PIL import compare_ssim
 
 from timelapse import create_timelapse
 from daylight import run_end_of_day
+from gopro import capture_gopro_photo
 
 
 DEFAULT_SKY_AREA = "100,0,400,50"
@@ -104,6 +105,8 @@ def snap(camera_name, camera_config: Dict):
     url = camera_config.get("url")
     timeout = camera_config.get("timeout_s", 20)
     local_command = camera_config.get("local_command")
+    gopro_ip = camera_config.get("gopro_ip")
+    gopro_root_ca = camera_config.get("gopro_root_ca")
 
     def capture() -> Image:
         if url is not None:
@@ -111,6 +114,11 @@ def snap(camera_name, camera_config: Dict):
             return get_pic_from_url(url, timeout, ua)
         if local_command is not None:
             return get_pic_from_local_command(local_command, timeout)
+        if gopro_ip is not None:
+            jpeg_bytes = capture_gopro_photo(
+                ip_address=gopro_ip, timeout=timeout, root_ca=gopro_root_ca
+            )
+            return Image.open(BytesIO(jpeg_bytes))
         # TODO(feature): Add more capture methods here
         return None
 
@@ -121,7 +129,9 @@ def snap(camera_name, camera_config: Dict):
     fixed_snap_interval = camera_config.get("snap_interval_s", None)
     if not camera_name in sleep_intervals:
         sleep_intervals[camera_name] = (
-            float(fixed_snap_interval) if isinstance(fixed_snap_interval, (int, float)) else 60.0
+            float(fixed_snap_interval)
+            if isinstance(fixed_snap_interval, (int, float))
+            else 60.0
         )
 
     # daylight_metadata is a map of picture filename and their average sky color
@@ -138,7 +148,10 @@ def snap(camera_name, camera_config: Dict):
         update_latest_link(previous_pic_fullpath)
         metadata = {
             # We want the relative path to the picture file, from the metadata file
-            "last_picture_url": os.path.relpath(previous_pic_fullpath, os.path.join(previous_pic_fullpath, os.path.pardir, os.path.pardir)),
+            "last_picture_url": os.path.relpath(
+                previous_pic_fullpath,
+                os.path.join(previous_pic_fullpath, os.path.pardir, os.path.pardir),
+            ),
         }
         metadata_path = os.path.join(previous_pic_dir, os.path.pardir, "metadata.json")
         with open(metadata_path, "w") as f:
@@ -278,7 +291,9 @@ def update_cameras_metadata(cameras_configs: Dict, work_dir: str):
         metadata["url"] = os.path.join("photos", cam)
         metadata["livefeed_url"] = cameras_config[cam].get("url" or "local_command")
         metadata["description"] = cameras_config[cam].get("description", "")
-        metadata["snap_interval_s"] = cameras_config[cam].get("snap_interval_s") or "dynamic"
+        metadata["snap_interval_s"] = (
+            cameras_config[cam].get("snap_interval_s") or "dynamic"
+        )
         metadata["dynamic_metadata"] = os.path.join("photos", cam, "metadata.json")
         metadata["image"] = os.path.join("photos", cam, "latest.jpg")
         metadata["lat"] = cameras_config[cam].get("lat")
@@ -314,9 +329,7 @@ def main(argv):
     for cam in cameras_config:
         if cameras_config[cam].get("disabled", False) is True:
             # If the camera is disabled, we skip it.
-            logging.info(
-                f"Camera {cam} is disabled in the config. Skipping it."
-            )
+            logging.info(f"Camera {cam} is disabled in the config. Skipping it.")
             continue
         Thread(
             target=create_and_start_and_watch_thread,
@@ -368,6 +381,7 @@ def timelapse_loop():
                     f"There was an error creating the timelapse for dir: {dir}"
                 )
         time.sleep(30)
+
 
 def daylight_loop():
     """
