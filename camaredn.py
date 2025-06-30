@@ -275,15 +275,16 @@ def update_cameras_metadata(cameras_configs: Dict, work_dir: str):
     updated_cameras_metadata = []
 
     json_filepath = os.path.join(work_dir, "cameras.json")
-    with open(json_filepath, "r") as json_file:
-        cameras_public_metadata = json.load(json_file)
+    if os.path.exists(json_filepath):
+        with open(json_filepath, "r") as json_file:
+            cameras_public_metadata = json.load(json_file)
 
-        for camera_metadata in cameras_public_metadata:
-            if camera_metadata["title"] not in cameras_config:
-                logging.warning(
-                    f"Camera {camera_metadata['title']} is not configured anymore. Delete it from {json_filepath} manually if you want to."
-                )
-                updated_cameras_metadata.append(camera_metadata)
+            for camera_metadata in cameras_public_metadata:
+                if camera_metadata["title"] not in cameras_config:
+                    logging.warning(
+                        f"Camera {camera_metadata['title']} is not configured anymore. Delete it from {json_filepath} manually if you want to."
+                    )
+                    updated_cameras_metadata.append(camera_metadata)
 
     for cam in cameras_config:
         metadata = {}

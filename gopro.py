@@ -2,6 +2,7 @@ import requests
 import time
 from typing import Optional
 
+# TODO: Use Bluetooth to enable wifi and wait for NetworkManager to connect to the wifi and IP connectivity to be available before attempting capture. Gopro tutorial has the code to enable wifi via bluetooth: https://github.com/gopro/OpenGoPro/blob/main/demos/python/tutorial/tutorial_modules/tutorial_6_connect_wifi/enable_wifi_ap.py
 
 def capture_gopro_photo(
     ip_address: str = "10.5.5.9",
@@ -37,10 +38,12 @@ def capture_gopro_photo(
         temp_file.close()
         verify_path = temp_file.name
 
-    trigger_url = f"{scheme}://{ip_address}/api/v1/command/shutter"
-    requests.post(
+# TODO: Set the control mode to pro https://gopro.github.io/OpenGoPro/http#tag/settings/operation/GPCAMERA_CHANGE_SETTING::175
+# TODO: Set the prese to the correct mode (photo night: 65539) or create a special preset. We may want preset for day, sunset/sunrise and night 
+
+    trigger_url = f"{scheme}://{ip_address}/gopro/camera/shutter/start"
+    requests.get(
         trigger_url,
-        json={"action": "trigger"},
         timeout=timeout,
         verify=verify_path,
     )
@@ -51,7 +54,7 @@ def capture_gopro_photo(
     # Retrieve the media list to find the latest file. The OpenGoPro API returns
     # a list of directories with the files they contain. We support both the
     # older `d`/`fs` fields as well as the newer `directory`/`files` names.
-    media_list_url = f"{scheme}://{ip_address}/api/v1/media/list"
+    media_list_url = f"{scheme}://{ip_address}/gopro/media/list"
     resp = requests.get(media_list_url, timeout=timeout, verify=verify_path)
     resp.raise_for_status()
     data = resp.json()
@@ -72,7 +75,7 @@ def capture_gopro_photo(
         latest_file_info = files[-1]
         latest_file = latest_file_info.get("filename") or latest_file_info.get("n")
 
-    photo_url = f"{scheme}://{ip_address}/api/v1/media/{latest_dir}/{latest_file}"
+    photo_url = f"{scheme}://{ip_address}/videos/DCIM/{latest_dir}/{latest_file}"
     photo_resp = requests.get(photo_url, timeout=timeout, verify=verify_path)
     photo_resp.raise_for_status()
 
