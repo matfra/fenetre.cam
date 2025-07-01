@@ -1,18 +1,36 @@
-# CamAREDN
+# fenetre
 
-Saves pictures of HTTP cameras in a structured directory, make daily timelapses and runs a web server. This is inspired by https://github.com/matfra/isitfoggy.today
+Takes pictures periodically ( Raspberry Pi camera, GoPro or any URL ), make timelapse and publish them on a self-hosted website. Try it with you own cameras! Example: https://fenetre.cam
 
 
-## Capturing from a GoPro camera
-The `gopro.py` module provides a helper function `capture_gopro_photo` to trigger a GoPro over WiFi and download the photo using the [OpenGoPro HTTP API](https://gopro.github.io/OpenGoPro/http). Example usage:
-```python
-from gopro import capture_gopro_photo
-photo_bytes = capture_gopro_photo(output_file="latest.jpg")
-```
-This defaults to the standard GoPro WiFi address `10.5.5.9`.
-When using a GoPro as a camera source, set the `gopro_ip` key in the camera configuration.
-If the camera operates in COHN mode (where it joins your WiFi network and serves over HTTPS), provide the root TLS certificate in a `gopro_root_ca` field so requests can be verified.
+This is the inspired by https://github.com/matfra/isitfoggy.today and https://github.com/matfra/camaredn
 
-## TODO
-- Monthly and yearly daylight view
-- Map browser to pick the cameras
+This is mostly written in Python, runs best on Linux, in a virtualenv or in docker.
+
+Currently supported picture sources:
+- any local command yielding an image format supported by PIL https://pillow.readthedocs.io/en/latest/reference/features.html#features-module
+- GoPro Hero 9+ via Bluetooth + WiFi with https://gopro.github.io/OpenGoPro/
+- Raspberry Pi camera (tested with v2 and HQ)
+
+## Development Setup
+
+The test suite requires Python >=3.11. Install all dependencies using `pip install -r requirements.txt` before running tests.
+
+## TODO:
+
+### UI:
+- Each camera should have a main visualization page
+
+### Utility
+- Enforce the disk usage limits
+
+### Picture capture:
+- Implement native libcamera python functions instead of relying on libcamera-still
+- Add a preprocessing stage based on the previous picture to customize settings for the next picture
+- Add a postprocessing stage with basic features to crop, resize, correct AWB, etc.
+- Add support for time of day (day/sunset/sunrise/night) for different frequency and settings/profiles
+
+### GoPro
+- Add the ability to enable Wi-Fi AP on a GoPro using Bluetooth
+- Fix unittests with the correct paths
+- Create a custom photo profile
