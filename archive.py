@@ -8,7 +8,7 @@ from absl import app
 from absl import flags
 from absl import logging
 
-from camaredn import create_timelapse, config_load
+from fenetre import create_timelapse, config_load
 from daylight import run_end_of_day
 
 import os
@@ -16,7 +16,7 @@ import os
 
 # TODO:
 # - Make an archival loop instead of relying one external crontab
-# for d in $(ls -1 /srv/camaredn/data/photos/) ; do /srv/camaredn/venv/bin/python /srv/camaredn/archive.py --camera_dir=/srv/camaredn/data/photos/$d --dry_run=False ; done
+# for d in $(ls -1 /srv/fenetre/data/photos/) ; do /srv/fenetre/venv/bin/python /srv/fenetre/archive.py --camera_dir=/srv/fenetre/data/photos/$d --dry_run=False ; done
 # - mark for archiving and only archive after N days
 # - If missing timelapses and daylight are found, offer to add the in the queue
 # - Make the queue for daylight and timelapse a file on the FS (use async read/write if necessary?)

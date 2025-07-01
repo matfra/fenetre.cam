@@ -2,8 +2,8 @@
 Description=Fetch images and build timelapses
 
 [Service]
-ExecStart=/home/mathieu/srv/camaredn/venv/bin/python /home/mathieu/srv/camaredn/camaredn.py --config=/home/mathieu/srv/camaredn/config.yaml
-User=camaredn
+ExecStart=/srv/fenetre/venv/bin/python /srv/fenetre/fenetre.py --config=/srv/fenetre/config.yaml
+User=fenetre
 Restart=always
 Environment=TZ=America/Los_Angeles
 

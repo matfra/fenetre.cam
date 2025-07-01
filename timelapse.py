@@ -19,7 +19,7 @@ def create_timelapse(
     ffmpeg_options: str = "",
     two_pass: bool = False,
     file_ext: str = "mp4",
-    tmp_dir: str = "/dev/shm/camaredn",
+    tmp_dir: str = "/dev/shm/fenetre",
     dry_run: bool = False,
 ) -> bool:
     if not os.path.exists(dir):

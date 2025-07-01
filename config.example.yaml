@@ -1,7 +1,7 @@
 global:
   ffmpeg_options: "-framerate 30 -c:v libvpx-vp9 -b:v 3M" #default to "-framerate 30"
   ffmpeg_2pass: True #default to False
-  work_dir: /Users/me/Photos/camaredn
+  work_dir: /Users/me/Photos/fenetre
   work_dir_max_size_GB: 10
   timezone: "America/Los_Angeles"
 http_server:
