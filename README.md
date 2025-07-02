@@ -34,3 +34,4 @@ Currently supported picture sources:
 - Add the ability to enable Wi-Fi AP on a GoPro using Bluetooth
 - Fix unittests with the correct paths
 - Create a custom photo profile
+- Use the Python SDK https://gopro.github.io/OpenGoPro/python_sdk/api.html

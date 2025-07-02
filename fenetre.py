@@ -28,6 +28,7 @@ from SSIM_PIL import compare_ssim
 from timelapse import create_timelapse
 from daylight import run_end_of_day
 from gopro import capture_gopro_photo
+from postprocess import postprocess
 
 
 DEFAULT_SKY_AREA = "100,0,400,50"
@@ -116,7 +117,10 @@ def snap(camera_name, camera_config: Dict):
             return get_pic_from_local_command(local_command, timeout)
         if gopro_ip is not None:
             jpeg_bytes = capture_gopro_photo(
-                ip_address=gopro_ip, timeout=timeout, root_ca=gopro_root_ca
+                ip_address=gopro_ip,
+                timeout=timeout,
+                root_ca=gopro_root_ca,
+                preset=camera_config.get("gopro_preset"),
             )
             return Image.open(BytesIO(jpeg_bytes))
         # TODO(feature): Add more capture methods here
@@ -126,6 +130,9 @@ def snap(camera_name, camera_config: Dict):
     previous_pic_dir, previous_pic_filename = get_pic_dir_and_filename(camera_name)
     previous_pic_fullpath = os.path.join(previous_pic_dir, previous_pic_filename)
     previous_pic = capture()
+    previous_pic = postprocess(
+        previous_pic, camera_config.get("postprocessing", [])
+    )
     fixed_snap_interval = camera_config.get("snap_interval_s", None)
     if not camera_name in sleep_intervals:
         sleep_intervals[camera_name] = (

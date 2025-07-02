@@ -1,7 +1,7 @@
 global:
   ffmpeg_options: "-framerate 30 -c:v libvpx-vp9 -b:v 3M" #default to "-framerate 30"
   ffmpeg_2pass: True #default to False
-  work_dir: /Users/me/Photos/fenetre
+  work_dir: /Users/fenetre
   work_dir_max_size_GB: 10
   timezone: "America/Los_Angeles"
 http_server:
@@ -18,6 +18,13 @@ cameras:
     ssim_area: 0,80,1920,700
     ssim_setpoint: 0.93
     timeout_s: 20 # Default value is not specified
+    postprocessing:
+      - type: "crop"
+        area: "0,0,1920,1080"
+      - type: "resize"
+        width: 1280
+        height: 720
+      - type: "awb"
   a-boring-cam:
     url: "http://boring.example.com/pic.jpg"
     sky_area: 1200,0,1920,300 #Top right sky corner only
@@ -42,4 +49,5 @@ cameras:
       -----BEGIN CERTIFICATE-----
       YOUR-GOPRO-ROOT-CA
       -----END CERTIFICATE-----
+    gopro_preset: "65539" # Photo night
     sky_area: 0,0,1920,500
