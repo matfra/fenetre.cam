@@ -208,6 +208,11 @@ def snap(camera_name, camera_config: Dict):
 
 
 def get_ssim_for_area(image1: Image, image2: Image, area: str) -> float:
+    if image1.size != image2.size:
+        logging.error(
+            f"Images {image1.size} and {image2.size} are not the same size, cannot compare SSIM."
+        )
+        return 1.0
     if area is None:
         return compare_ssim(image1, image2)
     crop_points = [int(i) for i in area.split(",")]
