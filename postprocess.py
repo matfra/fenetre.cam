@@ -12,7 +12,7 @@ def postprocess(pic: Image, postprocessing_steps: list) -> Image:
         if step["type"] == "crop":
             pic = crop(pic, step["area"])
         elif step["type"] == "resize":
-            pic = resize(pic, step["width"], step["height"])
+            pic = resize(pic, step.get("width"), step.get("height"))
         elif step["type"] == "awb":
             pic = auto_white_balance(pic)
     return pic
