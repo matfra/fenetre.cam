@@ -1,28 +1,28 @@
 # fenetre
 
-Takes pictures periodically ( Raspberry Pi camera, GoPro or any URL ), make timelapse and publish them on a self-hosted website. Try it with you own cameras! Example: https://fenetre.cam
+Takes pictures periodically ( Raspberry Pi camera, GoPro, local command or any URL), make timelapse and publish them on a self-hosted website. Try it with you own cameras! Example: https://fenetre.cam
 
 
 This is the inspired by https://github.com/matfra/isitfoggy.today and https://github.com/matfra/camaredn
 
-This is mostly written in Python, runs best on Linux, in a virtualenv or in docker.
+This is mostly written in Python and meant to run on Linux in a virtualenv or in docker.
 
 Currently supported picture sources:
 - any local command yielding an image format supported by PIL https://pillow.readthedocs.io/en/latest/reference/features.html#features-module
 - GoPro Hero 9+ via Bluetooth + WiFi with https://gopro.github.io/OpenGoPro/
 - Raspberry Pi camera (tested with v2 and HQ)
 
-## Development Setup
-
-The test suite requires Python >=3.11. Install all dependencies using `pip install -r requirements.txt` before running tests.
-
 ## TODO:
 
 ### UI:
 - Each camera should have a main visualization page
+- If cameras don't have coordinates (lat and lon), don't display the map. Display only the right panel
 
 ### Utility
 - Enforce the disk usage limits
+- Add an http listener for a prometheus exporter
+- Create counters for the number of pictures taken since start for each camera
+- Create counters for the size of each camera directory
 
 ### Picture capture:
 - Implement native libcamera python functions instead of relying on libcamera-still
