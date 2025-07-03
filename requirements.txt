@@ -20,3 +20,4 @@ opencv-python
 siphash24
 scikit-image
 open-gopro
+bleak

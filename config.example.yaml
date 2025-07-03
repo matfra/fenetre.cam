@@ -45,9 +45,11 @@ cameras:
     ssim_setpoint: 0.90
   a-gopro-camera:
     gopro_ip: "10.5.5.9"
+    gopro_ble_identifier: "XXXX" # Last 4 digits of GoPro serial number
     gopro_root_ca: |
       -----BEGIN CERTIFICATE-----
       YOUR-GOPRO-ROOT-CA
       -----END CERTIFICATE-----
     gopro_preset: "65539" # Photo night
+    gopro_utility_poll_interval_s: 10
     sky_area: 0,0,1920,500

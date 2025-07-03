@@ -28,6 +28,7 @@ from SSIM_PIL import compare_ssim
 from timelapse import create_timelapse
 from daylight import run_end_of_day
 from gopro import capture_gopro_photo
+from gopro_utility import GoProUtilityThread
 from postprocess import postprocess
 
 
@@ -378,6 +379,9 @@ def main(argv):
             name=f"{cam}_watchdog",
             args=[snap, cam, [cam, cameras_config[cam]], 86400],
         ).start()
+        if cameras_config[cam].get("gopro_ip"):
+            gopro_utility_thread = GoProUtilityThread(cameras_config[cam], exit_event)
+            gopro_utility_thread.start()
 
     # Optional web server
     if server_config.get("enabled", False):
