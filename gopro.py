@@ -55,9 +55,7 @@ def capture_gopro_photo(
         temp_file.close()
         verify_path = temp_file.name
 
-# DONE: Set the control mode to pro https://gopro.github.io/OpenGoPro/http#tag/settings/operation/GPCAMERA_CHANGE_SETTING::175
-# DONE: Set the prese to the correct mode (photo night: 65539) or create a special preset. We may want preset for day, sunset/sunrise and night 
-
+# DONE: Reverted to previous method of listing all medias and looking at the last item.
     if preset:
         set_gopro_preset(ip_address, preset, timeout, verify_path, scheme)
 
