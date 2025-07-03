@@ -233,11 +233,13 @@ def get_ssim_for_area(image1: Image, image2: Image, area: str) -> float:
 
 def server_run():
     server_class = http.server.ThreadingHTTPServer
+    handler_class = partial(
+        http.server.SimpleHTTPRequestHandler, directory=global_config["work_dir"]
+    )
     server_address = (server_config["host"], server_config["port"])
     logging.info(f"Starting HTTP Server on {server_address}")
-    httpd = server_class(server_address)
+    httpd = server_class(server_address, handler_class)
     httpd.serve_forever()
-
 
 def create_and_start_and_watch_thread(
     f: callable, name: str, arguments: List[str] = [], exp_backoff_limit: int = 0
