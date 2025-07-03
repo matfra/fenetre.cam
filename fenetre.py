@@ -165,6 +165,10 @@ def snap(camera_name, camera_config: Dict):
             json.dump(metadata, f, indent=4)
             logging.debug(f"{camera_name}: Updated metadata file {metadata_path}")
 
+        # This is a good time to exit if the exit event is set.
+        if exit_event.is_set():
+            logging.info(f"{camera_name}: Exiting snap loop.")
+            return
         logging.debug(f"{camera_name}: Sleeping {sleep_intervals[camera_name]}s")
         time.sleep(sleep_intervals[camera_name])
         new_pic_dir, new_pic_filename = get_pic_dir_and_filename(camera_name)
