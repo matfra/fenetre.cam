@@ -68,7 +68,7 @@ class GoProUtilityThread(threading.Thread):
                     else:
                         logging.info(f"IP connectivity to {self.gopro_ip} is now OK.")
                 else:
-                    logging.info(f"IP connectivity to {self.gopro_ip} is OK.")
+                    logging.debug(f"IP connectivity to {self.gopro_ip} is OK.")
 
                 # 3. Gather the state of the camera and store it
                 state = _get_gopro_state(
@@ -85,7 +85,7 @@ class GoProUtilityThread(threading.Thread):
 
     async def _enable_wifi_ap(self):
         try:
-            ssid, password, client = await enable_wifi(self.gopro_ble_identifier)
+            ssid, password, client = await enable_wifi()
             self._ble_client = client  # Store client for potential later disconnect
             logging.info(f"GoPro Wi-Fi AP enabled. SSID: {ssid}, Password: {password}")
         except Exception as e:
