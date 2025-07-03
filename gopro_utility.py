@@ -9,8 +9,8 @@ from typing import Dict, Optional
 from absl import logging
 
 
-sys.path.append(os.path.join(os.path.dirname(__file__), "resources", "OpenGoPro", "demos", "python", "tutorial", "tutorial_modules"))
-from enable_wifi_ap import enable_wifi
+from resources.OpenGoPro.demos.python.tutorial.tutorial_modules import enable_wifi
+
 
 def _get_gopro_state(ip_address: str, root_ca: Optional[str] = None) -> Dict:
     """
@@ -19,7 +19,7 @@ def _get_gopro_state(ip_address: str, root_ca: Optional[str] = None) -> Dict:
     """
     scheme = "https" if root_ca else "http"
     url = f"{scheme}://{ip_address}/gopro/camera/state"
-    
+
     try:
         response = requests.get(url, timeout=5, verify=root_ca or False)
         response.raise_for_status()
@@ -28,17 +28,20 @@ def _get_gopro_state(ip_address: str, root_ca: Optional[str] = None) -> Dict:
         logging.error(f"Failed to get GoPro state from {ip_address}: {e}")
         return {}
 
+
 class GoProUtilityThread(threading.Thread):
     def __init__(self, camera_config: Dict, exit_event: threading.Event):
-        super().__init__(name=f"{camera_config.get('name', 'gopro')}_utility_thread", daemon=True)
+        super().__init__(
+            name=f"{camera_config.get('name', 'gopro')}_utility_thread", daemon=True
+        )
         self.camera_config = camera_config
         self.exit_event = exit_event
         self.gopro_ip = camera_config.get("gopro_ip")
         self.gopro_root_ca = camera_config.get("gopro_root_ca")
         self.gopro_ble_identifier = camera_config.get("gopro_ble_identifier")
         self.poll_interval_s = camera_config.get("gopro_utility_poll_interval_s", 10)
-        self.camera_state = {} # Global variable to store camera state
-        self._ble_client = None # To store the BleakClient instance
+        self.camera_state = {}  # Global variable to store camera state
+        self._ble_client = None  # To store the BleakClient instance
 
     def run(self):
         logging.info(f"Starting GoPro utility thread for {self.gopro_ip}")
@@ -46,13 +49,17 @@ class GoProUtilityThread(threading.Thread):
             try:
                 # 1. Verify IP connectivity
                 if not self._check_ip_connectivity():
-                    logging.info(f"No IP connectivity to {self.gopro_ip}. Attempting to enable Wi-Fi AP via Bluetooth...")
+                    logging.info(
+                        f"No IP connectivity to {self.gopro_ip}. Attempting to enable Wi-Fi AP via Bluetooth..."
+                    )
                     # 2. Bluetooth commands to enable wifi AP mode
                     # This part needs to run in an asyncio event loop
                     asyncio.run(self._enable_wifi_ap())
                     # After enabling, re-check IP connectivity
                     if not self._check_ip_connectivity():
-                        logging.warning(f"Failed to establish IP connectivity to {self.gopro_ip} after enabling Wi-Fi AP.")
+                        logging.warning(
+                            f"Failed to establish IP connectivity to {self.gopro_ip} after enabling Wi-Fi AP."
+                        )
                         self.exit_event.wait(self.poll_interval_s)
                         continue
                     logging.info(f"IP connectivity to {self.gopro_ip} is now OK.")
@@ -60,9 +67,8 @@ class GoProUtilityThread(threading.Thread):
                     logging.info(f"IP connectivity to {self.gopro_ip} is OK.")
 
                 # 3. Gather the state of the camera and store it
-                state =_get_gopro_state(
-                    ip_address=self.gopro_ip,
-                    root_ca=self.gopro_root_ca
+                state = _get_gopro_state(
+                    ip_address=self.gopro_ip, root_ca=self.gopro_root_ca
                 )
                 self.camera_state = state
                 logging.debug(f"GoPro state for {self.gopro_ip}:\n{self.camera_state}")
@@ -76,7 +82,7 @@ class GoProUtilityThread(threading.Thread):
     async def _enable_wifi_ap(self):
         try:
             ssid, password, client = await enable_wifi(self.gopro_ble_identifier)
-            self._ble_client = client # Store client for potential later disconnect
+            self._ble_client = client  # Store client for potential later disconnect
             logging.info(f"GoPro Wi-Fi AP enabled. SSID: {ssid}, Password: {password}")
         except Exception as e:
             logging.error(f"Failed to enable GoPro Wi-Fi AP via Bluetooth: {e}")
@@ -90,5 +96,7 @@ class GoProUtilityThread(threading.Thread):
             logging.debug(f"TCP connection to {self.gopro_ip}:80 failed: {e}")
             return False
         except Exception as e:
-            logging.error(f"Error checking IP connectivity to {self.gopro_ip} with TCP: {e}")
+            logging.error(
+                f"Error checking IP connectivity to {self.gopro_ip} with TCP: {e}"
+            )
             return False

@@ -230,30 +230,6 @@ def get_ssim_for_area(image1: Image, image2: Image, area: str) -> float:
         image2.crop(crop_points).resize((50, 50)),
     )
 
-
-from gopro import get_gopro_state
-
-class GoProStateHandler(http.server.SimpleHTTPRequestHandler):
-    def do_GET(self):
-        if self.path == "/gopro/state":
-            self.send_response(200)
-            self.send_header("Content-type", "text/plain")
-            self.end_headers()
-            for cam in cameras_config:
-                if cameras_config[cam].get("gopro_ip"):
-                    self.wfile.write(
-                        bytes(
-                            get_gopro_state(
-                                ip_address=cameras_config[cam].get("gopro_ip"),
-                                root_ca=cameras_config[cam].get("gopro_root_ca"),
-                            ),
-                            "utf-8",
-                        )
-                    )
-        else:
-            super().do_GET()
-
-
 def server_run():
     server_class = http.server.ThreadingHTTPServer
     handler_class = partial(GoProStateHandler, directory=global_config["work_dir"])
