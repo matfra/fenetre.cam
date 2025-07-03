@@ -51,15 +51,22 @@ class GoProUtilityThread(threading.Thread):
                 # 1. Verify IP connectivity
                 if not self._check_ip_connectivity():
                     logging.info(f"No IP connectivity to {self.gopro_ip}. Attempting to enable Wi-Fi AP via Bluetooth...")
-                    # 2. Bluetooth commands to enable wifi AP mode
-                    # This part needs to run in an asyncio event loop
                     asyncio.run(self._enable_wifi_ap())
-                    # After enabling, re-check IP connectivity
-                    if not self._check_ip_connectivity():
-                        logging.warning(f"Failed to establish IP connectivity to {self.gopro_ip} after enabling Wi-Fi AP. Retrying in {self.bluetooth_retry_delay_s}s")
-                        self.exit_event.wait(self.bluetooth_retry_delay_s)
-                        continue
-                    logging.info(f"IP connectivity to {self.gopro_ip} is now OK.")
+
+                    # After attempting to enable Wi-Fi AP, poll for connectivity
+                    # for the duration of bluetooth_retry_delay_s
+                    start_time = time.time()
+                    while not self.exit_event.is_set() and (time.time() - start_time) < self.bluetooth_retry_delay_s:
+                        if self._check_ip_connectivity():
+                            logging.info(f"IP connectivity to {self.gopro_ip} is now OK.")
+                            break # Exit the polling loop if connected
+                        logging.debug(f"Still no IP connectivity to {self.gopro_ip}. Retrying check in {self.poll_interval_s}s...")
+                        self.exit_event.wait(self.poll_interval_s)
+
+                    if not self._check_ip_connectivity(): # Final check after the polling loop
+                        logging.warning(f"Failed to establish IP connectivity to {self.gopro_ip} after enabling Wi-Fi AP and polling.")
+                    else:
+                        logging.info(f"IP connectivity to {self.gopro_ip} is now OK.")
                 else:
                     logging.info(f"IP connectivity to {self.gopro_ip} is OK.")
 
