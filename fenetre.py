@@ -230,12 +230,12 @@ def get_ssim_for_area(image1: Image, image2: Image, area: str) -> float:
         image2.crop(crop_points).resize((50, 50)),
     )
 
+
 def server_run():
     server_class = http.server.ThreadingHTTPServer
-    handler_class = partial(GoProStateHandler, directory=global_config["work_dir"])
     server_address = (server_config["host"], server_config["port"])
     logging.info(f"Starting HTTP Server on {server_address}")
-    httpd = server_class(server_address, handler_class)
+    httpd = server_class(server_address)
     httpd.serve_forever()
 
 
