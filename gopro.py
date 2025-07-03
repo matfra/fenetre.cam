@@ -133,11 +133,12 @@ def get_gopro_state(
     root_ca: Optional[str] = None,
 ) -> str:
     """Get the GoPro state and format it in Prometheus format."""
-    from open_gopro import WirelessGoPro
+    from open_gopro.communication_client import GoProHttp
 
-    with WirelessGoPro(ip_address, root_ca) as gopro:
-        state = gopro.http_command.get_camera_state()
-        return "\n".join(
-            f'gopro_{key}{{camera="{ip_address}"}} {value}'
-            for key, value in state.items()
-        )
+    gopro = GoProHttp(ip_address, root_ca)
+    state = gopro.get_camera_state()
+    return "\n".join(
+        f'gopro_{key}{{camera="{ip_address}"}} {value}'
+        for key, value in state.items()
+    )
+
