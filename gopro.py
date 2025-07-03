@@ -125,3 +125,19 @@ def capture_gopro_photo(
     )
 
     return photo_resp.content
+
+
+def get_gopro_state(
+    ip_address: str = "10.5.5.9",
+    timeout: int = 5,
+    root_ca: Optional[str] = None,
+) -> str:
+    """Get the GoPro state and format it in Prometheus format."""
+    from open_gopro import WirelessGoPro
+
+    with WirelessGoPro(ip_address, root_ca) as gopro:
+        state = gopro.http_command.get_camera_state()
+        return "\n".join(
+            f'gopro_{key}{{camera="{ip_address}"}} {value}'
+            for key, value in state.items()
+        )
