@@ -52,4 +52,5 @@ cameras:
       -----END CERTIFICATE-----
     gopro_preset: "65539" # Photo night
     gopro_utility_poll_interval_s: 10
+    gopro_bluetooth_retry_delay_s: 180
     sky_area: 0,0,1920,500

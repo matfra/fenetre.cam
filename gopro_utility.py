@@ -40,7 +40,8 @@ class GoProUtilityThread(threading.Thread):
         self.gopro_root_ca = camera_config.get("gopro_root_ca")
         self.gopro_ble_identifier = camera_config.get("gopro_ble_identifier")
         self.poll_interval_s = camera_config.get("gopro_utility_poll_interval_s", 10)
-        self.camera_state = {}  # Global variable to store camera state
+        self.bluetooth_retry_delay_s = camera_config.get("gopro_bluetooth_retry_delay_s", 180) # Default to 3 minutes
+        self.camera_state = {} # Global variable to store camera state
         self._ble_client = None  # To store the BleakClient instance
 
     def run(self):
@@ -49,18 +50,14 @@ class GoProUtilityThread(threading.Thread):
             try:
                 # 1. Verify IP connectivity
                 if not self._check_ip_connectivity():
-                    logging.info(
-                        f"No IP connectivity to {self.gopro_ip}. Attempting to enable Wi-Fi AP via Bluetooth..."
-                    )
+                    logging.info(f"No IP connectivity to {self.gopro_ip}. Attempting to enable Wi-Fi AP via Bluetooth...")
                     # 2. Bluetooth commands to enable wifi AP mode
                     # This part needs to run in an asyncio event loop
                     asyncio.run(self._enable_wifi_ap())
                     # After enabling, re-check IP connectivity
                     if not self._check_ip_connectivity():
-                        logging.warning(
-                            f"Failed to establish IP connectivity to {self.gopro_ip} after enabling Wi-Fi AP."
-                        )
-                        self.exit_event.wait(self.poll_interval_s)
+                        logging.warning(f"Failed to establish IP connectivity to {self.gopro_ip} after enabling Wi-Fi AP. Retrying in {self.bluetooth_retry_delay_s}s")
+                        self.exit_event.wait(self.bluetooth_retry_delay_s)
                         continue
                     logging.info(f"IP connectivity to {self.gopro_ip} is now OK.")
                 else:
