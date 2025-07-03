@@ -2,22 +2,52 @@ import requests
 import time
 from typing import Optional
 
-# TODO(maybe): Use Bluetooth to enable wifi and wait for NetworkManager to connect to the wifi and IP connectivity to be available before attempting capture. Gopro tutorial has the code to enable wifi via bluetooth: https://github.com/gopro/OpenGoPro/blob/main/demos/python/tutorial/tutorial_modules/tutorial_6_connect_wifi/enable_wifi_ap.py
 
-def set_gopro_preset(
+def _set_gopro_settings(
     ip_address: str,
     preset: str,
     timeout: int,
     verify_path: str,
     scheme: str,
 ):
-    """Set the GoPro preset."""
-    preset_url = f"{scheme}://{ip_address}/gopro/camera/presets/load?p1={preset}"
+    """Set the GoPro settings for remote control."""
+    # Takeover control of the GoPro camera https://gopro.github.io/OpenGoPro/http#tag/Control/operation/GPCAMERA_SYSTEM_RESET
+    camera_control_url = (
+        f"{scheme}://{ip_address}/gopro/camera/control/set_ui_controller?p=2"
+    )
     requests.get(
-        preset_url,
+        camera_control_url,
         timeout=timeout,
         verify=verify_path,
     )
+
+    # Set the control mode to pro
+    pro_mode_url = f"{scheme}://{ip_address}/gopro/camera/setting?option=1&setting=175"
+    requests.get(
+        pro_mode_url,
+        timeout=timeout,
+        verify=verify_path,
+    )
+
+    # TODO(Enable this based on the GPS coordinates of the camera and expected sunset time)
+
+    night_photo_url = (
+        f"{scheme}://{ip_address}/gopro/camera/setting?option=1&setting=177"
+    )
+    requests.get(
+        night_photo_url,
+        timeout=timeout,
+        verify=verify_path,
+    )
+
+    """Set the GoPro preset."""
+    if preset:
+        preset_url = f"{scheme}://{ip_address}/gopro/camera/presets/load?p1={preset}"
+        requests.get(
+            preset_url,
+            timeout=timeout,
+            verify=verify_path,
+        )
 
 
 def _get_latest_file(
@@ -47,6 +77,7 @@ def _get_latest_file(
         latest_file_info = files[-1]
         latest_file = latest_file_info.get("filename") or latest_file_info.get("n")
     return latest_dir, latest_file
+
 
 def capture_gopro_photo(
     ip_address: str = "10.5.5.9",
@@ -83,12 +114,14 @@ def capture_gopro_photo(
         temp_file.close()
         verify_path = temp_file.name
 
-# DONE: Implement the logic to get the last file name, capture, loop until the new file appears, download it
+    # DONE: Implement the logic to get the last file name, capture, loop until the new file appears, download it
     # Get the last captured file before taking a new one
-    latest_dir_before, latest_file_before = _get_latest_file(ip_address, timeout, verify_path, scheme)
+    latest_dir_before, latest_file_before = _get_latest_file(
+        ip_address, timeout, verify_path, scheme
+    )
 
-    if preset:
-        set_gopro_preset(ip_address, preset, timeout, verify_path, scheme)
+    
+    _set_gopro_settings(ip_address, preset, timeout, verify_path, scheme)
 
     # Trigger the shutter to capture a new photo
     trigger_url = f"{scheme}://{ip_address}/gopro/camera/shutter/start"
@@ -101,8 +134,13 @@ def capture_gopro_photo(
     # Poll for the last captured file until it changes
     while True:
         try:
-            latest_dir_after, latest_file_after = _get_latest_file(ip_address, timeout, verify_path, scheme)
-            if latest_dir_after != latest_dir_before or latest_file_after != latest_file_before:
+            latest_dir_after, latest_file_after = _get_latest_file(
+                ip_address, timeout, verify_path, scheme
+            )
+            if (
+                latest_dir_after != latest_dir_before
+                or latest_file_after != latest_file_before
+            ):
                 break
         except requests.exceptions.HTTPError as e:
             if e.response.status_code == 503:
@@ -111,7 +149,9 @@ def capture_gopro_photo(
             raise
         time.sleep(0.5)
 
-    photo_url = f"{scheme}://{ip_address}/videos/DCIM/{latest_dir_after}/{latest_file_after}"
+    photo_url = (
+        f"{scheme}://{ip_address}/videos/DCIM/{latest_dir_after}/{latest_file_after}"
+    )
     photo_resp = requests.get(photo_url, timeout=timeout, verify=verify_path)
     photo_resp.raise_for_status()
 
@@ -126,35 +166,9 @@ def capture_gopro_photo(
         verify=verify_path,
     )
 
-    
     if temp_file:
         import os
 
         os.unlink(temp_file.name)
 
-    # Set the control mode to pro
-    pro_mode_url = f"{scheme}://{ip_address}/gopro/camera/setting?p1=175&p2=1"
-    requests.get(
-        pro_mode_url,
-        timeout=timeout,
-        verify=verify_path,
-    )
-
     return photo_resp.content
-
-
-def get_gopro_state(
-    ip_address: str = "10.5.5.9",
-    timeout: int = 5,
-    root_ca: Optional[str] = None,
-) -> str:
-    """Get the GoPro state and format it in Prometheus format."""
-    from open_gopro.communication_client import GoProHttp
-
-    gopro = GoProHttp(ip_address, root_ca)
-    state = gopro.get_camera_state()
-    return "\n".join(
-        f'gopro_{key}{{camera="{ip_address}"}} {value}'
-        for key, value in state.items()
-    )
-

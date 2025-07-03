@@ -8,10 +8,24 @@ import asyncio
 from typing import Dict, Optional
 from absl import logging
 
-from gopro import get_gopro_state
 
-sys.path.append(os.path.join(os.path.dirname(__file__), "resources", "OpenGoPro", "demos", "python", "tutorial", "tutorial_modules"))
-from enable_wifi_ap import enable_wifi
+from resources.OpenGoPro.demos.python.tutorial.tutorial_modules.enable_wifi_ap import enable_wifi
+
+def _get_gopro_state(ip_address: str, root_ca: Optional[str] = None) -> Dict:
+    """
+    Get the current state of the GoPro camera.
+    This function retrieves the camera's state via HTTP GET request.
+    """
+    scheme = "https" if root_ca else "http"
+    url = f"{scheme}://{ip_address}/gopro/camera/state"
+    
+    try:
+        response = requests.get(url, timeout=5, verify=root_ca or False)
+        response.raise_for_status()
+        return response.json()
+    except requests.RequestException as e:
+        logging.error(f"Failed to get GoPro state from {ip_address}: {e}")
+        return {}
 
 class GoProUtilityThread(threading.Thread):
     def __init__(self, camera_config: Dict, exit_event: threading.Event):
@@ -45,7 +59,7 @@ class GoProUtilityThread(threading.Thread):
                     logging.info(f"IP connectivity to {self.gopro_ip} is OK.")
 
                 # 3. Gather the state of the camera and store it
-                state = get_gopro_state(
+                state =_get_gopro_state(
                     ip_address=self.gopro_ip,
                     root_ca=self.gopro_root_ca
                 )

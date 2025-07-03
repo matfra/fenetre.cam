@@ -131,9 +131,10 @@ def snap(camera_name, camera_config: Dict):
     previous_pic_dir, previous_pic_filename = get_pic_dir_and_filename(camera_name)
     previous_pic_fullpath = os.path.join(previous_pic_dir, previous_pic_filename)
     previous_pic = capture()
-    previous_pic = postprocess(
-        previous_pic, camera_config.get("postprocessing", [])
-    )
+    if len(camera_config.get("postprocessing", [])) > 0:
+        previous_pic = postprocess(
+            previous_pic, camera_config.get("postprocessing", [])
+        )
     fixed_snap_interval = camera_config.get("snap_interval_s", None)
     if not camera_name in sleep_intervals:
         sleep_intervals[camera_name] = (
