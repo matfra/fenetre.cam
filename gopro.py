@@ -40,6 +40,47 @@ def _set_gopro_settings(
         verify=verify_path,
     )
 
+    # Set the LCD brightness to minimum to avoid wearing out the LCD
+    lcd_brightness_url = f"{scheme}://{ip_address}/gopro/camera/setting?option=10&setting=88"
+    requests.get(
+        lcd_brightness_url,
+        timeout=timeout,
+        verify=verify_path,
+    )
+
+    # Set photo output to superphoto
+    photo_output_url = f"{scheme}://{ip_address}/gopro/camera/setting?option=3&setting=125"
+    requests.get(
+        photo_output_url,
+        timeout=timeout,
+        verify=verify_path,
+    )
+
+    # Turn off all LEDs:
+    led_off_url = f"{scheme}://{ip_address}/gopro/camera/setting?option=4&setting=91"
+    requests.get(
+        led_off_url,
+        timeout=timeout,
+        verify=verify_path,
+    )
+
+    # Disable GPS in metadata
+    gps_off_url = f"{scheme}://{ip_address}/gopro/camera/setting?option=1&setting=83"
+    requests.get(
+        gps_off_url,
+        timeout=timeout,
+        verify=verify_path,
+    )
+
+    # Set up auto power down to 30 minutes (option 7)
+    auto_power_down_url = f"{scheme}://{ip_address}/gopro/camera/setting?option=1&setting=59"
+    requests.get(
+        auto_power_down_url,
+        timeout=timeout,
+        verify=verify_path,
+    )
+
+
     """Set the GoPro preset."""
     if preset:
         preset_url = f"{scheme}://{ip_address}/gopro/camera/presets/load?p1={preset}"
