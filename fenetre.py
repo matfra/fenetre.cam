@@ -209,6 +209,10 @@ def snap(camera_name, camera_config: Dict):
                     f"{camera_name}: ssim {ssim}, setpoint: {ssim_setpoint}, new sleep interval: {sleep_intervals[camera_name]}s"
                 )
         previous_pic = new_pic
+        if len(camera_config.get("postprocessing", [])) > 0:
+            previous_pic = postprocess(
+                previous_pic, camera_config.get("postprocessing", [])
+            )
         previous_pic_dir = new_pic_dir
         previous_pic_fullpath = new_pic_fullpath
 
