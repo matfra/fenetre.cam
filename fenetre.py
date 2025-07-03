@@ -145,7 +145,7 @@ def snap(camera_name, camera_config: Dict):
     daylight_metadata = {}
 
     # Capture loop
-    while True:
+    while not exit_event.is_set():
         # Immediately save the previous pic to disk.
         write_pic_to_disk(
             previous_pic,
@@ -264,7 +264,7 @@ def create_and_start_and_watch_thread(
     last_failure = datetime.now()
     global sleep_intervals
     sleep_intervals = {}  # Store the sleep time outside of the thread (which can die)
-    while True:
+    while not exit_event.is_set():
         running_threads_name = [t.name for t in threading.enumerate()]
 
         if not name in running_threads_name:
@@ -341,6 +341,9 @@ def update_cameras_metadata(cameras_configs: Dict, work_dir: str):
 def main(argv):
     del argv  # Unused.
 
+    global exit_event
+    exit_event = threading.Event()
+
     # TODO: Are global variable really necessary?
     global server_config, cameras_config, global_config
     server_config, cameras_config, global_config = config_load(FLAGS.config)
@@ -386,8 +389,12 @@ def main(argv):
     logging.info(f"Starting thread {daylight_loop}")
     daylight_thread.start()
 
-    while True:
-        time.sleep(5)
+    try:
+        while True:
+            time.sleep(5)
+    except KeyboardInterrupt:
+        logging.info("Exiting...")
+        exit_event.set()
 
 
 def timelapse_loop():
@@ -395,7 +402,7 @@ def timelapse_loop():
     This is a loop with a blocking Thread to create timelapses one at a time.
     This prevent overloading the system by creating new daily timelapses for all the cameras at the same time.
     """
-    while True:
+    while not exit_event.is_set():
         if len(timelapse_q) > 0:
             dir = timelapse_q.popleft()
             result = False
@@ -421,7 +428,7 @@ def daylight_loop():
     """
     This is a loop generating the daylight bands, one at a time.
     """
-    while True:
+    while not exit_event.is_set():
         if len(daylight_q) > 0:
             camera_name, daily_pic_dir, sky_area = daylight_q.popleft()
             logging.info(
