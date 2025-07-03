@@ -3,6 +3,7 @@ import numpy as np
 from PIL import Image
 from skimage import exposure
 from typing import Optional
+from absl import logging
 
 def postprocess(pic: Image, postprocessing_steps: list) -> Image:
     """
@@ -10,10 +11,13 @@ def postprocess(pic: Image, postprocessing_steps: list) -> Image:
     """
     for step in postprocessing_steps:
         if step["type"] == "crop":
+            logging.debug(f"Cropping image to area: {step['area']}")
             pic = crop(pic, step["area"])
         elif step["type"] == "resize":
+            logging.debug(f"Resizing image to width: {step.get('width')}, height: {step.get('height')}")
             pic = resize(pic, step.get("width"), step.get("height"))
         elif step["type"] == "awb":
+            logging.debug("Applying auto white balance to image")
             pic = auto_white_balance(pic)
     return pic
 
