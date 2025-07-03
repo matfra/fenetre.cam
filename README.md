@@ -14,6 +14,11 @@ Currently supported picture sources:
 
 ## TODO:
 
+## How to run?
+If you have a GoPro, you will need to run
+`git submodule update --init --recursive`
+
+
 ### UI:
 - Each camera should have a main visualization page
 - If cameras don't have coordinates (lat and lon), don't display the map. Display only the right panel

@@ -9,7 +9,8 @@ from typing import Dict, Optional
 from absl import logging
 
 
-from resources.OpenGoPro.demos.python.tutorial.tutorial_modules.enable_wifi_ap import enable_wifi
+sys.path.append(os.path.join(os.path.dirname(__file__), "resources", "OpenGoPro", "demos", "python", "tutorial", "tutorial_modules"))
+from enable_wifi_ap import enable_wifi
 
 def _get_gopro_state(ip_address: str, root_ca: Optional[str] = None) -> Dict:
     """
