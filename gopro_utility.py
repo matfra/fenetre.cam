@@ -3,7 +3,7 @@ import os
 import threading
 import time
 import requests
-import subprocess
+import socket
 import asyncio
 from typing import Dict, Optional
 from absl import logging
@@ -68,19 +68,12 @@ class GoProUtilityThread(threading.Thread):
 
     def _check_ip_connectivity(self) -> bool:
         try:
-            # Use ping to check IP connectivity
-            # -c 1: send 1 packet
-            # -W 1: wait 1 second for a response
-            command = ["ping", "-c", "1", "-W", "1", self.gopro_ip]
-            # On Windows, use -n 1 and -w 1000 (for 1000ms timeout)
-            # if sys.platform.startswith("win"): 
-            #     command = ["ping", "-n", "1", "-w", "1000", self.gopro_ip]
-
-            result = subprocess.run(command, capture_output=True, text=True, timeout=2)
-            return result.returncode == 0
-        except subprocess.TimeoutExpired:
-            logging.warning(f"Ping to {self.gopro_ip} timed out.")
+            # Attempt to connect to the GoPro's HTTP port (default 80)
+            with socket.create_connection((self.gopro_ip, 80), timeout=2):
+                return True
+        except (socket.timeout, ConnectionRefusedError, OSError) as e:
+            logging.debug(f"TCP connection to {self.gopro_ip}:80 failed: {e}")
             return False
         except Exception as e:
-            logging.error(f"Error checking IP connectivity to {self.gopro_ip} with ping: {e}")
+            logging.error(f"Error checking IP connectivity to {self.gopro_ip} with TCP: {e}")
             return False
