@@ -9,6 +9,7 @@ from absl import app
 from absl import flags
 from absl import logging
 
+from typing import Optional
 
 # TODO: optimize 2 pass encoding for vp9 https://developers.google.com/media/vp9/bitrate-modes
 
@@ -19,7 +20,7 @@ def create_timelapse(
     ffmpeg_options: str = "",
     two_pass: bool = False,
     file_ext: str = "mp4",
-    tmp_dir: str = "/dev/shm/fenetre",
+    tmp_dir: Optional[str] = "/dev/shm/fenetre",
     dry_run: bool = False,
 ) -> bool:
     if not os.path.exists(dir):

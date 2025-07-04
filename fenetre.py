@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from ast import Tuple
 import http.server
 import json
 import os
@@ -14,6 +15,9 @@ from io import BytesIO
 from threading import Thread
 from typing import Dict
 from typing import List
+from typing import Tuple
+from typing import Optional
+from typing import Callable
 
 import mozjpeg_lossless_optimization
 import pytz
@@ -44,7 +48,7 @@ def config_load(config_file_path: str) -> List[Dict]:
         return res
 
 
-def get_pic_from_url(url: str, timeout: int, ua: str = None) -> Image:
+def get_pic_from_url(url: str, timeout: int, ua: str = "") -> Image.Image:
     headers = {"Accept": "image/*,*"}
     if ua:
         requests_version = requests.__version__
@@ -63,7 +67,7 @@ def get_pic_from_url(url: str, timeout: int, ua: str = None) -> Image:
     return Image.open(BytesIO(r.content))
 
 
-def get_pic_dir_and_filename(camera_name: str) -> str:
+def get_pic_dir_and_filename(camera_name: str) -> Tuple[str, str]:
     tz = pytz.timezone(global_config["timezone"])
     dt = datetime.now(tz)
     return (
@@ -72,7 +76,7 @@ def get_pic_dir_and_filename(camera_name: str) -> str:
     )
 
 
-def write_pic_to_disk(pic: Image, pic_path: str, optimize: bool = False):
+def write_pic_to_disk(pic: Image.Image, pic_path: str, optimize: bool = False):
     os.makedirs(os.path.dirname(pic_path), exist_ok=True)
     os.chmod(os.path.dirname(pic_path), 33277)  # rwxrwxr-x
     if logging.level_debug():
@@ -98,7 +102,7 @@ def update_latest_link(pic_path: str):
     os.rename(tmp_link, latest_link)
 
 
-def get_pic_from_local_command(cmd: str, timeout_s: int) -> Image:
+def get_pic_from_local_command(cmd: str, timeout_s: int) -> Image.Image:
     s = subprocess.run(cmd.split(" "), stdout=subprocess.PIPE, timeout=timeout_s)
     return Image.open(BytesIO(s.stdout))
 
@@ -110,9 +114,9 @@ def snap(camera_name, camera_config: Dict):
     gopro_ip = camera_config.get("gopro_ip")
     gopro_root_ca = camera_config.get("gopro_root_ca")
 
-    def capture() -> Image:
+    def capture() -> Image.Image:
         if url is not None:
-            ua = global_config.get("user_agent", None)
+            ua = global_config.get("user_agent", "")
             return get_pic_from_url(url, timeout, ua)
         if local_command is not None:
             return get_pic_from_local_command(local_command, timeout)
@@ -125,7 +129,7 @@ def snap(camera_name, camera_config: Dict):
             )
             return Image.open(BytesIO(jpeg_bytes))
         # TODO(feature): Add more capture methods here
-        return None
+        return None # type: ignore
 
     # Initialization before the main loop
     previous_pic_dir, previous_pic_filename = get_pic_dir_and_filename(camera_name)
@@ -217,7 +221,7 @@ def snap(camera_name, camera_config: Dict):
         previous_pic_fullpath = new_pic_fullpath
 
 
-def get_ssim_for_area(image1: Image, image2: Image, area: str) -> float:
+def get_ssim_for_area(image1: Image.Image, image2: Image.Image, area: Optional[str]) -> float:
     if image1.size != image2.size:
         logging.error(
             f"Images {image1.size} and {image2.size} are not the same size, cannot compare SSIM."
@@ -246,7 +250,7 @@ def server_run():
     httpd.serve_forever()
 
 def create_and_start_and_watch_thread(
-    f: callable, name: str, arguments: List[str] = [], exp_backoff_limit: int = 0
+    f: Callable, name: str, arguments: List[str] = [], exp_backoff_limit: int = 0
 ) -> None:
     failure_count = 0
     last_failure = datetime.now()

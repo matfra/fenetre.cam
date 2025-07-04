@@ -5,7 +5,7 @@ from skimage import exposure
 from typing import Optional
 from absl import logging
 
-def postprocess(pic: Image, postprocessing_steps: list) -> Image:
+def postprocess(pic: Image.Image, postprocessing_steps: list) -> Image.Image:
     """
     Applies a series of post-processing steps to an image.
     """
@@ -21,7 +21,7 @@ def postprocess(pic: Image, postprocessing_steps: list) -> Image:
             pic = auto_white_balance(pic)
     return pic
 
-def crop(pic: Image, area: str) -> Image:
+def crop(pic: Image.Image, area: str) -> Image.Image:
     """
     Crops an image to a specified area.
     """
@@ -29,21 +29,21 @@ def crop(pic: Image, area: str) -> Image:
 
 # If only one dimension is provided, the other will be calculated based on the aspect ratio of the original image or the cropped area.
 # If both dimensions are provided, the image will be resized to those exact dimensions
-def resize(pic: Image, width: Optional[int] = None, height: Optional[int] = None) -> Image:
+def resize(pic: Image.Image, width: Optional[int] = None, height: Optional[int] = None) -> Image.Image:
     """
     Resizes an image to a specified width and height.
     """
     if width is None and height is None:
         return pic
-    if width is None:
+    if width is None and height is not None:
         aspect_ratio = pic.width / pic.height
         width = int(height * aspect_ratio)
-    if height is None:
+    if height is None and width is not None:
         aspect_ratio = pic.height / pic.width
         height = int(width * aspect_ratio)
-    return pic.resize(size=(width, height), reducing_gap=3.0)
+    return pic.resize(size=(width, height), reducing_gap=3.0) # type: ignore
 
-def auto_white_balance(pic: Image) -> Image:
+def auto_white_balance(pic: Image.Image) -> Image.Image:
     """
     Applies auto white balance to an image.
     """
