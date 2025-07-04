@@ -113,9 +113,9 @@ def capture_gopro_photo(
     )
 
     # Set photo output to superphoto
-    _make_gopro_request(
-        "/gopro/camera/setting?option=3&setting=125",
-    )
+#    _make_gopro_request(
+#        "/gopro/camera/setting?option=3&setting=125",
+#    )
 
     # Turn off all LEDs:
     _make_gopro_request(
@@ -129,19 +129,15 @@ def capture_gopro_photo(
 
     # Set up auto power down to 30 minutes (option 7)
     _make_gopro_request(
-        "/gopro/camera/setting?option=1&setting=59",
+        "/gopro/camera/setting?option=7&setting=59",
     )
 
-    # TODO(Enable this based on the GPS coordinates of the camera and expected sunset time)
-    _make_gopro_request(
-        "/gopro/camera/setting?option=1&setting=177",
-    )
 
     # Set the GoPro HERO 11 preset for night photography
-    if preset:
-        _make_gopro_request(
-            f"/gopro/camera/presets/load?p1={preset}",
-        )
+#    if preset:
+#        _make_gopro_request(
+#            f"/gopro/camera/presets/load?p1={preset}",
+#        )
 
     # Trigger the shutter to capture a new photo
     trigger_url = f"{scheme}://{ip_address}/gopro/camera/shutter/start"
