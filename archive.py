@@ -58,8 +58,10 @@ def keep_only_a_subset_of_jpeg_files(
         delete_count += 1
     logging.info(f"Deleted {delete_count}/{num_jpeg_files} files in {directory}.")
     archive_filepath = os.path.join(directory, "archived")
+    if dry_run:
+        return
     with open(archive_filepath, "w") as f:
-        logging.debug(f"Writing archived file: {archive_filepath}")
+        logging.info(f"Writing archived file: {archive_filepath}")
         pass
 
 
@@ -157,7 +159,6 @@ def main(argv):
                         ),
                         two_pass=global_config.get("ffmpeg_2pass", False),
                         file_ext=global_config.get("timelapse_file_extension", "mp4"),
-                        tmp_dir=global_config.get("tmp_dir"),
                         dry_run=FLAGS.dry_run,
                     )
                 else:
