@@ -6,7 +6,7 @@ from typing import Optional
 def _make_gopro_request(
     url_path: str,
     expected_response_code: int = 200,
-    expected_response_text: str = "{}",
+    expected_response_text: str = "{}\n",
     ip_address: str = "10.5.5.9",
     timeout: int = 5,
     root_ca_filepath: str = "",
@@ -100,101 +100,47 @@ def capture_gopro_photo(
     # Takeover control of the GoPro camera https://gopro.github.io/OpenGoPro/http#tag/Control/operation/GPCAMERA_SYSTEM_RESET
     _make_gopro_request(
         "/gopro/camera/control/set_ui_controller?p=2",
-        expected_response_code=200,
-        expected_response_text="{}",
-        ip_address=ip_address,
-        timeout=timeout,
-        root_ca_filepath=root_ca_filepath,
-        scheme=scheme,
     )
 
     # Set the control mode to pro
     _make_gopro_request(
         "/gopro/camera/setting?option=1&setting=175",
-        expected_response_code=200,
-        expected_response_text="{}",
-        ip_address=ip_address,
-        timeout=timeout,
-        root_ca_filepath=root_ca_filepath,
-        scheme=scheme,
     )
 
     # Set the LCD brightness to minimum to avoid wearing out the LCD
     _make_gopro_request(
         "/gopro/camera/setting?option=10&setting=88",
-        expected_response_code=200,
-        expected_response_text="{}",
-        ip_address=ip_address,
-        timeout=timeout,
-        root_ca_filepath=root_ca_filepath,
-        scheme=scheme,
     )
 
     # Set photo output to superphoto
     _make_gopro_request(
         "/gopro/camera/setting?option=3&setting=125",
-        expected_response_code=200,
-        expected_response_text="{}",
-        ip_address=ip_address,
-        timeout=timeout,
-        root_ca_filepath=root_ca_filepath,
-        scheme=scheme,
     )
 
     # Turn off all LEDs:
     _make_gopro_request(
         "/gopro/camera/setting?option=4&setting=91",
-        expected_response_code=200,
-        expected_response_text="{}",
-        ip_address=ip_address,
-        timeout=timeout,
-        root_ca_filepath=root_ca_filepath,
-        scheme=scheme,
     )
 
     # Disable GPS in metadata
     _make_gopro_request(
         "/gopro/camera/setting?option=1&setting=83",
-        expected_response_code=200,
-        expected_response_text="{}",
-        ip_address=ip_address,
-        timeout=timeout,
-        root_ca_filepath=root_ca_filepath,
-        scheme=scheme,
     )
 
     # Set up auto power down to 30 minutes (option 7)
     _make_gopro_request(
         "/gopro/camera/setting?option=1&setting=59",
-        expected_response_code=200,
-        expected_response_text="{}",
-        ip_address=ip_address,
-        timeout=timeout,
-        root_ca_filepath=root_ca_filepath,
-        scheme=scheme,
     )
 
     # TODO(Enable this based on the GPS coordinates of the camera and expected sunset time)
     _make_gopro_request(
         "/gopro/camera/setting?option=1&setting=177",
-        expected_response_code=200,
-        expected_response_text="{}",
-        ip_address=ip_address,
-        timeout=timeout,
-        root_ca_filepath=root_ca_filepath,
-        scheme=scheme,
     )
 
     # Set the GoPro HERO 11 preset for night photography
     if preset:
         _make_gopro_request(
             f"/gopro/camera/presets/load?p1={preset}",
-            expected_response_code=200,
-            expected_response_text="{}",
-            ip_address=ip_address,
-            timeout=timeout,
-            root_ca_filepath=root_ca_filepath,
-            scheme=scheme,
         )
 
     # Trigger the shutter to capture a new photo
