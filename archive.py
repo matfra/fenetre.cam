@@ -24,7 +24,7 @@ import os
 
 
 def keep_only_a_subset_of_jpeg_files(
-    directory: str, dry_run=True, image_ext="jpg", video_ext="webm", files_to_keep=48
+    directory: str, dry_run=True, image_ext="jpg", files_to_keep=48
 ):
     """Keeps only 48 of the jpeg files in a directory, distributed equally across all the existing files.
 
@@ -78,9 +78,7 @@ def list_unarchived_dirs(camera_dir, archived_marker_file="archived"):
         ):
             daydir = os.path.join(camera_dir, subdirectory)
             # Count the number of jpg files in the subdirectory.
-            photos_count = len(
-                glob.glob(os.path.join(daydir, "*.jpg"))
-            )
+            photos_count = len(glob.glob(os.path.join(daydir, "*.jpg")))
             # Check if the subdirectory contains a file named archived.
             if os.path.isfile(os.path.join(daydir, archived_marker_file)):
                 if photos_count > 48:
@@ -171,13 +169,9 @@ def main(argv):
 if __name__ == "__main__":
     FLAGS = flags.FLAGS
 
-    #    flags.DEFINE_string("camera_dir", None, "directory to cleanup")
-    #    flags.DEFINE_string("image_ext", "jpg", "video file extension")
-    #    flags.DEFINE_string("video_ext", "webm", "video file extension")
     flags.DEFINE_bool("create_timelapses", False, "Create missing timelapses")
     flags.DEFINE_bool("create_daylight_bands", False, "Create missing daylight")
     flags.DEFINE_bool("dry_run", True, "Do not delete the files")
     flags.DEFINE_string("config", None, "path to YAML config file")
     flags.mark_flag_as_required("config")
-    #    flags.mark_flag_as_required("camera_dir")
     app.run(main)

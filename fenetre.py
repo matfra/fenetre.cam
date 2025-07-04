@@ -129,7 +129,7 @@ def snap(camera_name, camera_config: Dict):
             )
             return Image.open(BytesIO(jpeg_bytes))
         # TODO(feature): Add more capture methods here
-        return None # type: ignore
+        return None  # type: ignore
 
     # Initialization before the main loop
     previous_pic_dir, previous_pic_filename = get_pic_dir_and_filename(camera_name)
@@ -196,9 +196,7 @@ def snap(camera_name, camera_config: Dict):
             logging.warning(f"{camera_name}: Could not fetch picture from {url}")
             continue
         if len(camera_config.get("postprocessing", [])) > 0:
-            new_pic = postprocess(
-                new_pic, camera_config.get("postprocessing", [])
-            )
+            new_pic = postprocess(new_pic, camera_config.get("postprocessing", []))
         if fixed_snap_interval is None:
             ssim = get_ssim_for_area(
                 previous_pic, new_pic, camera_config.get("ssim_area", None)
@@ -221,21 +219,30 @@ def snap(camera_name, camera_config: Dict):
         previous_pic_fullpath = new_pic_fullpath
 
 
-def get_ssim_for_area(image1: Image.Image, image2: Image.Image, area: Optional[str]) -> float:
+def get_ssim_for_area(
+    image1: Image.Image, image2: Image.Image, area: Optional[str]
+) -> float:
     if image1.size != image2.size:
         logging.error(
             f"Images {image1.size} and {image2.size} are not the same size, cannot compare SSIM."
         )
         return 1.0
+    # Compute SSIM on the full image.
     if area is None:
         return compare_ssim(image1, image2)
-    crop_points = [int(i) for i in area.split(",")]
+
+    # Prevents the linter from complaining about the type of crop_points.
+    crop_points_list = [float(i) for i in area.split(",")]
+    crop_points = (
+        crop_points_list[0],
+        crop_points_list[1],
+        crop_points_list[2],
+        crop_points_list[3],
+    )
     logging.debug(f"{crop_points}")
     return compare_ssim(
-        image1.crop(crop_points).resize(
-            (50, 50)
-        ),  # Resize 50x50 gets rid of the noise at night.
-        image2.crop(crop_points).resize((50, 50)),
+        image1.resize((50, 50), box=crop_points),
+        image2.resize((50, 50), box=crop_points),
     )
 
 
@@ -248,6 +255,7 @@ def server_run():
     logging.info(f"Starting HTTP Server on {server_address}")
     httpd = server_class(server_address, handler_class)
     httpd.serve_forever()
+
 
 def create_and_start_and_watch_thread(
     f: Callable, name: str, arguments: List[str] = [], exp_backoff_limit: int = 0
