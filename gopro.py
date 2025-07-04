@@ -17,11 +17,11 @@ def _make_gopro_request(
     r = requests.get(url, timeout=timeout, verify=root_ca_filepath)
     if r.status_code != expected_response_code:
         raise RuntimeError(
-            f"Expected response code {expected_response_code} but got {r.status_code}"
+            f"Expected response code {expected_response_code} but got {r.status_code}. Request URL: {url}"
         )
     if r.text != expected_response_text:
         raise RuntimeError(
-            f"Expected response text {expected_response_text} but got {r.text}"
+            f"Expected response text {expected_response_text} but got {r.text}. Request URL: {url}"
         )
     return r
 
