@@ -109,6 +109,7 @@ def capture_gopro_photo(
     )
 
     # Set the control mode to pro
+    _make_gopro_request(
         "/gopro/camera/setting?option=1&setting=175",
         expected_response_code=200,
         expected_response_text="{}",
