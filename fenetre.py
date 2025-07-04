@@ -191,6 +191,10 @@ def snap(camera_name, camera_config: Dict):
         if new_pic is None:
             logging.warning(f"{camera_name}: Could not fetch picture from {url}")
             continue
+        if len(camera_config.get("postprocessing", [])) > 0:
+            new_pic = postprocess(
+                new_pic, camera_config.get("postprocessing", [])
+            )
         if fixed_snap_interval is None:
             ssim = get_ssim_for_area(
                 previous_pic, new_pic, camera_config.get("ssim_area", None)
@@ -209,10 +213,6 @@ def snap(camera_name, camera_config: Dict):
                     f"{camera_name}: ssim {ssim}, setpoint: {ssim_setpoint}, new sleep interval: {sleep_intervals[camera_name]}s"
                 )
         previous_pic = new_pic
-        if len(camera_config.get("postprocessing", [])) > 0:
-            previous_pic = postprocess(
-                previous_pic, camera_config.get("postprocessing", [])
-            )
         previous_pic_dir = new_pic_dir
         previous_pic_fullpath = new_pic_fullpath
 
