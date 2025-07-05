@@ -198,7 +198,6 @@ def capture_gopro_photo(
         f"{scheme}://{ip_address}/videos/DCIM/{latest_dir_after}/{latest_file_after}"
     )
     photo_resp = requests.get(photo_url, timeout=timeout, verify=root_ca_filepath)
-    _log_request_response(photo_url, photo_resp)
     photo_resp.raise_for_status()
 
     if output_file:
