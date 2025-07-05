@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Fullscreen Camera View</title>
+<style>
+  body, html {
+    height: 100%;
+    margin: 0;
+    overflow: hidden;
+    background-color: #000;
+  }
+  img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+</style>
+</head>
+<body>
+
+<img id="cameraImage" src="" alt="Loading camera feed...">
+
+<script>
+  const urlParams = new URLSearchParams(window.location.search);
+  const cameraName = urlParams.get('camera');
+  const imageElement = document.getElementById('cameraImage');
+
+  function updateImage() {
+    if (cameraName) {
+      // Add a cache-busting parameter to the URL
+      const imageUrl = `photos/${cameraName}/latest.jpg?t=${new Date().getTime()}`;
+      imageElement.src = imageUrl;
+    } else {
+      imageElement.alt = "No camera specified. Please add '?camera=CAMERA_NAME' to the URL.";
+    }
+  }
+
+  // Initial image load
+  updateImage();
+
+  // Refresh the image every 60 seconds
+  setInterval(updateImage, 60000);
+</script>
+
+</body>
+</html>

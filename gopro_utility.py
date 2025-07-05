@@ -11,6 +11,12 @@ from absl import logging
 
 from resources.OpenGoPro.demos.python.tutorial.tutorial_modules import enable_wifi
 
+def format_gopro_sd_card(ip_address: str):
+    """
+    Deletes all files on the GoPro SD Card.
+    """
+    url = f"http://{ip_address}/gp/gpControl/command/storage/delete/all"
+    requests.get(url)
 
 def _get_gopro_state(ip_address: str, root_ca: Optional[str] = None) -> Dict:
     """

@@ -1,9 +1,30 @@
 import requests
 import time
 from typing import Optional
+import os
+import datetime
+from absl import logging
+
+log_dir_global = None
+
+def _set_log_dir(log_dir: str):
+    global log_dir_global
+    log_dir_global = log_dir
+
+def _log_request_response(url: str, response: requests.Response):
+    if log_dir_global:
+        os.makedirs(log_dir_global, exist_ok=True)
+        log_file_path = os.path.join(log_dir_global, "gopro.log")
+        with open(log_file_path, "a") as f:
+            f.write(f"Timestamp: {datetime.datetime.now().isoformat()}\n")
+            f.write(f"Request URL: {url}\n")
+            f.write(f"Response Code: {response.status_code}\n")
+            f.write(f"Response Text: {response.text}\n")
+            f.write("-" * 20 + "\n")
 
 
 def _make_gopro_request(
+
     url_path: str,
     expected_response_code: int = 200,
     expected_response_text: str = "{}\n",
@@ -15,6 +36,7 @@ def _make_gopro_request(
     """Helper function to make HTTP requests to GoPro with common parameters."""
     url = f"{scheme}://{ip_address}{url_path}"
     r = requests.get(url, timeout=timeout, verify=root_ca_filepath)
+    _log_request_response(url, r)
     if r.status_code != expected_response_code:
         raise RuntimeError(
             f"Expected response code {expected_response_code} but got {r.status_code}. Request URL: {url}"
@@ -34,12 +56,14 @@ def _get_latest_file(
 ):
     media_list_url = f"{scheme}://{ip_address}/gopro/media/list"
     resp = requests.get(media_list_url, timeout=timeout, verify=root_ca_filepath)
+    _log_request_response(media_list_url, resp)
     resp.raise_for_status()
     data = resp.json()
 
     media_entries = data.get("media") or data.get("results", {}).get("media")
     if not media_entries:
-        raise RuntimeError("No media information returned from GoPro")
+        logging.warning("No media medias found on GoPro.")
+        return None, None
 
     latest_dir_info = media_entries[-1]
     latest_dir = latest_dir_info.get("directory") or latest_dir_info.get("d")
@@ -61,6 +85,7 @@ def capture_gopro_photo(
     timeout: int = 5,
     root_ca: Optional[str] = None,
     preset: Optional[str] = None,
+    log_dir: Optional[str] = None,
 ) -> bytes:
     """Capture a photo from a GoPro over WiFi.
 
@@ -71,6 +96,7 @@ def capture_gopro_photo(
         ip_address: IP address of the GoPro (default is 10.5.5.9).
         output_file: Optional path to save the downloaded image.
         timeout: Timeout in seconds for the HTTP requests.
+        log_dir: Directory to store gopro.log
 
     Returns:
         The raw bytes of the captured JPEG image.
@@ -78,6 +104,8 @@ def capture_gopro_photo(
     Raises:
         requests.RequestException: If any of the network calls fail.
     """
+    if log_dir:
+        _set_log_dir(log_dir)
 
     scheme = "https" if root_ca else "http"
     root_ca_filepath = ""
@@ -141,11 +169,12 @@ def capture_gopro_photo(
 
     # Trigger the shutter to capture a new photo
     trigger_url = f"{scheme}://{ip_address}/gopro/camera/shutter/start"
-    requests.get(
+    r = requests.get(
         trigger_url,
         timeout=timeout,
         verify=root_ca_filepath,
     )
+    _log_request_response(trigger_url, r)
 
     # Poll for the last captured file until it changes
     while True:
@@ -169,6 +198,7 @@ def capture_gopro_photo(
         f"{scheme}://{ip_address}/videos/DCIM/{latest_dir_after}/{latest_file_after}"
     )
     photo_resp = requests.get(photo_url, timeout=timeout, verify=root_ca_filepath)
+    _log_request_response(photo_url, photo_resp)
     photo_resp.raise_for_status()
 
     if output_file:
@@ -176,11 +206,12 @@ def capture_gopro_photo(
             f.write(photo_resp.content)
 
     delete_url = f"{scheme}://{ip_address}/gopro/media/delete/file?path={latest_dir_after}/{latest_file_after}"
-    requests.get(
+    r = requests.get(
         delete_url,
         timeout=timeout,
         verify=root_ca_filepath,
     )
+    _log_request_response(delete_url, r)
 
     if temp_file:
         import os

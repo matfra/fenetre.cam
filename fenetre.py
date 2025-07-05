@@ -32,7 +32,7 @@ from SSIM_PIL import compare_ssim
 from timelapse import create_timelapse
 from daylight import run_end_of_day
 from gopro import capture_gopro_photo
-from gopro_utility import GoProUtilityThread
+from gopro_utility import GoProUtilityThread, format_gopro_sd_card
 from postprocess import postprocess
 
 
@@ -46,7 +46,6 @@ def config_load(config_file_path: str) -> List[Dict]:
         for section in ["http_server", "cameras", "global"]:
             res.append(config[section])
         return res
-
 
 def get_pic_from_url(url: str, timeout: int, ua: str = "") -> Image.Image:
     headers = {"Accept": "image/*,*"}
@@ -126,7 +125,14 @@ def snap(camera_name, camera_config: Dict):
                 timeout=timeout,
                 root_ca=gopro_root_ca,
                 preset=camera_config.get("gopro_preset"),
+                log_dir=global_config.get("log_dir"),
             )
+            try:
+                i = Image.open(BytesIO(jpeg_bytes))
+            except Image.UnidentifiedImageError:
+                logging.error(f"Failed to open image from GoPro: {gopro_ip}. Resetting gopro")
+                format_gopro_sd_card(gopro_ip)
+                raise
             return Image.open(BytesIO(jpeg_bytes))
         # TODO(feature): Add more capture methods here
         return None  # type: ignore
@@ -286,7 +292,14 @@ def create_and_start_and_watch_thread(
 def link_html_file(work_dir: str):
     current_dir = os.getcwd()
     shutil.copy(
+        os.path.join(current_dir, "map.html"), os.path.join(work_dir, "map.html")
+    )
+    shutil.copy(
         os.path.join(current_dir, "index.html"), os.path.join(work_dir, "index.html")
+    )
+    shutil.copy(
+        os.path.join(current_dir, "fullscreen.html"),
+        os.path.join(work_dir, "fullscreen.html"),
     )
     # Create the lib directory if it does not exist.
     if not os.path.exists(os.path.join(work_dir, "lib")):
@@ -322,7 +335,8 @@ def update_cameras_metadata(cameras_configs: Dict, work_dir: str):
     for cam in cameras_config:
         metadata = {}
         metadata["title"] = cam
-        metadata["url"] = os.path.join("photos", cam)
+        metadata["url"] = f"map.html?camera={cam}"
+        metadata["fullscreen_url"] = f"fullscreen.html?camera={cam}"
         metadata["livefeed_url"] = cameras_config[cam].get("url" or "local_command")
         metadata["description"] = cameras_config[cam].get("description", "")
         metadata["snap_interval_s"] = (
