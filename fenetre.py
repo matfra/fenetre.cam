@@ -75,21 +75,23 @@ def get_pic_dir_and_filename(camera_name: str) -> Tuple[str, str]:
     )
 
 
-def write_pic_to_disk(pic: Image.Image, pic_path: str, optimize: bool = False):
+def write_pic_to_disk(
+    pic: Image.Image, pic_path: str, optimize: bool = False, exif_data: bytes = b""
+):
     os.makedirs(os.path.dirname(pic_path), exist_ok=True)
     os.chmod(os.path.dirname(pic_path), 33277)  # rwxrwxr-x
     if logging.level_debug():
         logging.debug(f"Saving picture {pic_path}")
     if optimize is True:
         jpeg_io = BytesIO()
-        pic.convert("RGB").save(jpeg_io, format="JPEG", quality=90)
+        pic.convert("RGB").save(jpeg_io, format="JPEG", quality=90, exif=exif_data)
         jpeg_io.seek(0)
         jpeg_bytes = jpeg_io.read()
         optimized_jpeg_bytes = mozjpeg_lossless_optimization.optimize(jpeg_bytes)
         with open(pic_path, "wb") as output_file:
             output_file.write(optimized_jpeg_bytes)
     else:
-        pic.save(pic_path)
+        pic.save(pic_path, exif=exif_data)
 
 
 def update_latest_link(pic_path: str):
@@ -141,8 +143,9 @@ def snap(camera_name, camera_config: Dict):
     previous_pic_dir, previous_pic_filename = get_pic_dir_and_filename(camera_name)
     previous_pic_fullpath = os.path.join(previous_pic_dir, previous_pic_filename)
     previous_pic = capture()
+    previous_exif = previous_pic.info.get("exif")
     if len(camera_config.get("postprocessing", [])) > 0:
-        previous_pic = postprocess(
+        previous_pic, previous_exif = postprocess(
             previous_pic, camera_config.get("postprocessing", [])
         )
     fixed_snap_interval = camera_config.get("snap_interval_s", None)
@@ -163,6 +166,7 @@ def snap(camera_name, camera_config: Dict):
             previous_pic,
             previous_pic_fullpath,
             camera_config.get("mozjpeg_optimize", False),
+            previous_exif,
         )
         update_latest_link(previous_pic_fullpath)
         metadata = {
@@ -198,11 +202,14 @@ def snap(camera_name, camera_config: Dict):
             )
 
         new_pic = capture()
+        new_exif = new_pic.info.get("exif")
         if new_pic is None:
             logging.warning(f"{camera_name}: Could not fetch picture from {url}")
             continue
         if len(camera_config.get("postprocessing", [])) > 0:
-            new_pic = postprocess(new_pic, camera_config.get("postprocessing", []))
+            new_pic, new_exif = postprocess(
+                new_pic, camera_config.get("postprocessing", [])
+            )
         if fixed_snap_interval is None:
             ssim = get_ssim_for_area(
                 previous_pic, new_pic, camera_config.get("ssim_area", None)
@@ -221,6 +228,7 @@ def snap(camera_name, camera_config: Dict):
                     f"{camera_name}: ssim {ssim}, setpoint: {ssim_setpoint}, new sleep interval: {sleep_intervals[camera_name]}s"
                 )
         previous_pic = new_pic
+        previous_exif = new_exif
         previous_pic_dir = new_pic_dir
         previous_pic_fullpath = new_pic_fullpath
 

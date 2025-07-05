@@ -3,6 +3,9 @@ import re
 import subprocess
 from typing import Dict
 from typing import List
+from PIL import Image
+from PIL.ExifTags import TAGS
+from datetime import datetime
 
 import ffmpeg
 from absl import app
@@ -11,7 +14,52 @@ from absl import logging
 
 from typing import Optional
 
+def _generate_srt_file(image_dir: str, srt_filepath: str):
+    image_files = sorted([f for f in os.listdir(image_dir) if f.endswith(".jpg")])
+    with open(srt_filepath, "w") as srt_file:
+        for i, image_file in enumerate(image_files):
+            image_path = os.path.join(image_dir, image_file)
+            try:
+                img = Image.open(image_path)
+                exif_data = img._getexif()
+                if exif_data is None:
+                    exif_data = {}
+
+                exif_info = {
+                    "ExposureTime": "N/A",
+                    "FNumber": "N/A",
+                    "ISOSpeedRatings": "N/A",
+                    "FocalLength": "N/A",
+                    "Model": "N/A",
+                }
+
+                for tag_id, value in exif_data.items():
+                    tag = TAGS.get(tag_id, tag_id)
+                    if tag in exif_info:
+                        exif_info[tag] = value
+
+                # Extract timestamp from filename
+                timestamp_str = os.path.splitext(image_file)[0].replace("T", " ")
+                dt_object = datetime.strptime(timestamp_str, "%Y-%m-%d %H-%M-%S")
+                timestamp = dt_object.strftime("%Y-%m-%d %H:%M:%S")
+
+                # SRT format
+                srt_file.write(f"{i+1}\n")
+                start_time = f"00:00:{i:02d},000"
+                end_time = f"00:00:{i+1:02d},000"
+                srt_file.write(f"{start_time} --> {end_time}\n")
+                srt_file.write(f"Timestamp: {timestamp}\n")
+                srt_file.write(f"Camera: {exif_info['Model']}, ")
+                srt_file.write(f"Focal Length: {exif_info['FocalLength']}mm, ")
+                srt_file.write(f"Aperture: f/{exif_info['FNumber']}, ")
+                srt_file.write(f"Exposure: {exif_info['ExposureTime']}s, ")
+                srt_file.write(f"ISO: {exif_info['ISOSpeedRatings']}\n\n")
+
+            except Exception as e:
+                logging.error(f"Error processing {image_path}: {e}")
+
 # TODO: optimize 2 pass encoding for vp9 https://developers.google.com/media/vp9/bitrate-modes
+
 
 
 def create_timelapse(
@@ -27,6 +75,7 @@ def create_timelapse(
         raise FileNotFoundError(dir)
     timelapse_filename = re.search("^.*/([^/]+)/?$", dir).groups()[0] + "." + file_ext
     timelapse_filepath = os.path.join(dir, timelapse_filename)
+    srt_filepath = os.path.join(tmp_dir, f"{timelapse_filename}.srt")
     logging.debug(f"timelapse_filename: {timelapse_filename}")
     logging.debug(f"timelapse_filepath: {timelapse_filepath}")
 
@@ -35,6 +84,9 @@ def create_timelapse(
         os.mkdir(tmp_dir)
     if os.path.exists(timelapse_filepath) and overwrite is False:
         raise FileExistsError(timelapse_filepath)
+
+    _generate_srt_file(dir, srt_filepath)
+
     ffmpeg_cmd = [
         "nice",
         "-n10",
@@ -46,6 +98,12 @@ def create_timelapse(
         "glob",
         "-i",
         "{}".format(os.path.join(os.path.abspath(dir), "*.jpg")),
+        "-i",
+        srt_filepath,
+        "-c",
+        "copy",
+        "-c:s",
+        "mov_text",
     ]
     if overwrite:
         ffmpeg_cmd.append("-y")

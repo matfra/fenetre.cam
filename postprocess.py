@@ -5,10 +5,11 @@ from typing import Optional, Tuple
 from absl import logging
 
 
-def postprocess(pic: Image.Image, postprocessing_steps: list) -> Image.Image:
+def postprocess(pic: Image.Image, postprocessing_steps: list) -> Tuple[Image.Image, dict]:
     """
     Applies a series of post-processing steps to an image.
     """
+    exif_data = pic.info.get("exif")
     for step in postprocessing_steps:
         if step["type"] == "crop":
             logging.debug(f"Cropping image to area: {step['area']}")
@@ -21,7 +22,7 @@ def postprocess(pic: Image.Image, postprocessing_steps: list) -> Image.Image:
         elif step["type"] == "awb":
             logging.debug("Applying auto white balance to image")
             pic = auto_white_balance(pic)
-    return pic
+    return pic, exif_data
 
 
 def crop(pic: Image.Image, area: str) -> Image.Image:
