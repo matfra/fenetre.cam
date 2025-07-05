@@ -108,7 +108,7 @@ def get_pic_from_local_command(cmd: str, timeout_s: int) -> Image.Image:
 
 def snap(camera_name, camera_config: Dict):
     url = camera_config.get("url")
-    timeout = camera_config.get("timeout_s", 20)
+    timeout = camera_config.get("timeout_s", 60)
     local_command = camera_config.get("local_command")
     gopro_ip = camera_config.get("gopro_ip")
     gopro_root_ca = camera_config.get("gopro_root_ca")
