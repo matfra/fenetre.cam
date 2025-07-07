@@ -49,187 +49,184 @@ def _parse_color(color_input: Union[str, Tuple[int, int, int]]) -> Tuple[int, in
     return (255, 255, 255)
 
 
+def _add_text_overlay(
+    pic: Image.Image,
+    text_to_draw: str,
+    position: str = "bottom_right",
+    size: int = 24,
+    color: Union[str, Tuple[int, int, int]] = "white",
+    font_path: Optional[str] = None,
+    background_color: Optional[Union[str, Tuple[int, int, int]]] = None,
+    background_padding: int = 2
+) -> Image.Image:
+    """Internal helper to add any text overlay to an image."""
+    if not text_to_draw: # Do nothing if text is empty
+        return pic
+
+    draw = ImageDraw.Draw(pic, "RGBA" if background_color else pic.mode)
+
+    try:
+        if font_path:
+            font = ImageFont.truetype(font_path, size)
+        else:
+            try:
+                font = ImageFont.truetype("DejaVuSans.ttf", size)
+            except IOError:
+                try:
+                    font = ImageFont.truetype("Arial.ttf", size)
+                except IOError:
+                    logging.warning("DejaVuSans.ttf or Arial.ttf not found. Using default PIL font. Text might be small.")
+                    font = ImageFont.load_default()
+    except Exception as e:
+        logging.error(f"Error loading font: {e}. Using default PIL font.")
+        font = ImageFont.load_default()
+
+    parsed_text_color = _parse_color(color)
+
+    try:
+        text_bbox = draw.textbbox((0, 0), text_to_draw, font=font)
+        text_width = text_bbox[2] - text_bbox[0]
+        text_height = text_bbox[3] - text_bbox[1]
+    except TypeError:
+        try:
+            text_width = draw.textlength(text_to_draw, font=font)
+            cap_bbox = draw.textbbox((0,0), "M", font=font) # Estimate height
+            text_height = cap_bbox[3] - cap_bbox[1]
+            if text_width == 0: text_height = 0
+        except AttributeError:
+            logging.warning("Cannot determine text size accurately with the default font. Text may be misplaced.")
+            text_width = len(text_to_draw) * 6
+            text_height = 10
+            # Initialize text_bbox with estimated values if it couldn't be created before
+            text_bbox = (0, 0, text_width, text_height)
+
+
+    img_width, img_height = pic.size
+    padding = 10
+
+    if isinstance(position, str) and "," in position:
+        try:
+            x_str, y_str = position.split(',')
+            x = int(x_str.strip())
+            y = int(y_str.strip())
+        except ValueError:
+            logging.warning(f"Invalid coordinate string for position: {position}. Defaulting to bottom_right.")
+            x = img_width - text_width - padding
+            y = img_height - text_height - padding - (text_bbox[1] if text_bbox else 0)
+    elif position == "top_left":
+        x = padding
+        y = padding - (text_bbox[1] if text_bbox else 0)
+    elif position == "top_right":
+        x = img_width - text_width - padding
+        y = padding - (text_bbox[1] if text_bbox else 0)
+    elif position == "bottom_left":
+        x = padding
+        y = img_height - text_height - padding - (text_bbox[1] if text_bbox else 0)
+    elif position == "bottom_right":
+        x = img_width - text_width - padding
+        y = img_height - text_height - padding - (text_bbox[1] if text_bbox else 0)
+    elif position == "top_center":
+        x = (img_width - text_width) // 2
+        y = padding - (text_bbox[1] if text_bbox else 0)
+    elif position == "bottom_center":
+        x = (img_width - text_width) // 2
+        y = img_height - text_height - padding - (text_bbox[1] if text_bbox else 0)
+    else:
+        logging.warning(f"Unrecognized position: {position}. Defaulting to bottom_right.")
+        x = img_width - text_width - padding
+        y = img_height - text_height - padding - (text_bbox[1] if text_bbox else 0)
+
+    final_x = x - (text_bbox[0] if text_bbox else 0)
+    final_y = y - (text_bbox[1] if text_bbox else 0)
+
+    final_x = max(0, min(final_x, img_width - text_width))
+    final_y = max(0, min(final_y, img_height - text_height))
+
+    if background_color:
+        parsed_bg_color = _parse_color(background_color)
+        bg_x0 = final_x + (text_bbox[0] if text_bbox else 0) - background_padding
+        bg_y0 = final_y + (text_bbox[1] if text_bbox else 0) - background_padding
+        bg_x1 = final_x + (text_bbox[0] if text_bbox else 0) + text_width + background_padding
+        bg_y1 = final_y + (text_bbox[1] if text_bbox else 0) + text_height + background_padding
+
+        bg_x0 = max(0, bg_x0)
+        bg_y0 = max(0, bg_y0)
+        bg_x1 = min(img_width, bg_x1)
+        bg_y1 = min(img_height, bg_y1)
+
+        if bg_x1 > bg_x0 and bg_y1 > bg_y0:
+            if isinstance(parsed_bg_color, tuple) and len(parsed_bg_color) == 3:
+                bg_color_tuple_with_alpha = parsed_bg_color + (255,)
+            elif isinstance(parsed_bg_color, tuple) and len(parsed_bg_color) == 4:
+                bg_color_tuple_with_alpha = parsed_bg_color
+            else: # String color name
+                from PIL import ImageColor # Moved import here
+                try:
+                    bg_color_tuple_with_alpha = ImageColor.getcolor(parsed_bg_color, "RGBA")
+                except ValueError:
+                    logging.warning(f"Invalid background color name: {background_color}. Defaulting to semi-transparent black.")
+                    bg_color_tuple_with_alpha = (0,0,0,128)
+
+            if pic.mode != "RGBA" and bg_color_tuple_with_alpha[3] < 255:
+                overlay = Image.new("RGBA", pic.size, (0,0,0,0))
+                draw_overlay = ImageDraw.Draw(overlay)
+                draw_overlay.rectangle([bg_x0, bg_y0, bg_x1, bg_y1], fill=bg_color_tuple_with_alpha)
+                # Ensure pic is converted to RGBA before pasting if it's not already, to preserve alpha
+                if pic.mode != "RGBA":
+                    pic = pic.convert("RGBA")
+                    draw = ImageDraw.Draw(pic) # Re-create draw object for the new pic mode
+                pic.alpha_composite(overlay)
+            else: # Main image is RGBA or background is opaque
+                 # If pic was not RGBA initially but background is opaque, ensure draw object is for current pic mode
+                if draw.mode != pic.mode: # e.g. pic was RGB, bg_color is opaque, draw was made for RGB
+                     # This case should be handled by the initial draw = ImageDraw.Draw(pic, "RGBA" if background_color else pic.mode)
+                     # but as a safeguard:
+                     pass # Assuming draw object is appropriate or pic is already RGBA
+                draw.rectangle([bg_x0, bg_y0, bg_x1, bg_y1], fill=bg_color_tuple_with_alpha)
+
+    draw.text((final_x, final_y), text_to_draw, font=font, fill=parsed_text_color)
+    return pic
+
+
 def add_timestamp(
     pic: Image.Image,
     text_format: str = "%Y-%m-%d %H:%M:%S %Z",
     position: str = "bottom_right",
     size: int = 24,
     color: Union[str, Tuple[int, int, int]] = "white",
-    font_path: Optional[str] = None, # Allow custom font
-    background_color: Optional[Union[str, Tuple[int, int, int]]] = None, # Optional background color
-    background_padding: int = 2 # Padding around text for background
+    font_path: Optional[str] = None,
+    background_color: Optional[Union[str, Tuple[int, int, int]]] = None,
+    background_padding: int = 2,
+    custom_text: Optional[str] = None
 ) -> Image.Image:
-    """Adds a timestamp to the image."""
-    draw = ImageDraw.Draw(pic, "RGBA" if background_color else "RGB") # Use RGBA if background needs transparency
-
+    """Adds a timestamp and optional custom text to the image by utilizing _add_text_overlay."""
     try:
         tz_str = DEFAULT_TIMEZONE
         tz = pytz.timezone(tz_str)
         now = datetime.now(tz)
-        timestamp_text = now.strftime(text_format)
+        formatted_time = now.strftime(text_format)
+        if custom_text:
+            final_text_to_draw = f"{custom_text} {formatted_time}"
+        else:
+            final_text_to_draw = formatted_time
     except Exception as e:
         logging.error(f"Error formatting timestamp: {e}. Using default format.")
-        timestamp_text = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-    try:
-        if font_path:
-            font = ImageFont.truetype(font_path, size)
+        formatted_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        if custom_text:
+            final_text_to_draw = f"{custom_text} {formatted_time}"
         else:
-            # Try to load a commonly available font, fallback to default
-            try:
-                font = ImageFont.truetype("DejaVuSans.ttf", size)
-            except IOError:
-                try:
-                    font = ImageFont.truetype("Arial.ttf", size) # Common on Windows/macOS
-                except IOError:
-                    logging.warning("DejaVuSans.ttf or Arial.ttf not found. Using default PIL font. Timestamp text might be small.")
-                    font = ImageFont.load_default()
-    except Exception as e:
-        logging.error(f"Error loading font: {e}. Using default PIL font.")
-        font = ImageFont.load_default()
+            final_text_to_draw = formatted_time
 
-    parsed_color = _parse_color(color)
-
-    # Calculate text size and position
-    try:
-        # textbbox returns (left, top, right, bottom)
-        text_bbox = draw.textbbox((0, 0), timestamp_text, font=font)
-        text_width = text_bbox[2] - text_bbox[0]
-        text_height = text_bbox[3] - text_bbox[1]
-    except TypeError: # If font is default font, textbbox might not accept it.
-        # For default font, textlength and textbbox might behave differently or not be available.
-        # A common fallback for default font if textbbox fails (though ideally it shouldn't with modern Pillow):
-        try:
-            text_width = draw.textlength(timestamp_text, font=font) # Get width
-            # Estimate height for default font - this is a rough part for default fonts
-            # as they don't have rich metrics like TrueType.
-            # Often, the 'size' of default font is not directly comparable or settable like TTF.
-            # We'll use a heuristic or assume a common aspect ratio if specific metrics are unavailable.
-            # This might need adjustment based on visual results with the default font.
-            # For now, let's assume a generic height based on a typical character, e.g., 'M'.
-            # If 'font.size' attribute was available and meaningful for default, it could be used.
-            # As a simple fallback, let's query bbox for a capital letter.
-            cap_bbox = draw.textbbox((0,0), "M", font=font)
-            text_height = cap_bbox[3] - cap_bbox[1]
-            # If text_width from textlength is zero (e.g. empty string), ensure text_height is also zero
-            if text_width == 0:
-                text_height = 0
-
-        except AttributeError: # Fallback for very old Pillow or if textlength not on default font
-            logging.warning("Cannot determine text size accurately with the default font. Timestamp may be misplaced.")
-            # As a last resort, make a guess or use fixed values if text metrics are unavailable
-            text_width = len(timestamp_text) * 6 # Rough estimate: 6 pixels per char
-            text_height = 10 # Rough estimate: 10 pixels high
-
-
-    img_width, img_height = pic.size
-    padding = 10  # Pixels padding from image border
-
-    if isinstance(position, str) and "," in position: # "x,y" coordinates
-        try:
-            x_str, y_str = position.split(',')
-            x = int(x_str.strip())
-            # For bbox, the y-coordinate is the top of the text, so no further adjustment needed here for 'y'
-            # However, if we want 'y' to specify the *bottom* of the text, we'd do y = int(y_str.strip()) - text_height
-            y = int(y_str.strip())
-        except ValueError:
-            logging.warning(f"Invalid coordinate string for position: {position}. Defaulting to bottom_right.")
-            x = img_width - text_width - padding
-            y = img_height - text_height - padding - text_bbox[1] # Adjust for text_bbox top offset
-    elif position == "top_left":
-        x = padding
-        y = padding - text_bbox[1] # Adjust for text_bbox top offset
-    elif position == "top_right":
-        x = img_width - text_width - padding
-        y = padding - text_bbox[1] # Adjust for text_bbox top offset
-    elif position == "bottom_left":
-        x = padding
-        y = img_height - text_height - padding - text_bbox[1] # Adjust for text_bbox top offset
-    elif position == "bottom_right":
-        x = img_width - text_width - padding
-        y = img_height - text_height - padding - text_bbox[1] # Adjust for text_bbox top offset
-    elif position == "top_center":
-        x = (img_width - text_width) // 2
-        y = padding - text_bbox[1] # Adjust for text_bbox top offset
-    elif position == "bottom_center":
-        x = (img_width - text_width) // 2
-        y = img_height - text_height - padding - text_bbox[1] # Adjust for text_bbox top offset
-    else: # Default to bottom_right if position is unrecognized
-        logging.warning(f"Unrecognized position: {position}. Defaulting to bottom_right.")
-        x = img_width - text_width - padding
-        y = img_height - text_height - padding - text_bbox[1] # Adjust for text_bbox top offset
-
-    # Ensure x, y are within image bounds
-    # We need to consider the text_bbox[0] (left offset) as well for x positioning if it's not 0
-    # And text_bbox[1] (top offset) for y.
-    # The draw.text() function expects the top-left corner of the text *drawing area*,
-    # not necessarily the top-left of the text characters themselves if there's internal padding/offset.
-    # text_bbox[0] and text_bbox[1] are often 0 or small for typical fonts at (0,0) origin.
-
-    # The x,y calculated so far is for the origin of the text according to textbbox.
-    # draw.text((x,y)) will place the (text_bbox[0], text_bbox[1]) of the text at image coordinates (x,y).
-    # So, if text_bbox[0] is negative (e.g. character extends left of origin), we need to shift x.
-    # And if text_bbox[1] is negative (e.g. character extends above origin), we need to shift y.
-    # The calculated x,y is the desired top-left of the *bounding box*.
-    # So, we draw at (x - text_bbox[0], y - text_bbox[1])
-
-    final_x = x - text_bbox[0]
-    final_y = y - text_bbox[1]
-
-    # Ensure the bounding box is within image bounds after adjusting for internal text offsets
-    final_x = max(0, min(final_x, img_width - text_width))
-    final_y = max(0, min(final_y, img_height - text_height))
-
-    if background_color:
-        parsed_background_color = _parse_color(background_color)
-        # Define background rectangle position and size
-        # The text_bbox already includes internal padding of the font.
-        # We use final_x, final_y which are adjusted for text_bbox[0] and text_bbox[1]
-        # So the background rectangle should start at (final_x + text_bbox[0], final_y + text_bbox[1])
-        # and end at (final_x + text_bbox[2], final_y + text_bbox[3]) for tight fit.
-        # Add background_padding to this.
-        bg_x0 = final_x + text_bbox[0] - background_padding
-        bg_y0 = final_y + text_bbox[1] - background_padding
-        bg_x1 = final_x + text_bbox[0] + text_width + background_padding
-        bg_y1 = final_y + text_bbox[1] + text_height + background_padding
-
-        # Ensure background is within image bounds (optional, could allow partial backgrounds)
-        bg_x0 = max(0, bg_x0)
-        bg_y0 = max(0, bg_y0)
-        bg_x1 = min(img_width, bg_x1)
-        bg_y1 = min(img_height, bg_y1)
-
-        if bg_x1 > bg_x0 and bg_y1 > bg_y0: # Only draw if valid rectangle
-             # Check if parsed_background_color needs alpha for transparency
-            if isinstance(parsed_background_color, tuple) and len(parsed_background_color) == 3:
-                # Assume full opacity if alpha not provided
-                bg_color_tuple = parsed_background_color + (255,)
-            elif isinstance(parsed_background_color, tuple) and len(parsed_background_color) == 4:
-                bg_color_tuple = parsed_background_color
-            else: # String color name, let Pillow handle it, assume full opacity
-                # To ensure RGBA for draw.rectangle, convert named colors to RGBA
-                from PIL import ImageColor
-                try:
-                    # Convert named color to RGBA tuple
-                    # ImageColor.getcolor can return RGB or RGBA depending on the color string
-                    rgba_color = ImageColor.getcolor(parsed_background_color, "RGBA")
-                    bg_color_tuple = rgba_color
-                except ValueError: # Fallback if color name is not recognized by ImageColor
-                    logging.warning(f"Invalid background color name: {background_color}. Defaulting to semi-transparent black.")
-                    bg_color_tuple = (0,0,0,128) # Default: semi-transparent black
-
-            # Create a temporary drawing surface if the main image is not RGBA and we need transparency
-            if pic.mode != "RGBA" and bg_color_tuple[3] < 255:
-                overlay = Image.new("RGBA", pic.size, (0,0,0,0))
-                draw_overlay = ImageDraw.Draw(overlay)
-                draw_overlay.rectangle([bg_x0, bg_y0, bg_x1, bg_y1], fill=bg_color_tuple)
-                pic.paste(overlay, (0,0), overlay) # Paste using alpha
-            else: # Main image is RGBA or background is opaque
-                draw.rectangle([bg_x0, bg_y0, bg_x1, bg_y1], fill=bg_color_tuple)
-
-
-    draw.text((final_x, final_y), timestamp_text, font=font, fill=parsed_color)
-    return pic
+    return _add_text_overlay(
+        pic=pic,
+        text_to_draw=final_text_to_draw,
+        position=position,
+        size=size,
+        color=color,
+        font_path=font_path,
+        background_color=background_color,
+        background_padding=background_padding
+    )
 
 
 def postprocess(pic: Image.Image, postprocessing_steps: list) -> Tuple[Image.Image, dict]:
@@ -258,7 +255,8 @@ def postprocess(pic: Image.Image, postprocessing_steps: list) -> Tuple[Image.Ima
                     f"size={step.get('size', 24)}, "
                     f"color={step.get('color', 'white')}, "
                     f"background_color={step.get('background_color', None)}, "
-                    f"background_padding={step.get('background_padding', 2)}"
+                    f"background_padding={step.get('background_padding', 2)}, "
+                    f"custom_text={step.get('custom_text', None)}"
                 )
                 pic = add_timestamp(
                     pic,
@@ -268,8 +266,34 @@ def postprocess(pic: Image.Image, postprocessing_steps: list) -> Tuple[Image.Ima
                     color=step.get("color", "white"),
                     font_path=step.get("font_path"), # Allow custom font path from config
                     background_color=step.get("background_color", None),
+                    background_padding=step.get("background_padding", 2),
+                    custom_text=step.get("custom_text", None)
+                )
+        elif step["type"] == "text":
+            if step.get("enabled", False) and step.get("text_content"):
+                logging.debug(
+                    f"Adding generic text overlay with config: "
+                    f"text_content='{step.get('text_content')}', "
+                    f"position={step.get('position', 'bottom_right')}, "
+                    f"size={step.get('size', 24)}, "
+                    f"color={step.get('color', 'white')}, "
+                    f"font_path={step.get('font_path', None)}, "
+                    f"background_color={step.get('background_color', None)}, "
+                    f"background_padding={step.get('background_padding', 2)}"
+                )
+                pic = _add_text_overlay(
+                    pic=pic,
+                    text_to_draw=step.get("text_content"),
+                    position=step.get("position", "bottom_right"),
+                    size=step.get("size", 24),
+                    color=step.get("color", "white"),
+                    font_path=step.get("font_path", None),
+                    background_color=step.get("background_color", None),
                     background_padding=step.get("background_padding", 2)
                 )
+            elif not step.get("text_content") and step.get("enabled", False):
+                logging.warning("Generic text step is enabled but no 'text_content' was provided.")
+
     return pic, exif_data
 
 
