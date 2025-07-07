@@ -864,9 +864,9 @@ def daylight_loop():
 
 
 if __name__ == "__main__":
-    FLAGS = flags.FLAGS
+    #FLAGS = flags.FLAGS
 
-    flags.DEFINE_string("config", None, "path to YAML config file")
-    flags.mark_flag_as_required("config")
+    #flags.DEFINE_string("config", None, "path to YAML config file")
+    #flags.mark_flag_as_required("config")
     # FLAGS is now defined at module level
     app.run(main)
