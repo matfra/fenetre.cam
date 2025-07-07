@@ -26,6 +26,12 @@ cameras:
         width: 1280
         height: 720
       - type: "awb"
+      - type: "timestamp"
+        enabled: true
+        position: "bottom_right" # Options: "top_left", "top_right", "bottom_left", "bottom_right", or "x,y" coordinates
+        size: 24
+        color: "white" # common color names or RGB tuple e.g., "(255, 255, 255)"
+        format: "%Y-%m-%d %H:%M:%S %Z"
   a-boring-cam:
     url: "http://boring.example.com/pic.jpg"
     sky_area: 1200,0,1920,300 #Top right sky corner only
