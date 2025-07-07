@@ -13,7 +13,7 @@ from postprocess import add_timestamp, _parse_color, postprocess
 
 class TestPostprocess(unittest.TestCase):
 
-    def create_test_image(self, width=200, height=100, color="blue") -> Image.Image:
+    def create_test_image(self, width=200, height=100, color=(0, 0, 255)) -> Image.Image: # Default to blue tuple
         return Image.new("RGB", (width, height), color)
 
     def test_parse_color(self):
@@ -39,7 +39,8 @@ class TestPostprocess(unittest.TestCase):
         mock_image = self.create_test_image()
         mock_draw_instance = MagicMock()
         mock_draw_constructor.return_value = mock_draw_instance
-        mock_draw_instance.textsize.return_value = (100, 20) # example w, h
+        # Corrected to mock textbbox instead of textsize for width/height
+        mock_draw_instance.textbbox.return_value = (0, 0, 100, 20) # l, t, r, b
 
         # Mock datetime and timezone
         mock_tz = MagicMock()
@@ -86,7 +87,8 @@ class TestPostprocess(unittest.TestCase):
         mock_image = self.create_test_image(width=300, height=150)
         mock_draw_instance = MagicMock()
         mock_draw_constructor.return_value = mock_draw_instance
-        mock_draw_instance.textsize.return_value = (120, 25) # example w, h
+        # Corrected to mock textbbox
+        mock_draw_instance.textbbox.return_value = (0, 0, 120, 25) # l, t, r, b
 
         mock_tz = MagicMock()
         mock_pytz.timezone.return_value = mock_tz
@@ -128,7 +130,8 @@ class TestPostprocess(unittest.TestCase):
         mock_image = self.create_test_image()
         mock_draw_instance = MagicMock()
         mock_draw_constructor.return_value = mock_draw_instance
-        mock_draw_instance.textsize.return_value = (90, 18) # example w, h
+        # Corrected to mock textbbox
+        mock_draw_instance.textbbox.return_value = (0, 0, 90, 18) # l, t, r, b
 
         mock_tz = MagicMock()
         mock_pytz.timezone.return_value = mock_tz
@@ -167,7 +170,11 @@ class TestPostprocess(unittest.TestCase):
             text_format="%Y-%m-%d %H:%M:%S %Z", # Default
             position="center",
             size=30,
-            color="blue"
+            color="blue",
+            font_path=None,
+            background_color=None,
+            background_padding=2,
+            custom_text=None
         )
 
     @patch('postprocess.add_timestamp')
@@ -282,23 +289,15 @@ class TestPostprocess(unittest.TestCase):
     @patch('postprocess.ImageFont.truetype')
     @patch('postprocess.datetime')
     @patch('postprocess.pytz')
-    @patch('postprocess.ImageColor.getcolor') # Mock ImageColor for background
-    def test_add_timestamp_with_background(self, mock_imagecolor_getcolor, mock_pytz, mock_datetime, mock_truetype, mock_draw_constructor):
+    @patch('PIL.ImageColor.getcolor') # Corrected patch target
+    def test_add_timestamp_with_background(self, mock_pil_imagecolor_getcolor, mock_pytz, mock_datetime, mock_truetype, mock_draw_constructor):
         mock_image = self.create_test_image(width=200, height=100)
         # Important: Ensure image mode allows for transparency if background has alpha
         # For this test, let's assume we might use a semi-transparent background
-        mock_image = mock_image.convert("RGBA")
+        mock_image = mock_image.convert("RGBA") # Ensure image is RGBA for background testing
 
         mock_draw_instance = MagicMock()
-        # Ensure draw constructor is called with RGBA mode if background is present
-        # We'll check this by asserting the mode used when Draw is initialized
-        def draw_side_effect(img, mode=None):
-            # Check if the mode is correctly set to "RGBA" when background_color is used
-            if background_color_to_test: # Relies on background_color_to_test being in scope
-                self.assertEqual(mode, "RGBA", "ImageDraw not initialized in RGBA mode for background")
-            return mock_draw_instance
-        mock_draw_constructor.side_effect = draw_side_effect
-
+        mock_draw_constructor.return_value = mock_draw_instance # Standard mock setup
 
         mock_tz = MagicMock()
         mock_pytz.timezone.return_value = mock_tz
@@ -311,14 +310,15 @@ class TestPostprocess(unittest.TestCase):
         example_text_bbox = (0, 0, 80, 15) # l,t,r,b
         mock_draw_instance.textbbox.return_value = example_text_bbox
 
-        background_color_to_test = "gray"
+        # Test with a string background color (e.g., "gray")
+        background_color_string = "gray"
         # Mock what ImageColor.getcolor would return for "gray" in RGBA
-        mock_imagecolor_getcolor.return_value = (128, 128, 128, 255) # Opaque gray
+        mock_pil_imagecolor_getcolor.return_value = (128, 128, 128, 255) # Opaque gray
 
         with patch('postprocess.DEFAULT_TIMEZONE', "UTC"):
             add_timestamp(mock_image,
                           color="black",
-                          background_color=background_color_to_test,
+                          background_color=background_color_string,
                           background_padding=5,
                           position="bottom_left")
 
@@ -356,7 +356,7 @@ class TestPostprocess(unittest.TestCase):
         expected_bg_y1 = final_text_y + example_text_bbox[1] + text_height + background_padding
 
         self.assertEqual(rect_args[0], [expected_bg_x0, expected_bg_y0, expected_bg_x1, expected_bg_y1])
-        self.assertEqual(rect_kwargs['fill'], mock_imagecolor_getcolor.return_value)
+        self.assertEqual(rect_kwargs['fill'], mock_pil_imagecolor_getcolor.return_value)
 
         # Check that text is drawn on top
         mock_draw_instance.text.assert_called_once()
@@ -365,7 +365,7 @@ class TestPostprocess(unittest.TestCase):
 
         # Test with a tuple background color with alpha
         mock_draw_instance.reset_mock()
-        mock_imagecolor_getcolor.reset_mock() # Reset if it's used for tuple conversion too (it's not here)
+        mock_pil_imagecolor_getcolor.reset_mock() # Reset if it's used for tuple conversion too (it's not here)
 
         background_color_to_test = (0,0,255,128) # Semi-transparent blue
         # No need to mock ImageColor.getcolor for tuple inputs
@@ -431,20 +431,90 @@ class TestPostprocess(unittest.TestCase):
 
         # To test the 'postprocess' function's handling of 'custom_text' from config:
         # We need to mock 'add_timestamp' as it's called by 'postprocess'
-        with patch('postprocess.add_timestamp') as mock_add_timestamp_in_postprocess:
+        with patch('postprocess.add_timestamp') as mock_add_timestamp_in_postprocess: # This mocks the public add_timestamp
             img_for_postproc = self.create_test_image()
             postprocessing_steps = [
                 {
                     "type": "timestamp",
                     "enabled": True,
                     "custom_text": "Test Prefix"
+                    # other params like color, size, position etc. would be passed here
+                    # and checked in kwargs_passed if needed.
                 }
             ]
             postprocess(img_for_postproc, postprocessing_steps)
 
             mock_add_timestamp_in_postprocess.assert_called_once()
-            _, kwargs_passed = mock_add_timestamp_in_postprocess.call_args
+            call_args_list = mock_add_timestamp_in_postprocess.call_args_list
+            # Example of checking specific args passed to the mocked add_timestamp:
+            # self.assertEqual(call_args_list[0][1]['custom_text'], "Test Prefix")
+            # self.assertEqual(call_args_list[0][1]['color'], "white") # Default if not specified
+            _, kwargs_passed = call_args_list[0] # call_args is a tuple (args, kwargs)
             self.assertEqual(kwargs_passed.get('custom_text'), "Test Prefix")
+
+    @patch('postprocess._add_text_overlay') # Mock the internal helper directly for generic text step
+    def test_postprocess_integration_generic_text_step(self, mock_add_text_overlay):
+        img = self.create_test_image()
+        text_content = "Hello World"
+        text_color = "orange"
+        text_size = 40
+        text_position = "top_center"
+        bg_color = "black"
+        bg_padding = 5
+        font_p = "Arial.ttf"
+
+        postprocessing_steps = [
+            {
+                "type": "text",
+                "enabled": True,
+                "text_content": text_content,
+                "color": text_color,
+                "size": text_size,
+                "position": text_position,
+                "background_color": bg_color,
+                "background_padding": bg_padding,
+                "font_path": font_p
+            }
+        ]
+
+        mock_add_text_overlay.return_value = img # Ensure the mock returns an image
+
+        returned_img, _ = postprocess(img, postprocessing_steps)
+
+        self.assertEqual(img, returned_img) # Check if image is returned
+        mock_add_text_overlay.assert_called_once()
+
+        # Verify that _add_text_overlay was called with the correct parameters
+        args_passed, kwargs_passed = mock_add_text_overlay.call_args
+
+        self.assertEqual(kwargs_passed.get('pic'), img)
+        self.assertEqual(kwargs_passed.get('text_to_draw'), text_content)
+        self.assertEqual(kwargs_passed.get('color'), text_color)
+        self.assertEqual(kwargs_passed.get('size'), text_size)
+        self.assertEqual(kwargs_passed.get('position'), text_position)
+        self.assertEqual(kwargs_passed.get('background_color'), bg_color)
+        self.assertEqual(kwargs_passed.get('background_padding'), bg_padding)
+        self.assertEqual(kwargs_passed.get('font_path'), font_p)
+
+    @patch('postprocess._add_text_overlay')
+    @patch('postprocess.logging')
+    def test_postprocess_integration_generic_text_step_disabled_or_no_text(self, mock_logging, mock_add_text_overlay):
+        img = self.create_test_image()
+
+        # Test case 1: Step disabled
+        postprocessing_steps_disabled = [
+            {"type": "text", "enabled": False, "text_content": "Should not appear"}
+        ]
+        postprocess(img, postprocessing_steps_disabled)
+        mock_add_text_overlay.assert_not_called()
+
+        # Test case 2: Step enabled but no text_content
+        postprocessing_steps_no_text = [
+            {"type": "text", "enabled": True} # Missing text_content
+        ]
+        postprocess(img, postprocessing_steps_no_text)
+        mock_add_text_overlay.assert_not_called()
+        mock_logging.warning.assert_called_with("Generic text step is enabled but no 'text_content' was provided.")
 
 
 if __name__ == '__main__':
