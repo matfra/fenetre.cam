@@ -110,8 +110,14 @@ class TestPostprocess(unittest.TestCase):
         self.assertEqual(kwargs['fill'], (0,255,0))
 
         # For "top_left", position should be near (padding, padding)
+        # With textbbox, the coordinates might be adjusted by text_bbox[0] and text_bbox[1]
+        # Assuming text_bbox = (0, 0, 120, 25) for this test for simplicity in asserting position.
+        mock_draw_instance.textbbox.return_value = (0, 0, 120, 25)
         padding = 10
-        self.assertEqual(args[0], (padding, padding))
+        # final_x = padding - text_bbox[0]
+        # final_y = padding - text_bbox[1]
+        self.assertEqual(args[0], (padding - 0, padding - 0))
+
 
     @patch('postprocess.ImageDraw.Draw')
     @patch('postprocess.ImageFont.truetype', side_effect=IOError("Font not found")) # Mock font load failure
@@ -192,8 +198,8 @@ class TestPostprocess(unittest.TestCase):
 
         mock_font = MagicMock()
         mock_truetype.return_value = mock_font
-        # Mock textsize return value
-        mock_draw_instance.textsize.return_value = (100, 20) # width, height
+        # Mock textbbox return value
+        mock_draw_instance.textbbox.return_value = (0, 0, 100, 20) # l, t, r, b
 
         with patch('postprocess.DEFAULT_TIMEZONE', "UTC"):
              add_timestamp(mock_image, position="50,75", size=10, color="red")
@@ -227,6 +233,158 @@ class TestPostprocess(unittest.TestCase):
         tz = get_timezone_from_config()
         self.assertEqual(tz, "UTC") # Fallback
         mock_logging.warning.assert_called_with("config.yaml not found, defaulting timezone to UTC for timestamps.")
+
+    @patch('postprocess.ImageDraw.Draw')
+    @patch('postprocess.ImageFont.truetype')
+    @patch('postprocess.datetime')
+    @patch('postprocess.pytz')
+    def test_add_timestamp_new_positions(self, mock_pytz, mock_datetime, mock_truetype, mock_draw_constructor):
+        mock_image = self.create_test_image(width=400, height=200)
+        mock_draw_instance = MagicMock()
+        mock_draw_constructor.return_value = mock_draw_instance
+
+        mock_tz = MagicMock()
+        mock_pytz.timezone.return_value = mock_tz
+        mock_now = datetime(2023, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+        mock_datetime.now.return_value = mock_now
+
+        mock_font = MagicMock()
+        mock_truetype.return_value = mock_font
+
+        # Define text_bbox for consistent calculations: (left, top, right, bottom)
+        # Meaning text_width = 100, text_height = 20, left_offset=0, top_offset=0
+        example_text_bbox = (0, 0, 100, 20)
+        mock_draw_instance.textbbox.return_value = example_text_bbox
+        text_width = example_text_bbox[2] - example_text_bbox[0]
+        text_height = example_text_bbox[3] - example_text_bbox[1]
+
+        padding = 10
+        img_width, img_height = mock_image.size
+
+        positions_to_test = {
+            "top_center": ((img_width - text_width) // 2, padding - example_text_bbox[1]),
+            "bottom_center": ((img_width - text_width) // 2, img_height - text_height - padding - example_text_bbox[1])
+        }
+
+        for position_name, expected_coords in positions_to_test.items():
+            with patch('postprocess.DEFAULT_TIMEZONE', "UTC"):
+                add_timestamp(mock_image, position=position_name, size=10, color="green")
+
+            args, _ = mock_draw_instance.text.call_args
+            # final_x = expected_coords[0] - example_text_bbox[0]
+            # final_y = expected_coords[1] - example_text_bbox[1]
+            # Since example_text_bbox[0] and [1] are 0, final_x,y are same as expected_coords
+            self.assertEqual(args[0], expected_coords, f"Position failed for {position_name}")
+            # Reset mock for next iteration if necessary, though here it's implicitly reset by new call_args
+            mock_draw_instance.text.reset_mock()
+
+    @patch('postprocess.ImageDraw.Draw')
+    @patch('postprocess.ImageFont.truetype')
+    @patch('postprocess.datetime')
+    @patch('postprocess.pytz')
+    @patch('postprocess.ImageColor.getcolor') # Mock ImageColor for background
+    def test_add_timestamp_with_background(self, mock_imagecolor_getcolor, mock_pytz, mock_datetime, mock_truetype, mock_draw_constructor):
+        mock_image = self.create_test_image(width=200, height=100)
+        # Important: Ensure image mode allows for transparency if background has alpha
+        # For this test, let's assume we might use a semi-transparent background
+        mock_image = mock_image.convert("RGBA")
+
+        mock_draw_instance = MagicMock()
+        # Ensure draw constructor is called with RGBA mode if background is present
+        # We'll check this by asserting the mode used when Draw is initialized
+        def draw_side_effect(img, mode=None):
+            # Check if the mode is correctly set to "RGBA" when background_color is used
+            if background_color_to_test: # Relies on background_color_to_test being in scope
+                self.assertEqual(mode, "RGBA", "ImageDraw not initialized in RGBA mode for background")
+            return mock_draw_instance
+        mock_draw_constructor.side_effect = draw_side_effect
+
+
+        mock_tz = MagicMock()
+        mock_pytz.timezone.return_value = mock_tz
+        mock_now = datetime(2023, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+        mock_datetime.now.return_value = mock_now
+
+        mock_font = MagicMock()
+        mock_truetype.return_value = mock_font
+
+        example_text_bbox = (0, 0, 80, 15) # l,t,r,b
+        mock_draw_instance.textbbox.return_value = example_text_bbox
+
+        background_color_to_test = "gray"
+        # Mock what ImageColor.getcolor would return for "gray" in RGBA
+        mock_imagecolor_getcolor.return_value = (128, 128, 128, 255) # Opaque gray
+
+        with patch('postprocess.DEFAULT_TIMEZONE', "UTC"):
+            add_timestamp(mock_image,
+                          color="black",
+                          background_color=background_color_to_test,
+                          background_padding=5,
+                          position="bottom_left")
+
+        # Check that draw.rectangle was called for the background
+        mock_draw_instance.rectangle.assert_called_once()
+        rect_args, rect_kwargs = mock_draw_instance.rectangle.call_args
+
+        # rect_args[0] is the [x0, y0, x1, y1] list for the rectangle
+        # We need to calculate the expected background coordinates
+        # final_x, final_y for text (bottom_left)
+        padding = 10
+        text_width = example_text_bbox[2] - example_text_bbox[0]
+        text_height = example_text_bbox[3] - example_text_bbox[1]
+
+        # Expected text position (bottom_left)
+        # x = padding - example_text_bbox[0]
+        # y = mock_image.height - text_height - padding - example_text_bbox[1]
+        # Since text_bbox offsets are 0:
+        expected_text_x = padding
+        expected_text_y = mock_image.height - text_height - padding
+
+        # final_x for text drawing is expected_text_x - example_text_bbox[0]
+        # final_y for text drawing is expected_text_y - example_text_bbox[1]
+        final_text_x = expected_text_x - example_text_bbox[0]
+        final_text_y = expected_text_y - example_text_bbox[1]
+
+        background_padding = 5
+        # bg_x0 = final_text_x + example_text_bbox[0] - background_padding
+        # bg_y0 = final_text_y + example_text_bbox[1] - background_padding
+        # bg_x1 = final_text_x + example_text_bbox[0] + text_width + background_padding
+        # bg_y1 = final_text_y + example_text_bbox[1] + text_height + background_padding
+        expected_bg_x0 = final_text_x + example_text_bbox[0] - background_padding
+        expected_bg_y0 = final_text_y + example_text_bbox[1] - background_padding
+        expected_bg_x1 = final_text_x + example_text_bbox[0] + text_width + background_padding
+        expected_bg_y1 = final_text_y + example_text_bbox[1] + text_height + background_padding
+
+        self.assertEqual(rect_args[0], [expected_bg_x0, expected_bg_y0, expected_bg_x1, expected_bg_y1])
+        self.assertEqual(rect_kwargs['fill'], mock_imagecolor_getcolor.return_value)
+
+        # Check that text is drawn on top
+        mock_draw_instance.text.assert_called_once()
+        text_args, _ = mock_draw_instance.text.call_args
+        self.assertEqual(text_args[0], (final_text_x, final_text_y))
+
+        # Test with a tuple background color with alpha
+        mock_draw_instance.reset_mock()
+        mock_imagecolor_getcolor.reset_mock() # Reset if it's used for tuple conversion too (it's not here)
+
+        background_color_to_test = (0,0,255,128) # Semi-transparent blue
+        # No need to mock ImageColor.getcolor for tuple inputs
+
+        # Re-patch draw_constructor for this specific call if mode check is important
+        # Or ensure the side_effect handles this state change
+        # For simplicity, the previous check for RGBA mode on Draw init covers the general case.
+
+        with patch('postprocess.DEFAULT_TIMEZONE', "UTC"):
+             add_timestamp(mock_image,
+                          color="white",
+                          background_color=background_color_to_test,
+                          background_padding=3,
+                          position="top_right")
+
+        mock_draw_instance.rectangle.assert_called_once()
+        rect_args_transparent, rect_kwargs_transparent = mock_draw_instance.rectangle.call_args
+        self.assertEqual(rect_kwargs_transparent['fill'], background_color_to_test)
+
 
 if __name__ == '__main__':
     unittest.main()
