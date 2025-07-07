@@ -57,19 +57,28 @@ def add_timestamp(
     color: Union[str, Tuple[int, int, int]] = "white",
     font_path: Optional[str] = None, # Allow custom font
     background_color: Optional[Union[str, Tuple[int, int, int]]] = None, # Optional background color
-    background_padding: int = 2 # Padding around text for background
+    background_padding: int = 2, # Padding around text for background
+    custom_text: Optional[str] = None # Optional custom text to prepend
 ) -> Image.Image:
-    """Adds a timestamp to the image."""
+    """Adds a timestamp and optional custom text to the image."""
     draw = ImageDraw.Draw(pic, "RGBA" if background_color else "RGB") # Use RGBA if background needs transparency
 
     try:
         tz_str = DEFAULT_TIMEZONE
         tz = pytz.timezone(tz_str)
         now = datetime.now(tz)
-        timestamp_text = now.strftime(text_format)
+        formatted_time = now.strftime(text_format)
+        if custom_text:
+            timestamp_text = f"{custom_text} {formatted_time}"
+        else:
+            timestamp_text = formatted_time
     except Exception as e:
         logging.error(f"Error formatting timestamp: {e}. Using default format.")
-        timestamp_text = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        formatted_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        if custom_text:
+            timestamp_text = f"{custom_text} {formatted_time}"
+        else:
+            timestamp_text = formatted_time
 
     try:
         if font_path:
@@ -258,7 +267,8 @@ def postprocess(pic: Image.Image, postprocessing_steps: list) -> Tuple[Image.Ima
                     f"size={step.get('size', 24)}, "
                     f"color={step.get('color', 'white')}, "
                     f"background_color={step.get('background_color', None)}, "
-                    f"background_padding={step.get('background_padding', 2)}"
+                    f"background_padding={step.get('background_padding', 2)}, "
+                    f"custom_text={step.get('custom_text', None)}"
                 )
                 pic = add_timestamp(
                     pic,
@@ -268,7 +278,8 @@ def postprocess(pic: Image.Image, postprocessing_steps: list) -> Tuple[Image.Ima
                     color=step.get("color", "white"),
                     font_path=step.get("font_path"), # Allow custom font path from config
                     background_color=step.get("background_color", None),
-                    background_padding=step.get("background_padding", 2)
+                    background_padding=step.get("background_padding", 2),
+                    custom_text=step.get("custom_text", None)
                 )
     return pic, exif_data
 

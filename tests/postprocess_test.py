@@ -385,6 +385,67 @@ class TestPostprocess(unittest.TestCase):
         rect_args_transparent, rect_kwargs_transparent = mock_draw_instance.rectangle.call_args
         self.assertEqual(rect_kwargs_transparent['fill'], background_color_to_test)
 
+    @patch('postprocess.ImageDraw.Draw')
+    @patch('postprocess.ImageFont.truetype')
+    @patch('postprocess.datetime')
+    @patch('postprocess.pytz')
+    def test_add_timestamp_with_custom_text(self, mock_pytz, mock_datetime, mock_truetype, mock_draw_constructor):
+        mock_image = self.create_test_image()
+        mock_draw_instance = MagicMock()
+        mock_draw_constructor.return_value = mock_draw_instance
+
+        mock_tz = MagicMock()
+        mock_pytz.timezone.return_value = mock_tz
+        # Use a fixed datetime for predictable output
+        mock_now = datetime(2024, 7, 15, 10, 30, 0, tzinfo=timezone.utc)
+        mock_datetime.now.return_value = mock_now
+
+        mock_font = MagicMock()
+        mock_truetype.return_value = mock_font
+
+        # Mock textbbox to prevent issues with text size calculation in test
+        mock_draw_instance.textbbox.return_value = (0, 0, 150, 20) # l,t,r,b
+
+        custom_text_to_add = "Front Cam:"
+        # Default format is "%Y-%m-%d %H:%M:%S %Z"
+        expected_time_part = "2024-07-15 10:30:00 UTC"
+        expected_full_text = f"{custom_text_to_add} {expected_time_part}"
+
+        with patch('postprocess.DEFAULT_TIMEZONE', "UTC"):
+            add_timestamp(mock_image, custom_text=custom_text_to_add)
+
+        # Verify that draw.text was called with the combined custom text and timestamp
+        mock_draw_instance.text.assert_called_once()
+        args, _ = mock_draw_instance.text.call_args
+
+        # args[1] is the text argument in draw.text((coords), text, font=..., fill=...)
+        self.assertEqual(args[1], expected_full_text)
+
+        # Also test the integration through the main postprocess function
+        mock_draw_instance.text.reset_mock() # Reset for the next call test
+
+        # Mock the add_timestamp call within postprocess to check parameters
+        # This requires re-patching add_timestamp if we want to inspect its direct call from postprocess
+        # For simplicity here, we'll assume the earlier direct test of add_timestamp covers its internal logic
+        # and focus on the parameters passed from the 'postprocess' function config.
+
+        # To test the 'postprocess' function's handling of 'custom_text' from config:
+        # We need to mock 'add_timestamp' as it's called by 'postprocess'
+        with patch('postprocess.add_timestamp') as mock_add_timestamp_in_postprocess:
+            img_for_postproc = self.create_test_image()
+            postprocessing_steps = [
+                {
+                    "type": "timestamp",
+                    "enabled": True,
+                    "custom_text": "Test Prefix"
+                }
+            ]
+            postprocess(img_for_postproc, postprocessing_steps)
+
+            mock_add_timestamp_in_postprocess.assert_called_once()
+            _, kwargs_passed = mock_add_timestamp_in_postprocess.call_args
+            self.assertEqual(kwargs_passed.get('custom_text'), "Test Prefix")
+
 
 if __name__ == '__main__':
     unittest.main()
