@@ -233,7 +233,7 @@ def postprocess(pic: Image.Image, postprocessing_steps: list) -> Tuple[Image.Ima
     """
     Applies a series of post-processing steps to an image.
     """
-    exif_data = pic.info.get("exif") or b""
+    exif_data = pic.info.get("exif")
     for step in postprocessing_steps:
         if step["type"] == "crop":
             logging.debug(f"Cropping image to area: {step['area']}")

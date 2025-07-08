@@ -1,10 +1,16 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 import yaml
+import json # For handling JSON input
 import os
-import threading
 import signal
+from werkzeug.exceptions import BadRequest # Import BadRequest
 
-app = Flask(__name__)
+# app = Flask(__name__) # Default static folder is 'static'
+# To serve UI from a specific directory, e.g. 'config_ui/static' and 'config_ui/templates'
+# We'll assume 'static' and a root HTML file for simplicity first.
+# If index.html is in 'static', it's simpler. If we want a template, then template_folder.
+app = Flask(__name__, static_folder='static')
+
 
 CONFIG_FILE_PATH = os.environ.get("CONFIG_FILE_PATH", "config.yaml")
 FENETRE_PID_FILE = os.environ.get("FENETRE_PID_FILE", "fenetre.pid") # Used to signal fenetre.py for reload
@@ -27,24 +33,57 @@ def get_config():
 @app.route('/config', methods=['PUT'])
 def update_config():
     try:
-        new_config_yaml = request.data.decode('utf-8')
-        if not new_config_yaml:
-            return jsonify({"error": "Request body is empty. YAML data expected."}), 400
+        if not request.is_json:
+            return jsonify({"error": "Request body must be JSON."}), 415 # Unsupported Media Type
 
-        # Validate YAML structure (basic validation)
+        new_config_json = request.get_json()
+        if not new_config_json:
+            return jsonify({"error": "Request body is empty or not valid JSON."}), 400
+
+        if not isinstance(new_config_json, dict):
+            return jsonify({"error": "Root element of the configuration must be a dictionary."}), 400
+
+        # Convert JSON to YAML
         try:
-            new_config_data = yaml.safe_load(new_config_yaml)
-            if not isinstance(new_config_data, dict):
-                raise yaml.YAMLError("Root element must be a dictionary.")
-        except yaml.YAMLError as e:
-            return jsonify({"error": f"Invalid YAML format: {str(e)}"}), 400
+            new_config_yaml = yaml.dump(new_config_json, sort_keys=False, default_flow_style=False, indent=2)
+        except yaml.YAMLError as e: # Error during YAML conversion
+            return jsonify({"error": f"Error converting JSON to YAML: {str(e)}"}), 500
 
         with open(CONFIG_FILE_PATH, 'w') as f:
             f.write(new_config_yaml)
 
-        return jsonify({"message": "Configuration updated successfully. Reload is required to apply changes."}), 200
-    except Exception as e:
-        return jsonify({"error": f"Error writing configuration: {str(e)}"}), 500
+        return jsonify({"message": "Configuration updated successfully (saved as YAML). Reload is required to apply changes."}), 200
+    except BadRequest: # Catch errors from request.get_json() like malformed JSON
+        return jsonify({"error": "Invalid JSON format in request body or empty body."}), 400
+    except Exception as e: # Catch other unexpected errors
+        # Log the exception e for debugging on the server side
+        print(f"Unexpected error in update_config: {e}") # Or use app.logger
+        return jsonify({"error": f"Error processing configuration: {str(e)}"}), 500
+
+# --- UI Serving Routes ---
+
+@app.route('/ui')
+def serve_ui_page():
+    # Serves static/index.html, assuming index.html is the main page for the UI
+    # If index.html is not in the 'static' folder but e.g. in 'templates', use render_template
+    # For simplicity, let's assume we'll place index.html in the root of the static folder
+    # or serve it from a specific path if it's outside 'static_folder'
+    # A common pattern is to have a template for the main page.
+    # Let's serve 'index.html' from the root directory for now, or create a static/index.html later.
+    # For now, a simple placeholder or assume it's in static.
+    # Flask default static route is /static/<path:filename>
+    # To serve index.html at /ui, we can explicitly define a route.
+    # We will place index.html in a 'ui' subfolder within static, or serve it from project root.
+    # Let's assume we'll create a 'static/index.html' and access it via /static/index.html
+    # or create a specific route for /ui
+
+    # This will serve 'static/index.html'
+    return app.send_static_file('index.html')
+
+
+# Flask automatically adds a static route if static_folder is set.
+# e.g., /static/app.js will be served from static/app.js
+# No need for specific routes for each static file if they are in the 'static' folder.
 
 @app.route('/config/reload', methods=['POST'])
 def reload_config():

@@ -65,17 +65,34 @@ Fenetre now includes a separate HTTP server for managing its configuration (`con
     *   `CONFIG_FILE_PATH` (default: `config.yaml`) - This should point to the same `config.yaml` used by `fenetre.py`.
     *   `FENETRE_PID_FILE` (default: `fenetre.pid`) - `fenetre.py` writes its process ID here, which the config server uses to send a reload signal. Ensure this path is consistent between both processes.
 
+### Web UI for Configuration
+
+A web-based UI is provided to easily view and edit the configuration.
+
+*   **Accessing the UI**: Once `config_server.py` is running (see above), open your browser and navigate to:
+    ```
+    http://<config_server_host>:<config_server_port>/ui
+    ```
+    For example, if running locally with defaults: `http://localhost:8889/ui`
+
+*   **Features**:
+    *   **Load Current Config**: Fetches the active `config.yaml` and dynamically renders an editable form.
+    *   **Edit Values**: Modify configuration values directly in the form. Handles nested objects and arrays.
+    *   **Add/Remove Array Items**: Basic support for adding new items to arrays and removing existing ones.
+    *   **Save to config.yaml**: Saves the current state of the form back to `config.yaml` on the server (converts UI form data to JSON, then server converts JSON to YAML).
+    *   **Reload Application Config**: Sends a signal to the main `fenetre.py` process to reload and apply the updated `config.yaml`.
+
 ### API Endpoints
 
 *   **`GET /config`**
     *   Retrieves the current content of `config.yaml`.
-    *   **Response**: `200 OK` with JSON body of the configuration.
+    *   **Response**: `200 OK` with JSON body of the configuration (used by the Web UI).
 
 *   **`PUT /config`**
-    *   Updates `config.yaml` with the provided YAML data in the request body.
-    *   **Request Body**: Raw YAML content.
-    *   **Response**: `200 OK` with `{"message": "Configuration updated successfully. Reload is required to apply changes."}`.
-    *   **Note**: This only updates the file on disk. A subsequent call to `/config/reload` is needed to make the running `fenetre.py` application apply these changes.
+    *   Updates `config.yaml` with the provided JSON data in the request body.
+    *   **Request Body**: Raw JSON content. The server converts this to YAML before saving.
+    *   **Response**: `200 OK` with `{"message": "Configuration updated successfully (saved as YAML). Reload is required to apply changes."}`.
+    *   **Note**: This only updates the file on disk. A subsequent call to `/config/reload` (via API or UI button) is needed to make the running `fenetre.py` application apply these changes.
 
 *   **`POST /config/reload`**
     *   Signals the main `fenetre.py` process to reload its configuration from `config.yaml`.
@@ -95,11 +112,10 @@ Fenetre now includes a separate HTTP server for managing its configuration (`con
     ```
 
 2.  **Update configuration**:
-    Save your new configuration to a file, e.g., `new_config.yaml`.
+    Save your new configuration to a file, e.g., `new_config.json` (note it should be JSON).
     ```bash
-    curl -X PUT -H "Content-Type: application/x-yaml" --data-binary "@new_config.yaml" http://localhost:8889/config
+    curl -X PUT -H "Content-Type: application/json" --data-binary "@new_config.json" http://localhost:8889/config
     ```
-    *(Note: `application/x-yaml` or `text/yaml` are common Content-Types for YAML)*
 
 3.  **Reload configuration in `fenetre.py`**:
     ```bash

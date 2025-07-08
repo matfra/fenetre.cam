@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fenetre Configuration</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Fenetre Configuration Editor</h1>
+
+        <div class="controls">
+            <button id="loadConfigBtn">Load Current Config</button>
+            <button id="saveConfigBtn" disabled>Save to config.yaml</button>
+            <button id="reloadAppBtn">Reload Application Config</button>
+        </div>
+
+        <div id="statusMessage"></div>
+
+        <div id="configFormContainer">
+            <!-- Dynamic form will be rendered here by JavaScript -->
+            <p>Click "Load Current Config" to view and edit.</p>
+        </div>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>

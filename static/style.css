@@ -1,0 +1,146 @@
+/* Basic styling - will be expanded later */
+body {
+    font-family: sans-serif;
+    margin: 20px;
+    background-color: #f4f4f4;
+    color: #333;
+}
+
+.container {
+    background-color: #fff;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+h1 {
+    color: #333;
+    text-align: center;
+}
+
+.controls {
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.controls button {
+    padding: 10px 15px;
+    margin: 5px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    background-color: #007bff;
+    color: white;
+}
+
+.controls button:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+}
+
+#statusMessage {
+    margin-bottom: 20px;
+    padding: 10px;
+    border-radius: 4px;
+    text-align: center;
+}
+
+#statusMessage.success {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+#statusMessage.error {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+#configFormContainer fieldset {
+    border: 1px solid #ddd;
+    padding: 10px;
+    margin-bottom: 10px;
+    border-radius: 4px;
+}
+
+#configFormContainer legend {
+    font-weight: bold;
+    padding: 0 5px;
+    color: #0056b3;
+}
+
+#configFormContainer label {
+    display: block;
+    margin-top: 10px;
+    margin-bottom: 5px;
+    font-weight: bold;
+}
+
+#configFormContainer input[type="text"],
+#configFormContainer input[type="number"],
+#configFormContainer textarea {
+    width: calc(100% - 22px); /* Account for padding and border */
+    padding: 8px;
+    margin-bottom: 10px;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+    box-sizing: border-box; /* Important for width calculation */
+}
+
+#configFormContainer input[type="checkbox"] {
+    margin-right: 5px;
+    vertical-align: middle;
+}
+
+/* Indentation and styling for nested fieldsets */
+#configFormContainer fieldset fieldset {
+    margin-left: 20px;
+    border-left: 3px solid #007bff; /* Make border more prominent */
+    background-color: #f9f9f9; /* Slightly different background for nested objects */
+}
+
+#configFormContainer fieldset fieldset legend {
+    color: #17a2b8; /* Different color for nested legends */
+}
+
+
+.array-item {
+    border: 1px solid #e0e0e0; /* Solid border for array items */
+    padding: 10px;
+    margin-bottom: 5px;
+    position: relative;
+}
+
+.array-item-controls {
+    margin-top: 10px; /* More space for controls */
+    padding-top: 5px;
+    border-top: 1px solid #eee; /* Separator line */
+}
+
+/* Specific styling for labels within array items if needed */
+.array-item > label {
+    font-size: 0.9em;
+    color: #555;
+}
+/* Specific styling for fieldsets within array items (for arrays of objects) */
+.array-item > fieldset {
+    margin-top: 5px;
+    background-color: #fdfdfd; /* Slightly different for objects within arrays */
+}
+
+
+.remove-item-btn, .add-item-btn {
+    padding: 6px 10px; /* Slightly larger buttons */
+    font-size: 0.9em; /* Slightly larger font */
+    margin-right: 5px;
+    cursor: pointer;
+    background-color: #dc3545;
+    color: white;
+    border: none;
+    border-radius: 3px;
+}
+
+.add-item-btn {
+    background-color: #28a745;
+}
