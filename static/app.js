@@ -218,40 +218,53 @@ document.addEventListener('DOMContentLoaded', () => {
                         currentObject[key] = [];
                         // Iterate over array item containers
                         Array.from(child.querySelectorAll(':scope > .array-item')).forEach(itemDiv => {
-                            let itemValue;
-                            // If itemDiv contains a fieldset, it's an object array
-                            const nestedFieldset = itemDiv.querySelector(':scope > fieldset');
-                            if (nestedFieldset) {
-                                itemValue = {};
-                                processChildren(nestedFieldset, itemValue); // Recursively build the object
-                            } else { // Primitive array or simple object handled by direct inputs
-                                const directInput = itemDiv.querySelector('input, textarea');
-                                if(directInput){
-                                    if (directInput.type === 'checkbox') itemValue = directInput.checked;
-                                    else if (directInput.type === 'number') itemValue = parseFloat(directInput.value) || 0;
-                                    else itemValue = directInput.value;
-                                } else {
-                                    // Fallback for complex items in array that don't have a single input but might have multiple direct children inputs
-                                    // This part might need refinement if array items are complex objects without their own fieldset wrapper inside itemDiv
-                                    itemValue = {};
-                                    processChildren(itemDiv, itemValue);
+                            let itemValue = {}; // Assume array items that are not primitive are objects
+                            // Check if the itemDiv's direct children suggest it's a simple primitive
+                            // This check might need to be more robust based on how renderConfigForm structures primitives in arrays
+                            const directPrimitiveInput = itemDiv.querySelector(':scope > input, :scope > textarea');
+                            let isPrimitiveArrayItem = false;
+                            if (directPrimitiveInput) {
+                                // If the direct input's key is exactly the itemKey (e.g. "myArray[0]")
+                                // it means it's an array of primitives.
+                                // An object item would have inputs like "myArray[0].property"
+                                const isKeySimpleArrayIndex = !Object.values(directPrimitiveInput.dataset).some(val => val.includes('.'));
+                                if (directPrimitiveInput.dataset.key && directPrimitiveInput.dataset.key.endsWith(`[${itemDiv.dataset.index}]` ) && isKeySimpleArrayIndex) {
+                                     isPrimitiveArrayItem = true;
                                 }
+                            }
+
+
+                            if (isPrimitiveArrayItem && directPrimitiveInput) {
+                                if (directPrimitiveInput.type === 'checkbox') itemValue = directPrimitiveInput.checked;
+                                else if (directPrimitiveInput.type === 'number') itemValue = parseFloat(directPrimitiveInput.value) || 0;
+                                else itemValue = directPrimitiveInput.value;
+                            } else {
+                                // It's an object within an array. Process its children to build the object.
+                                // itemDiv itself contains the fields of the object.
+                                processChildren(itemDiv, itemValue);
                             }
                             currentObject[key].push(itemValue);
                         });
-                    } else { // Object
+                    } else { // Object (not an array)
                         currentObject[key] = {};
                         processChildren(child, currentObject[key]);
                     }
                 } else if (child.tagName === 'INPUT' || child.tagName === 'TEXTAREA') {
-                    if (child.dataset.key) { // Only process inputs that are part of the config structure
-                        const key = child.dataset.key.split('.').pop().replace(/\[\d+\]$/, '');
-                         if (child.type === 'checkbox') {
-                            currentObject[key] = child.checked;
+                    // This branch handles direct properties of an object, not items in an array directly.
+                    // Array items are handled within the 'array' fieldset logic.
+                    if (child.dataset.key) {
+                        const keyParts = child.dataset.key.split('.');
+                        const actualKey = keyParts[keyParts.length -1]; // The last part is the actual property name
+
+                        // Ensure we are not trying to process parts of an array item directly here
+                        // if (actualKey.includes('[')) continue; // Skip if it looks like an array element part
+
+                        if (child.type === 'checkbox') {
+                            currentObject[actualKey] = child.checked;
                         } else if (child.type === 'number') {
-                            currentObject[key] = parseFloat(child.value) || 0;
+                            currentObject[actualKey] = parseFloat(child.value) || 0;
                         } else {
-                            currentObject[key] = child.value;
+                            currentObject[actualKey] = child.value;
                         }
                     }
                 }
