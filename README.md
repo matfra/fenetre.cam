@@ -81,6 +81,28 @@ A web-based UI is provided to easily view and edit the configuration.
     *   **Add/Remove Array Items**: Basic support for adding new items to arrays and removing existing ones.
     *   **Save to config.yaml**: Saves the current state of the form back to `config.yaml` on the server (converts UI form data to JSON, then server converts JSON to YAML).
     *   **Reload Application Config**: Sends a signal to the main `fenetre.py` process to reload and apply the updated `config.yaml`.
+    *   **Link to Visual Crop Tool**: Provides a link to a visual tool for defining crop areas.
+
+#### Visual Crop Configuration Tool
+
+Accessible from the main configuration UI, this tool helps visually define crop areas for cameras.
+
+*   **Access**: Navigate from the main config UI (`/ui`) to the "Visual Crop Configuration Tool" (typically `/static/visual_config.html`).
+*   **Functionality**:
+    1.  **Select Camera**: Choose a URL-based camera from the dropdown.
+    2.  **Fetch Image**: Click "Fetch Camera Image" to load the current image from the camera's URL.
+    3.  **Define Crop**: Use the interactive Cropper.js interface on the image to select the desired crop area. Crop coordinates (x, y, width, height) are displayed.
+    4.  **Preview Crop**: Click "Preview Crop" to see the result of applying the current selection to the fetched image. The cropped portion is displayed.
+    5.  **Apply to Configuration**: Click "Apply Crop to Configuration". This will:
+        *   Fetch the latest full `config.yaml` content.
+        *   Update the `postprocessing` array for the selected camera:
+            *   Any existing `type: "crop"` steps are removed.
+            *   A new `type: "crop"` step is added with the selected area (coordinates are automatically converted to `left,top,right,bottom` format).
+        *   The entire modified configuration is then saved back to `config.yaml`.
+    6.  **Reload**: After applying, you'll typically need to go back to the main configuration UI and use the "Reload Application Config" button to make `fenetre.py` pick up the changes.
+*   **Current Limitations**:
+    *   Primarily designed for URL-based cameras. Fetching images from local commands or GoPro for the visual tool is not supported in this version.
+    *   Focuses on the "crop" postprocessing step.
 
 ### API Endpoints
 

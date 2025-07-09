@@ -1,9 +1,12 @@
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory, send_file
 import yaml
 import json # For handling JSON input
 import os
 import signal
 from werkzeug.exceptions import BadRequest # Import BadRequest
+import requests # For fetching images from URLs
+from PIL import Image # For image processing (crop)
+from io import BytesIO # For handling image data in memory
 
 # app = Flask(__name__) # Default static folder is 'static'
 # To serve UI from a specific directory, e.g. 'config_ui/static' and 'config_ui/templates'
@@ -84,6 +87,142 @@ def serve_ui_page():
 # Flask automatically adds a static route if static_folder is set.
 # e.g., /static/app.js will be served from static/app.js
 # No need for specific routes for each static file if they are in the 'static' folder.
+
+# --- API Endpoints for Visual Config Tool ---
+
+@app.route('/api/camera/<string:camera_name>/capture_for_ui', methods=['POST'])
+def capture_for_ui(camera_name):
+    try:
+        with open(CONFIG_FILE_PATH, 'r') as f:
+            config = yaml.safe_load(f)
+    except FileNotFoundError:
+        return jsonify({"error": f"Configuration file {CONFIG_FILE_PATH} not found."}), 500
+    except yaml.YAMLError:
+        return jsonify({"error": f"Error parsing configuration file {CONFIG_FILE_PATH}."}), 500
+
+    if 'cameras' not in config or camera_name not in config['cameras']:
+        return jsonify({"error": f"Camera '{camera_name}' not found in configuration."}), 404
+
+    camera_config = config['cameras'][camera_name]
+    url = camera_config.get('url')
+
+    if not url:
+        # For V1, only support URL-based cameras for this feature.
+        # Local commands or GoPro would require more complex handling or IPC.
+        return jsonify({"error": f"Camera '{camera_name}' does not have a URL configured. Only URL cameras supported for UI capture."}), 400
+
+    try:
+        # Replicate parts of fenetre.py's get_pic_from_url logic
+        # Consider adding User-Agent from global config if defined
+        global_config = config.get('global', {})
+        ua = global_config.get('user_agent', 'Fenetre Config UI/1.0')
+        headers = {"Accept": "image/*,*"}
+        if ua:
+            requests_version = requests.__version__
+            headers = {"User-Agent": f"{ua} v{requests_version}"}
+
+        timeout = camera_config.get('timeout_s', 20) # Default timeout for UI capture
+
+        r = requests.get(url, timeout=timeout, headers=headers, stream=True)
+        r.raise_for_status() # Raises an HTTPError if the HTTP request returned an unsuccessful status code
+
+        # Determine content type
+        content_type = r.headers.get('content-type', 'application/octet-stream')
+        if not content_type.startswith('image/'):
+            # Try to infer from URL if content-type is generic
+            if '.jpg' in url.lower() or '.jpeg' in url.lower():
+                content_type = 'image/jpeg'
+            elif '.png' in url.lower():
+                content_type = 'image/png'
+            # Add more inferences if needed, or PIL can try to determine format later
+
+        img_bytes = BytesIO(r.content)
+        img_bytes.seek(0)
+
+        return send_file(img_bytes, mimetype=content_type)
+
+    except requests.exceptions.RequestException as e:
+        return jsonify({"error": f"Error fetching image for camera '{camera_name}' from {url}: {str(e)}"}), 500
+    except Exception as e:
+        return jsonify({"error": f"Unexpected error capturing image for '{camera_name}': {str(e)}"}), 500
+
+
+@app.route('/api/camera/preview_crop', methods=['POST'])
+def preview_crop():
+    if 'image' not in request.files:
+        return jsonify({"error": "No image file provided in the request."}), 400
+
+    crop_data_str = request.form.get('crop_data')
+    if not crop_data_str:
+        return jsonify({"error": "No crop_data provided in the request form."}), 400
+
+    try:
+        crop_data = json.loads(crop_data_str)
+    except json.JSONDecodeError:
+        return jsonify({"error": "Invalid JSON in crop_data."}), 400
+
+    x = crop_data.get('x')
+    y = crop_data.get('y')
+    width = crop_data.get('width')
+    height = crop_data.get('height')
+
+    if None in [x, y, width, height]:
+        return jsonify({"error": "Missing one or more crop coordinates (x, y, width, height)."}), 400
+
+    try:
+        x, y, width, height = int(x), int(y), int(width), int(height)
+    except ValueError:
+        return jsonify({"error": "Crop coordinates must be integers."}), 400
+
+    if width <= 0 or height <= 0:
+        return jsonify({"error": "Crop width and height must be positive."}), 400
+
+    file = request.files['image']
+
+    try:
+        img = Image.open(file.stream)
+
+        # Crop box is (left, upper, right, lower)
+        # Our input is x, y, width, height where x,y is top-left
+        crop_box = (x, y, x + width, y + height)
+
+        # Ensure crop box is within image bounds
+        img_width, img_height = img.size
+        actual_crop_box = (
+            max(0, crop_box[0]),
+            max(0, crop_box[1]),
+            min(img_width, crop_box[2]),
+            min(img_height, crop_box[3])
+        )
+
+        if actual_crop_box[0] >= actual_crop_box[2] or actual_crop_box[1] >= actual_crop_box[3]:
+            return jsonify({"error": "Crop area is outside image bounds or has zero/negative dimensions after clamping."}), 400
+
+        cropped_img = img.crop(actual_crop_box)
+
+        img_io = BytesIO()
+        # Determine format; default to JPEG if not obvious, or preserve original if possible
+        img_format = img.format if img.format else 'JPEG'
+        if img_format.upper() == 'JPG': img_format = 'JPEG' # Common alias
+
+        cropped_img.save(img_io, format=img_format)
+        img_io.seek(0)
+
+        mimetype = f'image/{img_format.lower()}'
+        if img_format == 'JPEG' and not mimetype.endswith('jpeg'): # common case
+             mimetype = 'image/jpeg'
+
+        return send_file(img_io, mimetype=mimetype)
+
+    except FileNotFoundError: # Should not happen with BytesIO from request.files
+        return jsonify({"error": "Image file somehow not found after upload."}), 500
+    except IOError: # Error from PIL (e.g., cannot open image)
+        return jsonify({"error": "Cannot process image file. It might be corrupted or not a supported format."}), 400
+    except Exception as e:
+        # Log error e
+        print(f"Error in preview_crop: {e}")
+        return jsonify({"error": f"Error during image processing: {str(e)}"}), 500
+
 
 @app.route('/config/reload', methods=['POST'])
 def reload_config():

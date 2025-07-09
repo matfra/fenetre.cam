@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visual Configuration - Fenetre</title>
+    <link rel="stylesheet" href="/static/style.css"> <!-- Reuse main styles -->
+    <link rel="stylesheet" href="/static/lib/cropperjs/cropper.min.css"> <!-- Cropper.js CSS -->
+    <style>
+        /* Additional styles specific to this page */
+        .visual-config-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .image-display-area {
+            margin-top: 20px;
+            margin-bottom: 20px;
+            max-width: 90vw; /* Limit width */
+            max-height: 70vh; /* Limit height */
+            border: 1px solid #ccc;
+        }
+        #sourceImage, #croppedPreviewImage {
+            max-width: 100%;
+            max-height: 100%;
+            display: block; /* Helps with Cropper.js layout */
+        }
+        .crop-controls, .camera-selection {
+            margin-bottom: 15px;
+        }
+        #cropInfo {
+            font-family: monospace;
+            background-color: #e9ecef;
+            padding: 8px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            min-height: 20px; /* Ensure it's visible even when empty */
+        }
+        .previews {
+            display: flex;
+            justify-content: space-around;
+            width: 100%;
+            margin-top: 10px;
+        }
+        .preview-container {
+            border: 1px solid #ddd;
+            padding: 5px;
+            min-width: 200px; /* Min width for preview */
+            min-height: 150px; /* Min height for preview */
+            text-align: center;
+        }
+        .preview-container h3 {
+            margin-top: 0;
+            font-size: 1em;
+            color: #333;
+        }
+         #croppedPreviewImageContainer {
+            width: 300px; /* Example fixed size, adjust as needed */
+            height: 200px; /* Example fixed size */
+            overflow: hidden; /* In case cropped image is larger */
+        }
+        #croppedPreviewImage {
+            max-width: 100%;
+            max-height: 100%;
+        }
+    </style>
+</head>
+<body>
+    <div class="container visual-config-container">
+        <h1>Visual Postprocessing Configuration</h1>
+        <p><a href="/ui">Back to Main Configuration</a></p>
+
+        <div class="camera-selection">
+            <label for="cameraSelect">Select Camera:</label>
+            <select id="cameraSelect">
+                <option value="">-- Select a Camera --</option>
+            </select>
+            <button id="fetchImageBtn">Fetch Camera Image</button>
+        </div>
+
+        <div id="visualStatusMessage" class="status-message"></div>
+
+        <div class="previews">
+            <div class="preview-container">
+                <h3>Original Image (for cropping)</h3>
+                <div id="imageContainer" class="image-display-area">
+                    <img id="sourceImage" alt="Source image for cropping will appear here">
+                </div>
+            </div>
+            <div class="preview-container">
+                <h3>Cropped Preview</h3>
+                 <div id="croppedPreviewImageContainer" class="image-display-area">
+                    <img id="croppedPreviewImage" alt="Cropped preview will appear here">
+                </div>
+            </div>
+        </div>
+
+        <div class="crop-controls">
+            <h3>Crop Information (X, Y, Width, Height):</h3>
+            <div id="cropInfo">Selected area details will appear here.</div>
+            <button id="previewCropBtn" disabled>Preview Crop</button>
+            <button id="applyCropBtn" disabled>Apply Crop to Configuration</button>
+        </div>
+
+    </div>
+
+    <script src="/static/lib/cropperjs/cropper.min.js"></script> <!-- Cropper.js JS -->
+    <script src="/static/visual_config.js"></script>
+</body>
+</html>
