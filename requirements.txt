@@ -21,3 +21,5 @@ siphash24
 scikit-image
 open-gopro
 bleak
+Flask
+PyYAML
