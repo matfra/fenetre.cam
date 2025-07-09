@@ -167,7 +167,7 @@ document.addEventListener('DOMContentLoaded', () => {
             originalImageBlob = await response.blob();
             sourceImage.src = URL.createObjectURL(originalImageBlob);
 
-            sourceImage.onload = () => {
+            sourceImage.onload = async () => { // Made this an async function
                 imageDimensions.naturalWidth = sourceImage.naturalWidth;
                 imageDimensions.naturalHeight = sourceImage.naturalHeight;
                 imageDimensions.displayWidth = sourceImage.offsetWidth;
