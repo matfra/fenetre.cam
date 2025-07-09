@@ -1,17 +1,20 @@
 document.addEventListener('DOMContentLoaded', () => {
     const cameraSelect = document.getElementById('cameraSelect');
     const fetchImageBtn = document.getElementById('fetchImageBtn');
-    const imageContainer = document.getElementById('imageContainer');
+    // const imageContainer = document.getElementById('imageContainer'); // Not directly used, imageWrapper is new parent
     const sourceImage = document.getElementById('sourceImage');
-    const cropInfo = document.getElementById('cropInfo');
+    const cropCanvas = document.getElementById('cropCanvas');
+    const cropX1Input = document.getElementById('cropX1');
+    const cropY1Input = document.getElementById('cropY1');
+    const cropX2Input = document.getElementById('cropX2');
+    const cropY2Input = document.getElementById('cropY2');
     const previewCropBtn = document.getElementById('previewCropBtn');
     const croppedPreviewImage = document.getElementById('croppedPreviewImage');
     const applyCropBtn = document.getElementById('applyCropBtn');
     const visualStatusMessage = document.getElementById('visualStatusMessage');
 
-    let cropper = null;
-    let currentCropData = null;
-    let originalImageBlob = null; // To store the fetched image blob for previewing crop
+    let originalImageBlob = null;
+    let imageDimensions = { width: 0, height: 0 }; // Store displayed dimensions of sourceImage
 
     // --- Initialization ---
     async function populateCameraSelect() {
@@ -40,8 +43,34 @@ document.addEventListener('DOMContentLoaded', () => {
     fetchImageBtn.addEventListener('click', handleFetchImage);
     previewCropBtn.addEventListener('click', handlePreviewCrop);
     applyCropBtn.addEventListener('click', handleApplyCrop);
+    [cropX1Input, cropY1Input, cropX2Input, cropY2Input].forEach(input => {
+        input.addEventListener('input', drawCropRectangle);
+    });
+
 
     // --- Core Functions ---
+    function drawCropRectangle() {
+        const x1 = parseInt(cropX1Input.value) || 0;
+        const y1 = parseInt(cropY1Input.value) || 0;
+        const x2 = parseInt(cropX2Input.value) || 0;
+        const y2 = parseInt(cropY2Input.value) || 0;
+
+        const ctx = cropCanvas.getContext('2d');
+        ctx.clearRect(0, 0, cropCanvas.width, cropCanvas.height); // Clear previous rectangle
+
+        // Only draw if we have valid image dimensions
+        if (imageDimensions.width > 0 && imageDimensions.height > 0) {
+            const width = Math.abs(x2 - x1);
+            const height = Math.abs(y2 - y1);
+            const startX = Math.min(x1, x2);
+            const startY = Math.min(y1, y2);
+
+            ctx.strokeStyle = 'red';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(startX, startY, width, height);
+        }
+    }
+
     async function handleFetchImage() {
         const cameraName = cameraSelect.value;
         if (!cameraName) {
@@ -50,16 +79,15 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         setStatus(`Fetching image for ${cameraName}...`, 'info');
-        if (cropper) {
-            cropper.destroy();
-            cropper = null;
-        }
         sourceImage.src = ''; // Clear previous image
         croppedPreviewImage.src = ''; // Clear preview
-        cropInfo.textContent = 'Selected area details will appear here.';
         previewCropBtn.disabled = true;
         applyCropBtn.disabled = true;
         originalImageBlob = null;
+        imageDimensions = { width: 0, height: 0 };
+        cropCanvas.width = 0; // Clear canvas
+        cropCanvas.height = 0;
+
 
         try {
             const response = await fetch(`/api/camera/${cameraName}/capture_for_ui`, { method: 'POST' });
@@ -68,31 +96,27 @@ document.addEventListener('DOMContentLoaded', () => {
                 throw new Error(errorData.error || `Failed to fetch image for ${cameraName}`);
             }
 
-            originalImageBlob = await response.blob(); // Store the blob
+            originalImageBlob = await response.blob();
             sourceImage.src = URL.createObjectURL(originalImageBlob);
 
             sourceImage.onload = () => {
-                cropper = new Cropper(sourceImage, {
-                    viewMode: 1, // Allow cropping outside image boundaries, but restrict crop box to be within canvas
-                    autoCropArea: 0.8, // Initial crop area size (80% of image)
-                    responsive: true,
-                    background: false, // No grid background from cropper itself
-                    crop(event) {
-                        currentCropData = {
-                            x: Math.round(event.detail.x),
-                            y: Math.round(event.detail.y),
-                            width: Math.round(event.detail.width),
-                            height: Math.round(event.detail.height),
-                            rotate: event.detail.rotate,
-                            scaleX: event.detail.scaleX,
-                            scaleY: event.detail.scaleY,
-                        };
-                        cropInfo.textContent = `X: ${currentCropData.x}, Y: ${currentCropData.y}, W: ${currentCropData.width}, H: ${currentCropData.height}`;
-                        previewCropBtn.disabled = false;
-                        applyCropBtn.disabled = false;
-                    },
-                });
-                setStatus('Image loaded. Select crop area.', 'success');
+                // Set canvas dimensions to match the displayed image
+                imageDimensions.width = sourceImage.offsetWidth;
+                imageDimensions.height = sourceImage.offsetHeight;
+                cropCanvas.width = imageDimensions.width;
+                cropCanvas.height = imageDimensions.height;
+
+                // Initialize crop inputs to full image size
+                cropX1Input.value = 0;
+                cropY1Input.value = 0;
+                cropX2Input.value = imageDimensions.width;
+                cropY2Input.value = imageDimensions.height;
+
+                drawCropRectangle(); // Draw initial full-image rectangle
+
+                setStatus('Image loaded. Adjust crop coordinates as needed.', 'success');
+                previewCropBtn.disabled = false;
+                applyCropBtn.disabled = false;
             };
             sourceImage.onerror = () => {
                  setStatus('Error loading image into display area.', 'error');
@@ -105,27 +129,42 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function handlePreviewCrop() {
-        if (!originalImageBlob || !currentCropData || currentCropData.width === 0 || currentCropData.height === 0) {
-            setStatus('Please fetch an image and select a crop area first.', 'error');
+        if (!originalImageBlob) {
+            setStatus('Please fetch an image first.', 'error');
+            return;
+        }
+
+        const x1 = parseInt(cropX1Input.value);
+        const y1 = parseInt(cropY1Input.value);
+        const x2 = parseInt(cropX2Input.value);
+        const y2 = parseInt(cropY2Input.value);
+
+        const cropX = Math.min(x1, x2);
+        const cropY = Math.min(y1, y2);
+        const cropWidth = Math.abs(x2 - x1);
+        const cropHeight = Math.abs(y2 - y1);
+
+        if (cropWidth === 0 || cropHeight === 0) {
+            setStatus('Invalid crop dimensions (width or height is zero).', 'error');
             return;
         }
 
         setStatus('Generating crop preview...', 'info');
-        croppedPreviewImage.src = ''; // Clear previous preview
+        croppedPreviewImage.src = '';
 
         const formData = new FormData();
-        formData.append('image', originalImageBlob, 'source_image.jpg'); // filename is informative
+        formData.append('image', originalImageBlob, 'source_image.jpg');
         formData.append('crop_data', JSON.stringify({
-            x: currentCropData.x,
-            y: currentCropData.y,
-            width: currentCropData.width,
-            height: currentCropData.height,
+            x: cropX,
+            y: cropY,
+            width: cropWidth,
+            height: cropHeight,
         }));
 
         try {
             const response = await fetch('/api/camera/preview_crop', {
                 method: 'POST',
-                body: formData, // Sending as FormData
+                body: formData,
             });
 
             if (!response.ok) {
@@ -145,27 +184,35 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function handleApplyCrop() {
         const cameraName = cameraSelect.value;
-        if (!cameraName || !currentCropData || currentCropData.width === 0 || currentCropData.height === 0) {
-            setStatus('No camera selected or crop area defined.', 'error');
+        if (!cameraName) {
+            setStatus('No camera selected.', 'error');
+            return;
+        }
+
+        const x1 = parseInt(cropX1Input.value);
+        const y1 = parseInt(cropY1Input.value);
+        const x2 = parseInt(cropX2Input.value);
+        const y2 = parseInt(cropY2Input.value);
+
+        const left = Math.min(x1, x2);
+        const top = Math.min(y1, y2);
+        const right = Math.max(x1, x2);
+        const bottom = Math.max(y1, y2);
+
+        if ((right - left) === 0 || (bottom - top) === 0) {
+            setStatus('Invalid crop dimensions for saving (width or height is zero).', 'error');
             return;
         }
 
         setStatus(`Applying crop for ${cameraName} to configuration...`, 'info');
 
         try {
-            // 1. Fetch current full configuration
             const configResponse = await fetch('/config');
             if (!configResponse.ok) throw new Error('Failed to fetch current configuration.');
             let currentConfig = await configResponse.json();
 
-            // 2. Prepare the crop area string (left,top,right,bottom)
-            const x = currentCropData.x;
-            const y = currentCropData.y;
-            const width = currentCropData.width;
-            const height = currentCropData.height;
-            const cropAreaString = `${x},${y},${x + width},${y + height}`;
+            const cropAreaString = `${left},${top},${right},${bottom}`;
 
-            // 3. Find the camera and update/add its postprocessing for crop
             if (currentConfig.cameras && currentConfig.cameras[cameraName]) {
                 let camConfig = currentConfig.cameras[cameraName];
                 if (!camConfig.postprocessing) {

@@ -90,19 +90,20 @@ Accessible from the main configuration UI, this tool helps visually define crop 
 *   **Access**: Navigate from the main config UI (`/ui`) to the "Visual Crop Configuration Tool" (typically `/static/visual_config.html`).
 *   **Functionality**:
     1.  **Select Camera**: Choose a URL-based camera from the dropdown.
-    2.  **Fetch Image**: Click "Fetch Camera Image" to load the current image from the camera's URL.
-    3.  **Define Crop**: Use the interactive Cropper.js interface on the image to select the desired crop area. Crop coordinates (x, y, width, height) are displayed.
-    4.  **Preview Crop**: Click "Preview Crop" to see the result of applying the current selection to the fetched image. The cropped portion is displayed.
-    5.  **Apply to Configuration**: Click "Apply Crop to Configuration". This will:
+    2.  **Fetch Image**: Click "Fetch & Display Image" to load the current image from the camera's URL. The image is displayed.
+    3.  **Define Crop**: Four input fields (X1, Y1, X2, Y2) are initialized to the full image dimensions. Adjust these coordinates manually. A red rectangle will be drawn on the image over a canvas, visually representing the current crop area.
+    4.  **Preview Crop**: Click "Preview Crop". This sends the original fetched image and the current X1,Y1,X2,Y2 coordinates (converted to x,y,width,height) to the server, which returns a cropped version. The cropped image is displayed below the original.
+    5.  **Apply to Configuration**: Click "Apply Crop to Config". This will:
         *   Fetch the latest full `config.yaml` content.
+        *   Convert the X1,Y1,X2,Y2 coordinates to a `left,top,right,bottom` string.
         *   Update the `postprocessing` array for the selected camera:
             *   Any existing `type: "crop"` steps are removed.
-            *   A new `type: "crop"` step is added with the selected area (coordinates are automatically converted to `left,top,right,bottom` format).
+            *   A new `type: "crop"` step is added with the defined area string.
         *   The entire modified configuration is then saved back to `config.yaml`.
     6.  **Reload**: After applying, you'll typically need to go back to the main configuration UI and use the "Reload Application Config" button to make `fenetre.py` pick up the changes.
 *   **Current Limitations**:
-    *   Primarily designed for URL-based cameras. Fetching images from local commands or GoPro for the visual tool is not supported in this version.
-    *   Focuses on the "crop" postprocessing step.
+    *   The image fetching for the visual tool primarily supports URL-based cameras.
+    *   This tool currently focuses only on defining the "crop" postprocessing step.
 
 ### API Endpoints
 

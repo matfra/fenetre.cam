@@ -5,59 +5,81 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Visual Configuration - Fenetre</title>
     <link rel="stylesheet" href="/static/style.css"> <!-- Reuse main styles -->
-    <link rel="stylesheet" href="/static/lib/cropperjs/cropper.min.css"> <!-- Cropper.js CSS -->
     <style>
-        /* Additional styles specific to this page */
         .visual-config-container {
             display: flex;
             flex-direction: column;
             align-items: center;
         }
-        .image-display-area {
-            margin-top: 20px;
+        .top-controls {
             margin-bottom: 20px;
-            max-width: 90vw; /* Limit width */
-            max-height: 70vh; /* Limit height */
-            border: 1px solid #ccc;
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            width: 100%;
+            text-align: center;
         }
-        #sourceImage, #croppedPreviewImage {
+        .top-controls label, .top-controls select, .top-controls button {
+            margin: 5px;
+        }
+        .coordinate-inputs {
+            margin-bottom: 15px;
+            padding: 10px;
+            border: 1px solid #f0f0f0;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+        }
+        .coordinate-inputs label {
+            margin-right: 5px;
+            display: inline-block;
+            width: 30px; /* Align labels */
+        }
+        .coordinate-inputs input[type="number"] {
+            width: 70px;
+            margin-right: 15px;
+            padding: 5px;
+        }
+        #imageWrapper { /* Renamed from imageContainer for clarity */
+            position: relative; /* For absolute positioning of canvas */
+            margin-top: 10px;
+            margin-bottom: 10px;
+            max-width: 90vw;
+            max-height: 60vh; /* Adjusted height */
+            border: 1px solid #ccc;
+            display: inline-block; /* To wrap around the image size */
+        }
+        #sourceImage {
             max-width: 100%;
             max-height: 100%;
-            display: block; /* Helps with Cropper.js layout */
+            display: block; /* Remove extra space below image */
         }
-        .crop-controls, .camera-selection {
-            margin-bottom: 15px;
+        #cropCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: none; /* Allow interaction with elements below if needed, though not for this UI */
         }
-        #cropInfo {
-            font-family: monospace;
-            background-color: #e9ecef;
-            padding: 8px;
-            border-radius: 4px;
-            margin-bottom: 10px;
-            min-height: 20px; /* Ensure it's visible even when empty */
-        }
-        .previews {
+        .previews-area {
             display: flex;
             justify-content: space-around;
             width: 100%;
-            margin-top: 10px;
+            margin-top: 20px;
         }
-        .preview-container {
+        .preview-box {
             border: 1px solid #ddd;
-            padding: 5px;
-            min-width: 200px; /* Min width for preview */
-            min-height: 150px; /* Min height for preview */
+            padding: 10px;
             text-align: center;
         }
-        .preview-container h3 {
+        .preview-box h3 {
             margin-top: 0;
             font-size: 1em;
             color: #333;
         }
-         #croppedPreviewImageContainer {
-            width: 300px; /* Example fixed size, adjust as needed */
-            height: 200px; /* Example fixed size */
-            overflow: hidden; /* In case cropped image is larger */
+        #croppedPreviewImageContainer {
+            width: 300px;
+            height: 200px;
+            border: 1px solid #eee;
+            overflow: hidden;
+            margin: 0 auto; /* Center the preview image container */
         }
         #croppedPreviewImage {
             max-width: 100%;
@@ -67,44 +89,50 @@
 </head>
 <body>
     <div class="container visual-config-container">
-        <h1>Visual Postprocessing Configuration</h1>
-        <p><a href="/ui">Back to Main Configuration</a></p>
+        <h1>Visual Crop Configuration</h1>
+        <p><a href="/ui" style="margin-bottom: 15px; display: inline-block;">Back to Main Configuration Editor</a></p>
 
-        <div class="camera-selection">
-            <label for="cameraSelect">Select Camera:</label>
+        <div class="top-controls">
+            <label for="cameraSelect">Camera:</label>
             <select id="cameraSelect">
-                <option value="">-- Select a Camera --</option>
+                <option value="">-- Select --</option>
             </select>
-            <button id="fetchImageBtn">Fetch Camera Image</button>
-        </div>
-
-        <div id="visualStatusMessage" class="status-message"></div>
-
-        <div class="previews">
-            <div class="preview-container">
-                <h3>Original Image (for cropping)</h3>
-                <div id="imageContainer" class="image-display-area">
-                    <img id="sourceImage" alt="Source image for cropping will appear here">
-                </div>
-            </div>
-            <div class="preview-container">
-                <h3>Cropped Preview</h3>
-                 <div id="croppedPreviewImageContainer" class="image-display-area">
-                    <img id="croppedPreviewImage" alt="Cropped preview will appear here">
-                </div>
-            </div>
-        </div>
-
-        <div class="crop-controls">
-            <h3>Crop Information (X, Y, Width, Height):</h3>
-            <div id="cropInfo">Selected area details will appear here.</div>
+            <button id="fetchImageBtn">Fetch & Display Image</button>
             <button id="previewCropBtn" disabled>Preview Crop</button>
-            <button id="applyCropBtn" disabled>Apply Crop to Configuration</button>
+            <button id="applyCropBtn" disabled>Apply Crop to Config</button>
         </div>
 
+        <div class="coordinate-inputs">
+            <label for="cropX1">X1:</label>
+            <input type="number" id="cropX1" value="0">
+            <label for="cropY1">Y1:</label>
+            <input type="number" id="cropY1" value="0">
+            <label for="cropX2">X2:</label>
+            <input type="number" id="cropX2" value="0">
+            <label for="cropY2">Y2:</label>
+            <input type="number" id="cropY2" value="0">
+        </div>
+
+        <div id="visualStatusMessage" class="status-message" style="min-height: 20px;"></div>
+
+        <div class="previews-area">
+            <div class="preview-box">
+                <h3>Original Image & Crop Area</h3>
+                <div id="imageWrapper">
+                    <img id="sourceImage" alt="Source image will appear here">
+                    <canvas id="cropCanvas"></canvas>
+                </div>
+            </div>
+            <div class="preview-box">
+                <h3>Cropped Preview</h3>
+                <div id="croppedPreviewImageContainer">
+                    <img id="croppedPreviewImage" alt="Cropped preview">
+                </div>
+            </div>
+        </div>
     </div>
 
-    <script src="/static/lib/cropperjs/cropper.min.js"></script> <!-- Cropper.js JS -->
+    <!-- Cropper.js links removed -->
     <script src="/static/visual_config.js"></script>
 </body>
 </html>

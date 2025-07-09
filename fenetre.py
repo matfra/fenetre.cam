@@ -168,7 +168,7 @@ def snap(camera_name, camera_config: Dict):
     previous_pic_dir, previous_pic_filename = get_pic_dir_and_filename(camera_name)
     previous_pic_fullpath = os.path.join(previous_pic_dir, previous_pic_filename)
     previous_pic = capture()
-    previous_exif = previous_pic.info.get("exif") or b""
+    previous_exif = previous_pic.info.get("exif")
     if len(camera_config.get("postprocessing", [])) > 0:
         previous_pic, previous_exif = postprocess(
             previous_pic, camera_config.get("postprocessing", [])
@@ -549,7 +549,6 @@ def load_and_apply_configuration(initial_load=False, config_file_override=None):
     # (Re)link HTML files and update cameras.json
     # These depend on work_dir from global_config and camera details from cameras_config
     if global_config.get("work_dir"):
-        # TODO: If work_dir doesn't exist, create it
         link_html_file(global_config["work_dir"])
         update_cameras_metadata(cameras_config, global_config["work_dir"])
     else:
@@ -865,4 +864,9 @@ def daylight_loop():
 
 
 if __name__ == "__main__":
+    FLAGS = flags.FLAGS
+
+    flags.DEFINE_string("config", None, "path to YAML config file")
+    flags.mark_flag_as_required("config")
+    # FLAGS is now defined at module level
     app.run(main)
