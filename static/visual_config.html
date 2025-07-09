@@ -59,15 +59,20 @@
             pointer-events: none; /* Allow interaction with elements below if needed, though not for this UI */
         }
         .previews-area {
-            display: flex;
-            justify-content: space-around;
+            /* display: flex; remove flex for simple vertical stacking */
+            /* justify-content: space-around; */
             width: 100%;
             margin-top: 20px;
+            display: flex; /* Use flex for centering children */
+            flex-direction: column; /* Stack children vertically */
+            align-items: center; /* Center children horizontally */
         }
         .preview-box {
             border: 1px solid #ddd;
             padding: 10px;
             text-align: center;
+            margin-bottom: 20px; /* Add margin between stacked boxes */
+            width: fit-content; /* Adjust width to content or set a max-width */
         }
         .preview-box h3 {
             margin-top: 0;
@@ -111,6 +116,38 @@
             <input type="number" id="cropX2" value="0">
             <label for="cropY2">Y2:</label>
             <input type="number" id="cropY2" value="0">
+        </div>
+
+        <div class="coordinate-inputs" id="skyAreaControls" style="display: none;">
+            <h4>Sky Area (Cyan Rectangle)</h4>
+            <label for="skyX1">X1:</label>
+            <input type="number" id="skyX1" value="0">
+            <label for="skyY1">Y1:</label>
+            <input type="number" id="skyY1" value="0">
+            <label for="skyX2">X2:</label>
+            <input type="number" id="skyX2" value="0">
+            <label for="skyY2">Y2:</label>
+            <input type="number" id="skyY2" value="0">
+        </div>
+
+        <div class="coordinate-inputs" id="ssimAreaControls" style="display: none;">
+            <h4>SSIM Area (Yellow Rectangle)</h4>
+            <label for="ssimX1">X1:</label>
+            <input type="number" id="ssimX1" value="0">
+            <label for="ssimY1">Y1:</label>
+            <input type="number" id="ssimY1" value="0">
+            <label for="ssimX2">X2:</label>
+            <input type="number" id="ssimX2" value="0">
+            <label for="ssimY2">Y2:</label>
+            <input type="number" id="ssimY2" value="0">
+        </div>
+
+        <div class="top-controls" style="border-top: 1px solid #eee; margin-top:15px; border-bottom: none;">
+            <input type="checkbox" id="enableSkyArea">
+            <label for="enableSkyArea" style="width: auto; margin-right: 15px;">Define Sky Area</label>
+
+            <input type="checkbox" id="enableSsimArea">
+            <label for="enableSsimArea" style="width: auto;">Define SSIM Area</label>
         </div>
 
         <div id="visualStatusMessage" class="status-message" style="min-height: 20px;"></div>

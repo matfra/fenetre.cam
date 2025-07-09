@@ -90,20 +90,23 @@ Accessible from the main configuration UI, this tool helps visually define crop 
 *   **Access**: Navigate from the main config UI (`/ui`) to the "Visual Crop Configuration Tool" (typically `/static/visual_config.html`).
 *   **Functionality**:
     1.  **Select Camera**: Choose a URL-based camera from the dropdown.
-    2.  **Fetch Image**: Click "Fetch & Display Image" to load the current image from the camera's URL. The image is displayed.
-    3.  **Define Crop**: Four input fields (X1, Y1, X2, Y2) are initialized to the full image dimensions. Adjust these coordinates manually. A red rectangle will be drawn on the image over a canvas, visually representing the current crop area.
-    4.  **Preview Crop**: Click "Preview Crop". This sends the original fetched image and the current X1,Y1,X2,Y2 coordinates (converted to x,y,width,height) to the server, which returns a cropped version. The cropped image is displayed below the original.
-    5.  **Apply to Configuration**: Click "Apply Crop to Config". This will:
+    2.  **Fetch Image**: Click "Fetch & Display Image" to load the current image from the camera's URL. The image is displayed, potentially scaled to fit your screen.
+    3.  **Define Areas**:
+        *   **Crop Area (Red Rectangle)**: Four input fields (X1, Y1, X2, Y2) are initialized to the full displayed image dimensions. Adjust these coordinates manually. A red rectangle on the image visually represents this area.
+        *   **Sky Area (Cyan Rectangle, Optional)**: Check "Define Sky Area" to enable its X1,Y1,X2,Y2 input fields. A cyan rectangle will show this area. If a `sky_area` is already defined in `config.yaml` for the camera, its coordinates will be loaded and scaled for display.
+        *   **SSIM Area (Yellow Rectangle, Optional)**: Check "Define SSIM Area" to enable its X1,Y1,X2,Y2 input fields. A yellow rectangle will show this area. If an `ssim_area` is defined, it will be loaded and scaled.
+        *   **Coordinate System**: All coordinates (X1,Y1,X2,Y2) you input are relative to the *displayed image* on your screen. The tool automatically scales these coordinates to the image's original (natural) dimensions when saving to `config.yaml` or sending for preview.
+    4.  **Preview Crop**: Click "Preview Crop". This uses the **Crop Area** coordinates, scales them to the original image dimensions, and sends them to the server with the original fetched image. The server returns a cropped version, displayed below the original. (Sky/SSIM areas are not part of this preview).
+    5.  **Apply to Configuration**: Click "Apply Crop to Config" (will be renamed to "Apply Visual Settings" or similar). This will:
         *   Fetch the latest full `config.yaml` content.
-        *   Convert the X1,Y1,X2,Y2 coordinates to a `left,top,right,bottom` string.
-        *   Update the `postprocessing` array for the selected camera:
-            *   Any existing `type: "crop"` steps are removed.
-            *   A new `type: "crop"` step is added with the defined area string.
+        *   For **Crop Area**: Convert the UI X1,Y1,X2,Y2 to a scaled `left,top,right,bottom` string. Update the `postprocessing` array for the selected camera (existing `type: "crop"` steps are removed, new one added).
+        *   For **Sky Area**: If "Define Sky Area" is checked, convert its UI coordinates to a scaled `left,top,right,bottom` string and save to the camera's `sky_area` field. If unchecked, `sky_area` is removed from the config.
+        *   For **SSIM Area**: If "Define SSIM Area" is checked, convert its UI coordinates to a scaled `left,top,right,bottom` string and save to `ssim_area`. If unchecked, `ssim_area` is removed.
         *   The entire modified configuration is then saved back to `config.yaml`.
     6.  **Reload**: After applying, you'll typically need to go back to the main configuration UI and use the "Reload Application Config" button to make `fenetre.py` pick up the changes.
+*   **Layout**: The original image (with drawn rectangles) and the cropped preview image are displayed vertically.
 *   **Current Limitations**:
     *   The image fetching for the visual tool primarily supports URL-based cameras.
-    *   This tool currently focuses only on defining the "crop" postprocessing step.
 
 ### API Endpoints
 

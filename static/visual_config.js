@@ -8,13 +8,29 @@ document.addEventListener('DOMContentLoaded', () => {
     const cropY1Input = document.getElementById('cropY1');
     const cropX2Input = document.getElementById('cropX2');
     const cropY2Input = document.getElementById('cropY2');
+
+    const enableSkyAreaCheckbox = document.getElementById('enableSkyArea');
+    const skyAreaControlsDiv = document.getElementById('skyAreaControls');
+    const skyX1Input = document.getElementById('skyX1');
+    const skyY1Input = document.getElementById('skyY1');
+    const skyX2Input = document.getElementById('skyX2');
+    const skyY2Input = document.getElementById('skyY2');
+
+    const enableSsimAreaCheckbox = document.getElementById('enableSsimArea');
+    const ssimAreaControlsDiv = document.getElementById('ssimAreaControls');
+    const ssimX1Input = document.getElementById('ssimX1');
+    const ssimY1Input = document.getElementById('ssimY1');
+    const ssimX2Input = document.getElementById('ssimX2');
+    const ssimY2Input = document.getElementById('ssimY2');
+
     const previewCropBtn = document.getElementById('previewCropBtn');
     const croppedPreviewImage = document.getElementById('croppedPreviewImage');
     const applyCropBtn = document.getElementById('applyCropBtn');
     const visualStatusMessage = document.getElementById('visualStatusMessage');
 
     let originalImageBlob = null;
-    let imageDimensions = { width: 0, height: 0 }; // Store displayed dimensions of sourceImage
+    let imageDimensions = { displayWidth: 0, displayHeight: 0, naturalWidth: 0, naturalHeight: 0 };
+    let scaleFactors = { x: 1, y: 1 };
 
     // --- Initialization ---
     async function populateCameraSelect() {
@@ -42,34 +58,86 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Event Listeners ---
     fetchImageBtn.addEventListener('click', handleFetchImage);
     previewCropBtn.addEventListener('click', handlePreviewCrop);
-    applyCropBtn.addEventListener('click', handleApplyCrop);
-    [cropX1Input, cropY1Input, cropX2Input, cropY2Input].forEach(input => {
-        input.addEventListener('input', drawCropRectangle);
+    applyCropBtn.addEventListener('click', handleApplyVisualSettings); // Renamed
+
+    // Event listeners for coordinate inputs
+    [cropX1Input, cropY1Input, cropX2Input, cropY2Input,
+     skyX1Input, skyY1Input, skyX2Input, skyY2Input,
+     ssimX1Input, ssimY1Input, ssimX2Input, ssimY2Input].forEach(input => {
+        input.addEventListener('input', drawAllRectangles);
+    });
+
+    // Event listeners for checkboxes
+    enableSkyAreaCheckbox.addEventListener('change', () => {
+        skyAreaControlsDiv.style.display = enableSkyAreaCheckbox.checked ? 'block' : 'none';
+        if (!enableSkyAreaCheckbox.checked) {
+            // Optionally clear inputs when hiding, or leave them
+        }
+        drawAllRectangles();
+    });
+
+    enableSsimAreaCheckbox.addEventListener('change', () => {
+        ssimAreaControlsDiv.style.display = enableSsimAreaCheckbox.checked ? 'block' : 'none';
+        if (!enableSsimAreaCheckbox.checked) {
+            // Optionally clear inputs
+        }
+        drawAllRectangles();
     });
 
 
     // --- Core Functions ---
-    function drawCropRectangle() {
-        const x1 = parseInt(cropX1Input.value) || 0;
-        const y1 = parseInt(cropY1Input.value) || 0;
-        const x2 = parseInt(cropX2Input.value) || 0;
-        const y2 = parseInt(cropY2Input.value) || 0;
-
+    function drawAllRectangles() { // Renamed from drawCropRectangle
         const ctx = cropCanvas.getContext('2d');
-        ctx.clearRect(0, 0, cropCanvas.width, cropCanvas.height); // Clear previous rectangle
+        ctx.clearRect(0, 0, cropCanvas.width, cropCanvas.height);
 
-        // Only draw if we have valid image dimensions
-        if (imageDimensions.width > 0 && imageDimensions.height > 0) {
-            const width = Math.abs(x2 - x1);
-            const height = Math.abs(y2 - y1);
-            const startX = Math.min(x1, x2);
-            const startY = Math.min(y1, y2);
+        if (!(imageDimensions.displayWidth > 0 && imageDimensions.displayHeight > 0)) {
+            return; // No image loaded or dimensions not set
+        }
 
-            ctx.strokeStyle = 'red';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(startX, startY, width, height);
+        // Draw Crop Rectangle (Red)
+        const cx1 = parseInt(cropX1Input.value) || 0;
+        const cy1 = parseInt(cropY1Input.value) || 0;
+        const cx2 = parseInt(cropX2Input.value) || 0;
+        const cy2 = parseInt(cropY2Input.value) || 0;
+        if (!(cx1 === 0 && cy1 === 0 && cx2 === 0 && cy2 === 0)) { // Avoid drawing 0-size rect if all are 0
+             drawRect(ctx, cx1, cy1, cx2, cy2, 'red');
+        }
+
+
+        // Draw Sky Area Rectangle (Cyan)
+        if (enableSkyAreaCheckbox.checked) {
+            const sx1 = parseInt(skyX1Input.value) || 0;
+            const sy1 = parseInt(skyY1Input.value) || 0;
+            const sx2 = parseInt(skyX2Input.value) || 0;
+            const sy2 = parseInt(skyY2Input.value) || 0;
+            if (!(sx1 === 0 && sy1 === 0 && sx2 === 0 && sy2 === 0)) {
+                drawRect(ctx, sx1, sy1, sx2, sy2, 'cyan');
+            }
+        }
+
+        // Draw SSIM Area Rectangle (Yellow)
+        if (enableSsimAreaCheckbox.checked) {
+            const ssx1 = parseInt(ssimX1Input.value) || 0;
+            const ssy1 = parseInt(ssimY1Input.value) || 0;
+            const ssx2 = parseInt(ssimX2Input.value) || 0;
+            const ssy2 = parseInt(ssimY2Input.value) || 0;
+            if (!(ssx1 === 0 && ssy1 === 0 && ssx2 === 0 && ssy2 === 0)) {
+                 drawRect(ctx, ssx1, ssy1, ssx2, ssy2, 'yellow');
+            }
         }
     }
+
+    function drawRect(ctx, x1, y1, x2, y2, color) {
+        const width = Math.abs(x2 - x1);
+        const height = Math.abs(y2 - y1);
+        const startX = Math.min(x1, x2);
+        const startY = Math.min(y1, y2);
+
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+        ctx.strokeRect(startX, startY, width, height);
+    }
+
 
     async function handleFetchImage() {
         const cameraName = cameraSelect.value;
@@ -79,15 +147,15 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         setStatus(`Fetching image for ${cameraName}...`, 'info');
-        sourceImage.src = ''; // Clear previous image
-        croppedPreviewImage.src = ''; // Clear preview
+        sourceImage.src = '';
+        croppedPreviewImage.src = '';
         previewCropBtn.disabled = true;
         applyCropBtn.disabled = true;
         originalImageBlob = null;
-        imageDimensions = { width: 0, height: 0 };
-        cropCanvas.width = 0; // Clear canvas
+        imageDimensions = { displayWidth: 0, displayHeight: 0, naturalWidth: 0, naturalHeight: 0 };
+        scaleFactors = { x: 1, y: 1 };
+        cropCanvas.width = 0;
         cropCanvas.height = 0;
-
 
         try {
             const response = await fetch(`/api/camera/${cameraName}/capture_for_ui`, { method: 'POST' });
@@ -100,21 +168,70 @@ document.addEventListener('DOMContentLoaded', () => {
             sourceImage.src = URL.createObjectURL(originalImageBlob);
 
             sourceImage.onload = () => {
-                // Set canvas dimensions to match the displayed image
-                imageDimensions.width = sourceImage.offsetWidth;
-                imageDimensions.height = sourceImage.offsetHeight;
-                cropCanvas.width = imageDimensions.width;
-                cropCanvas.height = imageDimensions.height;
+                imageDimensions.naturalWidth = sourceImage.naturalWidth;
+                imageDimensions.naturalHeight = sourceImage.naturalHeight;
+                imageDimensions.displayWidth = sourceImage.offsetWidth;
+                imageDimensions.displayHeight = sourceImage.offsetHeight;
 
-                // Initialize crop inputs to full image size
+                if (imageDimensions.displayWidth > 0 && imageDimensions.displayHeight > 0) {
+                    scaleFactors.x = imageDimensions.naturalWidth / imageDimensions.displayWidth;
+                    scaleFactors.y = imageDimensions.naturalHeight / imageDimensions.displayHeight;
+                } else { // Fallback if offsetWidth/Height are zero (e.g. image hidden)
+                    scaleFactors.x = 1;
+                    scaleFactors.y = 1;
+                }
+
+                cropCanvas.width = imageDimensions.displayWidth;
+                cropCanvas.height = imageDimensions.displayHeight;
+
                 cropX1Input.value = 0;
                 cropY1Input.value = 0;
-                cropX2Input.value = imageDimensions.width;
-                cropY2Input.value = imageDimensions.height;
+                cropX2Input.value = imageDimensions.displayWidth;
+                cropY2Input.value = imageDimensions.displayHeight;
 
-                drawCropRectangle(); // Draw initial full-image rectangle
+                // After image is loaded, fetch full config to check for existing sky/ssim areas
+                try {
+                    const fullConfigResponse = await fetch('/config');
+                    if (fullConfigResponse.ok) {
+                        const fullConfig = await fullConfigResponse.json();
+                        const camConfig = fullConfig.cameras && fullConfig.cameras[cameraName] ? fullConfig.cameras[cameraName] : null;
 
-                setStatus('Image loaded. Adjust crop coordinates as needed.', 'success');
+                        if (camConfig) {
+                            if (camConfig.sky_area) {
+                                const [l, t, r, b] = camConfig.sky_area.split(',').map(Number);
+                                skyX1Input.value = Math.round(l / scaleFactors.x);
+                                skyY1Input.value = Math.round(t / scaleFactors.y);
+                                skyX2Input.value = Math.round(r / scaleFactors.x);
+                                skyY2Input.value = Math.round(b / scaleFactors.y);
+                                enableSkyAreaCheckbox.checked = true;
+                                skyAreaControlsDiv.style.display = 'block';
+                            } else {
+                                enableSkyAreaCheckbox.checked = false;
+                                skyAreaControlsDiv.style.display = 'none';
+                            }
+
+                            if (camConfig.ssim_area) {
+                                const [l, t, r, b] = camConfig.ssim_area.split(',').map(Number);
+                                ssimX1Input.value = Math.round(l / scaleFactors.x);
+                                ssimY1Input.value = Math.round(t / scaleFactors.y);
+                                ssimX2Input.value = Math.round(r / scaleFactors.x);
+                                ssimY2Input.value = Math.round(b / scaleFactors.y);
+                                enableSsimAreaCheckbox.checked = true;
+                                ssimAreaControlsDiv.style.display = 'block';
+                            } else {
+                                enableSsimAreaCheckbox.checked = false;
+                                ssimAreaControlsDiv.style.display = 'none';
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.error("Error fetching full config to populate sky/ssim areas:", e);
+                    // Proceed without pre-filling sky/ssim, they can still be set manually
+                }
+
+                drawAllRectangles(); // Renamed
+
+                setStatus('Image loaded. Adjust crop/area coordinates as needed.', 'success');
                 previewCropBtn.disabled = false;
                 applyCropBtn.disabled = false;
             };
@@ -139,15 +256,22 @@ document.addEventListener('DOMContentLoaded', () => {
         const x2 = parseInt(cropX2Input.value);
         const y2 = parseInt(cropY2Input.value);
 
-        const cropX = Math.min(x1, x2);
-        const cropY = Math.min(y1, y2);
-        const cropWidth = Math.abs(x2 - x1);
-        const cropHeight = Math.abs(y2 - y1);
+        // UI coordinates
+        const uiCropX = Math.min(x1, x2);
+        const uiCropY = Math.min(y1, y2);
+        const uiCropWidth = Math.abs(x2 - x1);
+        const uiCropHeight = Math.abs(y2 - y1);
 
-        if (cropWidth === 0 || cropHeight === 0) {
+        if (uiCropWidth === 0 || uiCropHeight === 0) {
             setStatus('Invalid crop dimensions (width or height is zero).', 'error');
             return;
         }
+
+        // Scale UI coordinates to natural image coordinates for the backend
+        const naturalCropX = Math.round(uiCropX * scaleFactors.x);
+        const naturalCropY = Math.round(uiCropY * scaleFactors.y);
+        const naturalCropWidth = Math.round(uiCropWidth * scaleFactors.x);
+        const naturalCropHeight = Math.round(uiCropHeight * scaleFactors.y);
 
         setStatus('Generating crop preview...', 'info');
         croppedPreviewImage.src = '';
@@ -155,10 +279,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const formData = new FormData();
         formData.append('image', originalImageBlob, 'source_image.jpg');
         formData.append('crop_data', JSON.stringify({
-            x: cropX,
-            y: cropY,
-            width: cropWidth,
-            height: cropHeight,
+            x: naturalCropX,
+            y: naturalCropY,
+            width: naturalCropWidth,
+            height: naturalCropHeight,
         }));
 
         try {
@@ -182,56 +306,88 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    async function handleApplyCrop() {
+    async function handleApplyVisualSettings() { // Renamed from handleApplyCrop
         const cameraName = cameraSelect.value;
         if (!cameraName) {
             setStatus('No camera selected.', 'error');
             return;
         }
 
-        const x1 = parseInt(cropX1Input.value);
-        const y1 = parseInt(cropY1Input.value);
-        const x2 = parseInt(cropX2Input.value);
-        const y2 = parseInt(cropY2Input.value);
-
-        const left = Math.min(x1, x2);
-        const top = Math.min(y1, y2);
-        const right = Math.max(x1, x2);
-        const bottom = Math.max(y1, y2);
-
-        if ((right - left) === 0 || (bottom - top) === 0) {
-            setStatus('Invalid crop dimensions for saving (width or height is zero).', 'error');
-            return;
-        }
-
-        setStatus(`Applying crop for ${cameraName} to configuration...`, 'info');
+        setStatus(`Applying visual settings for ${cameraName} to configuration...`, 'info');
 
         try {
             const configResponse = await fetch('/config');
             if (!configResponse.ok) throw new Error('Failed to fetch current configuration.');
             let currentConfig = await configResponse.json();
 
-            const cropAreaString = `${left},${top},${right},${bottom}`;
-
-            if (currentConfig.cameras && currentConfig.cameras[cameraName]) {
-                let camConfig = currentConfig.cameras[cameraName];
-                if (!camConfig.postprocessing) {
-                    camConfig.postprocessing = [];
-                }
-
-                // Remove existing crop steps
-                camConfig.postprocessing = camConfig.postprocessing.filter(step => step.type !== 'crop');
-
-                // Add new crop step
-                camConfig.postprocessing.unshift({ // Add to the beginning
-                    type: "crop",
-                    area: cropAreaString
-                });
-            } else {
+            if (!currentConfig.cameras || !currentConfig.cameras[cameraName]) {
                 throw new Error(`Camera ${cameraName} not found in current configuration.`);
             }
+            let camConfig = currentConfig.cameras[cameraName];
 
-            // 4. PUT the modified configuration
+            // Handle Crop Area
+            const cx1 = parseInt(cropX1Input.value);
+            const cy1 = parseInt(cropY1Input.value);
+            const cx2 = parseInt(cropX2Input.value);
+            const cy2 = parseInt(cropY2Input.value);
+            const cNatL = Math.round(Math.min(cx1, cx2) * scaleFactors.x);
+            const cNatT = Math.round(Math.min(cy1, cy2) * scaleFactors.y);
+            const cNatR = Math.round(Math.max(cx1, cx2) * scaleFactors.x);
+            const cNatB = Math.round(Math.max(cy1, cy2) * scaleFactors.y);
+
+            if ((cNatR - cNatL) > 0 && (cNatB - cNatT) > 0) {
+                if (!camConfig.postprocessing) camConfig.postprocessing = [];
+                camConfig.postprocessing = camConfig.postprocessing.filter(step => step.type !== 'crop');
+                camConfig.postprocessing.unshift({
+                    type: "crop",
+                    area: `${cNatL},${cNatT},${cNatR},${cNatB}`
+                });
+            } else {
+                // If crop dimensions are zero, optionally remove existing crop or do nothing
+                 camConfig.postprocessing = camConfig.postprocessing.filter(step => step.type !== 'crop');
+                 setStatus('Crop area has zero width/height, existing crop (if any) removed.', 'info');
+            }
+
+            // Handle Sky Area
+            if (enableSkyAreaCheckbox.checked) {
+                const sx1 = parseInt(skyX1Input.value);
+                const sy1 = parseInt(skyY1Input.value);
+                const sx2 = parseInt(skyX2Input.value);
+                const sy2 = parseInt(skyY2Input.value);
+                const sNatL = Math.round(Math.min(sx1, sx2) * scaleFactors.x);
+                const sNatT = Math.round(Math.min(sy1, sy2) * scaleFactors.y);
+                const sNatR = Math.round(Math.max(sx1, sx2) * scaleFactors.x);
+                const sNatB = Math.round(Math.max(sy1, sy2) * scaleFactors.y);
+                if ((sNatR - sNatL) > 0 && (sNatB - sNatT) > 0) {
+                    camConfig.sky_area = `${sNatL},${sNatT},${sNatR},${sNatB}`;
+                } else {
+                    delete camConfig.sky_area; // Invalid dimensions, remove if exists
+                    setStatus('Sky area has zero width/height, not saved.', 'info');
+                }
+            } else {
+                delete camConfig.sky_area;
+            }
+
+            // Handle SSIM Area
+            if (enableSsimAreaCheckbox.checked) {
+                const ssx1 = parseInt(ssimX1Input.value);
+                const ssy1 = parseInt(ssimY1Input.value);
+                const ssx2 = parseInt(ssimX2Input.value);
+                const ssy2 = parseInt(ssimY2Input.value);
+                const ssNatL = Math.round(Math.min(ssx1, ssx2) * scaleFactors.x);
+                const ssNatT = Math.round(Math.min(ssy1, ssy2) * scaleFactors.y);
+                const ssNatR = Math.round(Math.max(ssx1, ssx2) * scaleFactors.x);
+                const ssNatB = Math.round(Math.max(ssy1, ssy2) * scaleFactors.y);
+                 if ((ssNatR - ssNatL) > 0 && (ssNatB - ssNatT) > 0) {
+                    camConfig.ssim_area = `${ssNatL},${ssNatT},${ssNatR},${ssNatB}`;
+                } else {
+                    delete camConfig.ssim_area; // Invalid dimensions, remove if exists
+                    setStatus('SSIM area has zero width/height, not saved.', 'info');
+                }
+            } else {
+                delete camConfig.ssim_area;
+            }
+
             const updateResponse = await fetch('/config', {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
@@ -244,11 +400,11 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             const result = await updateResponse.json();
-            setStatus(result.message || `Crop for ${cameraName} applied. Remember to reload application config.`, 'success');
+            setStatus(result.message || `Visual settings for ${cameraName} applied. Remember to reload application config.`, 'success');
 
         } catch (error) {
-            console.error('Error applying crop to config:', error);
-            setStatus(`Error applying crop: ${error.message}`, 'error');
+            console.error('Error applying visual settings to config:', error);
+            setStatus(`Error applying settings: ${error.message}`, 'error');
         }
     }
 
