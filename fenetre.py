@@ -549,6 +549,7 @@ def load_and_apply_configuration(initial_load=False, config_file_override=None):
     # (Re)link HTML files and update cameras.json
     # These depend on work_dir from global_config and camera details from cameras_config
     if global_config.get("work_dir"):
+        # TODO: If work_dir doesn't exist, create it
         link_html_file(global_config["work_dir"])
         update_cameras_metadata(cameras_config, global_config["work_dir"])
     else:
