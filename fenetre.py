@@ -37,12 +37,8 @@ from gopro import capture_gopro_photo
 from gopro_utility import GoProUtilityThread, format_gopro_sd_card
 from postprocess import postprocess
 
-# Attempt to import waitress, fall back to werkzeug simple server for config server
-try:
-    from waitress import serve as waitress_serve
-except ImportError:
-    waitress_serve = None
-    from werkzeug.serving import run_simple as werkzeug_run_simple
+# Import waitress directly, as it's now a requirement
+from waitress import serve as waitress_serve
 
 
 # Define flags at module level so they are available when module is imported
@@ -345,33 +341,16 @@ def run_config_server_func(host: str, port: int, flask_app, fenetre_config_file:
 
     global config_server_instance_global
     try:
-        logging.info(f"Starting Config Server on http://{host}:{port}")
-        if waitress_serve:
-            # Waitress is generally preferred and handles shutdown better if integrated.
-            # However, direct shutdown of `waitress.serve` from another thread is not straightforward
-            # without internal access or a control socket.
-            # For now, we rely on exit_event being checked by waitress or its thread being a daemon.
-            # A more robust solution might involve running waitress in a subprocess
-            # or using a server that has a programmatic shutdown method (e.g. a development server or a custom setup).
-            # For simplicity here, we'll run it directly.
-            # TODO: Implement a proper shutdown mechanism for waitress if this proves problematic.
-            # One common pattern for shutting down waitress is to have a dedicated shutdown endpoint in the Flask app
-            # that, when called, would raise SystemExit or call a server-specific shutdown if available.
-            # Alternatively, the thread running serve() could periodically check exit_event if serve() was non-blocking,
-            # but it is blocking.
-            # For now, we'll make the thread a daemon and rely on main process exit,
-            # or for SIGHUP reloads, the thread will be joined.
-            waitress_serve(flask_app, host=host, port=port, threads=4) # threads=4 is an example
-        elif werkzeug_run_simple:
-            # werkzeug's run_simple also blocks and doesn't have a clean external shutdown.
-            # It can be stopped by killing the process or, for dev server, Ctrl+C.
-            # When run in a thread, similar issues to waitress.
-            # It does have a _reloader_loop that might be interruptible.
-            # Setting use_reloader=False is important if we manage reloads via SIGHUP.
-            werkzeug_run_simple(host, port, flask_app, use_reloader=False, use_debugger=False)
-        else:
-            logging.error("No suitable WSGI server (Waitress or Werkzeug) found for Config Server.")
-            return
+        logging.info(f"Starting Config Server with Waitress on http://{host}:{port}")
+        # Waitress is used directly as it's a requirement.
+        # For shutdown: Waitress doesn't have a simple programmatic shutdown for `serve()` from another thread.
+        # The thread running `waitress_serve` is a daemon, so it will exit when the main application exits.
+        # For SIGHUP reloads (where the thread is stopped and restarted), the `join(timeout=10)`
+        # in `stop_config_server` will wait for it. If Waitress doesn't exit on its own
+        # (e.g. due to a SystemExit from a Flask route, or if it handled signals itself),
+        # the join might time out. This is a known limitation for cleanly stopping daemonized blocking servers.
+        # A Flask shutdown route is a common pattern to make this more explicit if needed.
+        waitress_serve(flask_app, host=host, port=port, threads=4) # threads=4 is an example
     except SystemExit:
         logging.info("Config server shutting down (SystemExit caught).")
     except Exception as e:
