@@ -77,19 +77,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Users can add it manually if the form allows adding arbitrary key-value pairs, or we add it as an optional common field.
     ];
 
-
-    // Order for common fields (can be refined)
-    const commonCameraFieldsOrder = [
-        'description', 'timeout_s', 'sky_area', 'ssim_area', 'ssim_setpoint',
-        'disabled', 'mozjpeg_optimize', 'postprocessing'
-        // 'snap_interval_s' can be added if a fixed interval is desired as a common option.
-        // If snap_interval_s is present, it overrides SSIM logic.
-        // The absence of snap_interval_s implies dynamic interval.
-        // This needs to be clear in the UI, perhaps by having snap_interval_s and if it's empty/0, ssim settings apply.
-        // For now, keeping snap_interval_s out of common template to encourage dynamic by default.
-        // Users can add it manually if the form allows adding arbitrary key-value pairs, or we add it as an optional common field.
-    ];
-
+    // NOTE: The duplicate declaration of commonCameraFieldsOrder that was here has been removed.
 
     const loadConfigBtn = document.getElementById('loadConfigBtn');
     const saveConfigBtn = document.getElementById('saveConfigBtn');
