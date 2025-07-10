@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visual Configuration - Fenetre</title>
+    <link rel="stylesheet" href="/static/style.css"> <!-- Reuse main styles -->
+    <style>
+        .visual-config-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .top-controls {
+            margin-bottom: 20px;
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            width: 100%;
+            text-align: center;
+        }
+        .top-controls label, .top-controls select, .top-controls button {
+            margin: 5px;
+        }
+        .coordinate-inputs {
+            margin-bottom: 15px;
+            padding: 10px;
+            border: 1px solid #f0f0f0;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+        }
+        .coordinate-inputs label {
+            margin-right: 5px;
+            display: inline-block;
+            width: 30px; /* Align labels */
+        }
+        .coordinate-inputs input[type="number"] {
+            width: 70px;
+            margin-right: 15px;
+            padding: 5px;
+        }
+        #imageWrapper { /* Renamed from imageContainer for clarity */
+            position: relative; /* For absolute positioning of canvas */
+            margin-top: 10px;
+            margin-bottom: 10px;
+            max-width: 90vw;
+            max-height: 60vh; /* Adjusted height */
+            border: 1px solid #ccc;
+            display: inline-block; /* To wrap around the image size */
+        }
+        #sourceImage {
+            max-width: 100%;
+            max-height: 100%;
+            display: block; /* Remove extra space below image */
+        }
+        #cropCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: none; /* Allow interaction with elements below if needed, though not for this UI */
+        }
+        .previews-area {
+            /* display: flex; remove flex for simple vertical stacking */
+            /* justify-content: space-around; */
+            width: 100%;
+            margin-top: 20px;
+            display: flex; /* Use flex for centering children */
+            flex-direction: column; /* Stack children vertically */
+            align-items: center; /* Center children horizontally */
+        }
+        .preview-box {
+            border: 1px solid #ddd;
+            padding: 10px;
+            text-align: center;
+            margin-bottom: 20px; /* Add margin between stacked boxes */
+            width: fit-content; /* Adjust width to content or set a max-width */
+        }
+        .preview-box h3 {
+            margin-top: 0;
+            font-size: 1em;
+            color: #333;
+        }
+        #croppedPreviewImageContainer {
+            width: 300px;
+            height: 200px;
+            border: 1px solid #eee;
+            overflow: hidden;
+            margin: 0 auto; /* Center the preview image container */
+        }
+        #croppedPreviewImage {
+            max-width: 100%;
+            max-height: 100%;
+        }
+        .natural-coords-display {
+            font-size: 0.85em;
+            color: #555;
+            margin-top: 5px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container visual-config-container">
+        <h1>Visual Crop Configuration</h1>
+        <p><a href="/ui" style="margin-bottom: 15px; display: inline-block;">Back to Main Configuration Editor</a></p>
+
+        <div class="top-controls">
+            <label for="cameraSelect">Camera:</label>
+            <select id="cameraSelect">
+                <option value="">-- Select --</option>
+            </select>
+            <button id="fetchImageBtn">Fetch & Display Image</button>
+            <button id="previewCropBtn" disabled>Preview Crop</button>
+            <button id="applyCropBtn" disabled>Apply Crop to Config</button>
+        </div>
+
+        <div class="coordinate-inputs">
+            <h4>Crop Area (Red Rectangle)</h4>
+            <label for="cropX1">X1:</label>
+            <input type="number" id="cropX1" value="0">
+            <label for="cropY1">Y1:</label>
+            <input type="number" id="cropY1" value="0">
+            <label for="cropX2">X2:</label>
+            <input type="number" id="cropX2" value="0">
+            <label for="cropY2">Y2:</label>
+            <input type="number" id="cropY2" value="0">
+            <div class="natural-coords-display" id="cropNaturalCoords">Natural: -</div>
+        </div>
+
+        <div class="coordinate-inputs" id="skyAreaControls" style="display: none;">
+            <h4>Sky Area (Cyan Rectangle)</h4>
+            <label for="skyX1">X1:</label>
+            <input type="number" id="skyX1" value="0">
+            <label for="skyY1">Y1:</label>
+            <input type="number" id="skyY1" value="0">
+            <label for="skyX2">X2:</label>
+            <input type="number" id="skyX2" value="0">
+            <label for="skyY2">Y2:</label>
+            <input type="number" id="skyY2" value="0">
+            <div class="natural-coords-display" id="skyNaturalCoords">Natural: -</div>
+        </div>
+
+        <div class="coordinate-inputs" id="ssimAreaControls" style="display: none;">
+            <h4>SSIM Area (Yellow Rectangle)</h4>
+            <label for="ssimX1">X1:</label>
+            <input type="number" id="ssimX1" value="0">
+            <label for="ssimY1">Y1:</label>
+            <input type="number" id="ssimY1" value="0">
+            <label for="ssimX2">X2:</label>
+            <input type="number" id="ssimX2" value="0">
+            <label for="ssimY2">Y2:</label>
+            <input type="number" id="ssimY2" value="0">
+            <div class="natural-coords-display" id="ssimNaturalCoords">Natural: -</div>
+        </div>
+
+        <div id="imageInfoDisplay" style="margin-top: 10px; font-size: 0.9em; text-align: center;">
+            <p>Image Natural Size: <span id="naturalSize">-</span></p>
+            <p>Display Scale Factor (X, Y): <span id="displayScale">-</span></p>
+        </div>
+
+        <div class="top-controls" style="border-top: 1px solid #eee; margin-top:15px; border-bottom: none;">
+            <input type="checkbox" id="enableSkyArea">
+            <label for="enableSkyArea" style="width: auto; margin-right: 15px;">Define Sky Area</label>
+
+            <input type="checkbox" id="enableSsimArea">
+            <label for="enableSsimArea" style="width: auto;">Define SSIM Area</label>
+        </div>
+
+        <div id="visualStatusMessage" class="status-message" style="min-height: 20px;"></div>
+
+        <div class="previews-area">
+            <div class="preview-box">
+                <h3>Original Image & Crop Area</h3>
+                <div id="imageWrapper">
+                    <img id="sourceImage" alt="Source image will appear here">
+                    <canvas id="cropCanvas"></canvas>
+                </div>
+            </div>
+            <div class="preview-box">
+                <h3>Cropped Preview</h3>
+                <div id="croppedPreviewImageContainer">
+                    <img id="croppedPreviewImage" alt="Cropped preview">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cropper.js links removed -->
+    <script src="/static/visual_config.js"></script>
+</body>
+</html>
