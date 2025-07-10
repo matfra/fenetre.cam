@@ -144,3 +144,75 @@ h1 {
 .add-item-btn {
     background-color: #28a745;
 }
+
+/* Styling for type selector sections */
+.type-selector-container {
+    padding: 10px;
+    margin: 10px 0;
+    border: 1px dashed #007bff;
+    background-color: #e7f3ff;
+    border-radius: 4px;
+}
+
+.type-selector-container label {
+    margin-right: 10px;
+}
+
+.type-selector-container select {
+    padding: 5px;
+    margin-right: 10px;
+    border-radius: 3px;
+}
+
+.type-selector-container button {
+    padding: 5px 10px;
+    margin-left: 5px;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    background-color: #007bff;
+    color: white;
+}
+.type-selector-container button:nth-of-type(2) { /* Assuming Cancel is the second button */
+    background-color: #6c757d;
+}
+
+
+/* Styling for groups within a camera's configuration */
+.camera-source-group, .camera-common-group {
+    padding: 10px;
+    margin-top: 10px;
+    border: 1px solid #cce5ff; /* Light blue border */
+    border-radius: 4px;
+    background-color: #f8f9fa; /* Very light grey background */
+}
+
+.camera-source-group h4, .camera-common-group h4 {
+    margin-top: 0;
+    color: #0056b3;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 5px;
+}
+
+/* Styling for the remove camera button */
+.remove-camera-btn {
+    display: block; /* Make it take its own line */
+    margin: 15px auto 5px auto; /* Center it somewhat, with space */
+    padding: 8px 15px;
+    background-color: #c82333; /* A more distinct red */
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+/* Styling for postprocessing items specifically */
+.postprocessing-item {
+    background-color: #fff9e6; /* Light yellow background for pp items */
+    border-left: 3px solid #ffc107; /* Amber left border */
+}
+.postprocessing-item h5 { /* Type: crop */
+    margin-top: 0;
+    margin-bottom: 10px;
+    color: #b38600;
+}
