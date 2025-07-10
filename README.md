@@ -90,20 +90,29 @@ Accessible from the main configuration UI, this tool helps visually define crop 
 *   **Access**: Navigate from the main config UI (`/ui`) to the "Visual Crop Configuration Tool" (typically `/static/visual_config.html`).
 *   **Functionality**:
     1.  **Select Camera**: Choose a URL-based camera from the dropdown.
-    2.  **Fetch Image**: Click "Fetch & Display Image" to load the current image from the camera's URL. The image is displayed, potentially scaled to fit your screen.
+    2.  **Fetch Image**: Click "Fetch & Display Image" to load the current image from the camera's URL.
+        *   The image is displayed, potentially scaled to fit your screen.
+        *   Information about the image's **natural (original) size** and the current **display scale factor** is shown.
     3.  **Define Areas**:
-        *   **Crop Area (Red Rectangle)**: Four input fields (X1, Y1, X2, Y2) are initialized to the full displayed image dimensions. Adjust these coordinates manually. A red rectangle on the image visually represents this area.
-        *   **Sky Area (Cyan Rectangle, Optional)**: Check "Define Sky Area" to enable its X1,Y1,X2,Y2 input fields. A cyan rectangle will show this area. If a `sky_area` is already defined in `config.yaml` for the camera, its coordinates will be loaded and scaled for display.
-        *   **SSIM Area (Yellow Rectangle, Optional)**: Check "Define SSIM Area" to enable its X1,Y1,X2,Y2 input fields. A yellow rectangle will show this area. If an `ssim_area` is defined, it will be loaded and scaled.
-        *   **Coordinate System**: All coordinates (X1,Y1,X2,Y2) you input are relative to the *displayed image* on your screen. The tool automatically scales these coordinates to the image's original (natural) dimensions when saving to `config.yaml` or sending for preview.
-    4.  **Preview Crop**: Click "Preview Crop". This uses the **Crop Area** coordinates, scales them to the original image dimensions, and sends them to the server with the original fetched image. The server returns a cropped version, displayed below the original. (Sky/SSIM areas are not part of this preview).
-    5.  **Apply to Configuration**: Click "Apply Crop to Config" (will be renamed to "Apply Visual Settings" or similar). This will:
+        *   **Crop Area (Red Rectangle)**: Input fields for X1, Y1, X2, Y2 are initialized to the full *displayed* image dimensions.
+        *   **Sky Area (Cyan Rectangle, Optional)**: Enable via checkbox. If a `sky_area` exists in `config.yaml`, its coordinates (from natural image dimensions) are loaded and converted to the current *displayed* image coordinates for the input fields.
+        *   **SSIM Area (Yellow Rectangle, Optional)**: Enable via checkbox. Similar loading and scaling logic as Sky Area.
+        *   As you adjust the X1,Y1,X2,Y2 input fields for any area:
+            *   The corresponding colored rectangle on the canvas updates instantly.
+            *   A display below each area's inputs shows the **calculated natural (real pixel) coordinates** that would result from your current UI selection, based on the image's display scale.
+    4.  **Window Resize**: If you resize your browser window while an image is displayed:
+        *   The displayed image will resize to fit the new layout.
+        *   The scale factor display will update.
+        *   The X1,Y1,X2,Y2 input fields for all active areas will automatically adjust their values so that the drawn rectangles maintain their position and coverage relative to the **actual image content**.
+        *   The displayed natural coordinates will remain consistent, reflecting the true selection on the original image.
+    5.  **Preview Crop**: Click "Preview Crop". This uses the **Crop Area's** current UI coordinates, scales them to natural image dimensions, and requests a preview from the server. The cropped image is displayed vertically below the original.
+    6.  **Apply to Configuration**: Click "Apply Visual Settings" (or similar button name). This will:
         *   Fetch the latest full `config.yaml` content.
-        *   For **Crop Area**: Convert the UI X1,Y1,X2,Y2 to a scaled `left,top,right,bottom` string. Update the `postprocessing` array for the selected camera (existing `type: "crop"` steps are removed, new one added).
-        *   For **Sky Area**: If "Define Sky Area" is checked, convert its UI coordinates to a scaled `left,top,right,bottom` string and save to the camera's `sky_area` field. If unchecked, `sky_area` is removed from the config.
-        *   For **SSIM Area**: If "Define SSIM Area" is checked, convert its UI coordinates to a scaled `left,top,right,bottom` string and save to `ssim_area`. If unchecked, `ssim_area` is removed.
-        *   The entire modified configuration is then saved back to `config.yaml`.
-    6.  **Reload**: After applying, you'll typically need to go back to the main configuration UI and use the "Reload Application Config" button to make `fenetre.py` pick up the changes.
+        *   Use the **stored natural coordinates** (derived from your UI inputs and scaling) for Crop, Sky, and SSIM areas to update the configuration.
+        *   For Crop Area: Updates the `postprocessing` array.
+        *   For Sky/SSIM Areas: Updates or removes the `sky_area` / `ssim_area` fields directly on the camera object.
+        *   The entire modified configuration is saved back to `config.yaml`.
+    7.  **Reload**: After applying, use the "Reload Application Config" button on the main configuration UI to make `fenetre.py` pick up changes.
 *   **Layout**: The original image (with drawn rectangles) and the cropped preview image are displayed vertically.
 *   **Current Limitations**:
     *   The image fetching for the visual tool primarily supports URL-based cameras.
