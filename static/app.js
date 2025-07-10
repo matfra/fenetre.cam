@@ -328,4 +328,7 @@ document.addEventListener('DOMContentLoaded', () => {
             statusMessage.classList.add('error');
         }
     }
+
+    // Automatically load the configuration when the page loads
+    fetchAndDisplayConfig();
 });

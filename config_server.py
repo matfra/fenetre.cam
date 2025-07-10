@@ -67,7 +67,7 @@ def update_config():
 
 # --- UI Serving Routes ---
 
-@app.route('/ui')
+@app.route('/') # Changed from /ui to /
 def serve_ui_page():
     # Serves static/index.html, assuming index.html is the main page for the UI
     # If index.html is not in the 'static' folder but e.g. in 'templates', use render_template
