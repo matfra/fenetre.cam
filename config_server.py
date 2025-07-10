@@ -14,20 +14,19 @@ from io import BytesIO # For handling image data in memory
 # If index.html is in 'static', it's simpler. If we want a template, then template_folder.
 app = Flask(__name__, static_folder='static')
 
-
-CONFIG_FILE_PATH = os.environ.get("CONFIG_FILE_PATH", "config.yaml")
-FENETRE_PID_FILE = os.environ.get("FENETRE_PID_FILE", "fenetre.pid") # Used to signal fenetre.py for reload
-
-# --- Configuration Server Settings ---
-CONFIG_SERVER_HOST = os.environ.get("CONFIG_SERVER_HOST", "0.0.0.0")
-CONFIG_SERVER_PORT = int(os.environ.get("CONFIG_SERVER_PORT", 8889))
+# CONFIG_FILE_PATH and FENETRE_PID_FILE will now be passed via app.config
+# by fenetre.py when it runs this Flask app.
+# CONFIG_SERVER_HOST and CONFIG_SERVER_PORT are also managed by fenetre.py.
 
 @app.route('/config', methods=['GET'])
 def get_config():
+    config_file_path = app.config.get('FENETRE_CONFIG_FILE')
+    if not config_file_path:
+        return jsonify({"error": "FENETRE_CONFIG_FILE not set in app config."}), 500
     try:
-        if not os.path.exists(CONFIG_FILE_PATH):
-            return jsonify({"error": f"Configuration file not found: {CONFIG_FILE_PATH}"}), 404
-        with open(CONFIG_FILE_PATH, 'r') as f:
+        if not os.path.exists(config_file_path):
+            return jsonify({"error": f"Configuration file not found: {config_file_path}"}), 404
+        with open(config_file_path, 'r') as f:
             config_data = yaml.safe_load(f)
         return jsonify(config_data), 200
     except Exception as e:
@@ -35,6 +34,9 @@ def get_config():
 
 @app.route('/config', methods=['PUT'])
 def update_config():
+    config_file_path = app.config.get('FENETRE_CONFIG_FILE')
+    if not config_file_path:
+        return jsonify({"error": "FENETRE_CONFIG_FILE not set in app config."}), 500
     try:
         if not request.is_json:
             return jsonify({"error": "Request body must be JSON."}), 415 # Unsupported Media Type
@@ -52,7 +54,7 @@ def update_config():
         except yaml.YAMLError as e: # Error during YAML conversion
             return jsonify({"error": f"Error converting JSON to YAML: {str(e)}"}), 500
 
-        with open(CONFIG_FILE_PATH, 'w') as f:
+        with open(config_file_path, 'w') as f:
             f.write(new_config_yaml)
 
         return jsonify({"message": "Configuration updated successfully (saved as YAML). Reload is required to apply changes."}), 200
@@ -92,13 +94,17 @@ def serve_ui_page():
 
 @app.route('/api/camera/<string:camera_name>/capture_for_ui', methods=['POST'])
 def capture_for_ui(camera_name):
+    config_file_path = app.config.get('FENETRE_CONFIG_FILE')
+    if not config_file_path:
+        return jsonify({"error": "FENETRE_CONFIG_FILE not set in app config."}), 500
+
     try:
-        with open(CONFIG_FILE_PATH, 'r') as f:
+        with open(config_file_path, 'r') as f:
             config = yaml.safe_load(f)
     except FileNotFoundError:
-        return jsonify({"error": f"Configuration file {CONFIG_FILE_PATH} not found."}), 500
+        return jsonify({"error": f"Configuration file {config_file_path} not found."}), 500
     except yaml.YAMLError:
-        return jsonify({"error": f"Error parsing configuration file {CONFIG_FILE_PATH}."}), 500
+        return jsonify({"error": f"Error parsing configuration file {config_file_path}."}), 500
 
     if 'cameras' not in config or camera_name not in config['cameras']:
         return jsonify({"error": f"Camera '{camera_name}' not found in configuration."}), 404
@@ -231,39 +237,33 @@ def reload_config():
     This is a placeholder and will be more fully implemented in fenetre.py
     by having fenetre.py listen for a signal (e.g., SIGHUP or SIGUSR1).
     """
+    fenetre_pid_file_path = app.config.get('FENETRE_PID_FILE_PATH')
+    if not fenetre_pid_file_path:
+        return jsonify({"error": "FENETRE_PID_FILE_PATH not set in app config."}), 500
+
     try:
-        if os.path.exists(FENETRE_PID_FILE):
-            with open(FENETRE_PID_FILE, 'r') as f:
+        if os.path.exists(fenetre_pid_file_path):
+            with open(fenetre_pid_file_path, 'r') as f:
                 pid_str = f.read().strip()
                 if pid_str:
                     pid = int(pid_str)
                     # Send SIGHUP (1) to the process. SIGHUP is often used to signal daemons to reload configuration.
                     # Ensure fenetre.py is set up to handle this signal.
-                    os.kill(pid, signal.SIGHUP)
+                    os.kill(pid, signal.SIGHUP) # signal.SIGHUP should be available as signal was imported
                     return jsonify({"message": f"Reload signal sent to process {pid}."}), 200
                 else:
                     return jsonify({"error": "PID file is empty."}), 500
         else:
-            return jsonify({"error": f"PID file not found: {FENETRE_PID_FILE}. Cannot signal reload."}), 404
+            return jsonify({"error": f"PID file not found: {fenetre_pid_file_path}. Cannot signal reload."}), 404
 
-    except FileNotFoundError:
-         return jsonify({"error": f"PID file not found: {FENETRE_PID_FILE}. Cannot signal reload."}), 404
+    except FileNotFoundError: # Should be caught by os.path.exists, but as a safeguard
+         return jsonify({"error": f"PID file not found: {fenetre_pid_file_path}. Cannot signal reload."}), 404
     except ProcessLookupError:
-        return jsonify({"error": f"Process with PID read from {FENETRE_PID_FILE} not found. It might have exited."}), 500
-    except ValueError:
-        return jsonify({"error": f"Invalid PID found in {FENETRE_PID_FILE}."}), 500
-    except Exception as e:
+        return jsonify({"error": f"Process with PID read from {fenetre_pid_file_path} not found. It might have exited."}), 500
+    except ValueError: # Error converting pid_str to int
+        return jsonify({"error": f"Invalid PID found in {fenetre_pid_file_path}."}), 500
+    except Exception as e: # Catch-all for other errors like permission issues with os.kill
         return jsonify({"error": f"Error signaling reload: {str(e)}"}), 500
 
-def run_server():
-    # Using waitress or gunicorn is recommended for production instead of Flask's built-in server.
-    # For simplicity in this context, we use the built-in server.
-    # Consider adding host and port configuration if needed.
-    app.run(host=CONFIG_SERVER_HOST, port=CONFIG_SERVER_PORT, debug=False)
-
-if __name__ == '__main__':
-    # This allows running the config server independently for testing or in a separate process.
-    print(f"Starting configuration server on http://{CONFIG_SERVER_HOST}:{CONFIG_SERVER_PORT}")
-    print(f"Monitoring configuration file: {os.path.abspath(CONFIG_FILE_PATH)}")
-    print(f"PID file for fenetre process: {os.path.abspath(FENETRE_PID_FILE)}")
-    run_server()
+# The run_server() function and if __name__ == '__main__': block are removed.
+# fenetre.py will now manage the lifecycle of this Flask app.

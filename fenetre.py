@@ -37,6 +37,13 @@ from gopro import capture_gopro_photo
 from gopro_utility import GoProUtilityThread, format_gopro_sd_card
 from postprocess import postprocess
 
+# Attempt to import waitress, fall back to werkzeug simple server for config server
+try:
+    from waitress import serve as waitress_serve
+except ImportError:
+    waitress_serve = None
+    from werkzeug.serving import run_simple as werkzeug_run_simple
+
 
 # Define flags at module level so they are available when module is imported
 flags.DEFINE_string("config", None, "path to YAML config file")
@@ -51,6 +58,8 @@ FENETRE_PID_FILE = os.environ.get("FENETRE_PID_FILE", "fenetre.pid")
 # Global dictionary to keep track of active camera threads and related utility threads
 active_camera_threads = {} # Stores {camera_name: {'watchdog': Thread, 'gopro_utility': GoProUtilityThread (optional)}}
 http_server_thread_global = None # Global reference to the HTTP server thread
+config_server_thread_global = None # Global reference to the Config server thread
+config_server_instance_global = None # To manage the waitress/werkzeug server instance for shutdown
 exit_event = threading.Event() # Initialize globally
 
 
@@ -60,7 +69,8 @@ def config_load(config_file_path: str) -> List[Dict]:
             config = yaml.safe_load(f)
             res = []
             # Ensure all expected sections are present, providing empty dicts if not
-            for section in ["http_server", "cameras", "global"]:
+            # Added 'config_server' section
+            for section in ["http_server", "cameras", "global", "config_server"]:
                 res.append(config.get(section, {}))
             return res
     except FileNotFoundError:
@@ -324,6 +334,92 @@ def stop_http_server():
     http_server_thread_global = None
 
 
+# --- Config Server Management ---
+def run_config_server_func(host: str, port: int, flask_app, fenetre_config_file: str, fenetre_pid_file: str):
+    """Runs the Flask config server."""
+    # Pass necessary fenetre config to Flask app
+    # This assumes config_server.py will be modified to pick these up
+    flask_app.config['FENETRE_CONFIG_FILE'] = fenetre_config_file
+    flask_app.config['FENETRE_PID_FILE_PATH'] = fenetre_pid_file
+    flask_app.config['EXIT_EVENT'] = exit_event # Pass exit_event for potential graceful shutdown
+
+    global config_server_instance_global
+    try:
+        logging.info(f"Starting Config Server on http://{host}:{port}")
+        if waitress_serve:
+            # Waitress is generally preferred and handles shutdown better if integrated.
+            # However, direct shutdown of `waitress.serve` from another thread is not straightforward
+            # without internal access or a control socket.
+            # For now, we rely on exit_event being checked by waitress or its thread being a daemon.
+            # A more robust solution might involve running waitress in a subprocess
+            # or using a server that has a programmatic shutdown method (e.g. a development server or a custom setup).
+            # For simplicity here, we'll run it directly.
+            # TODO: Implement a proper shutdown mechanism for waitress if this proves problematic.
+            # One common pattern for shutting down waitress is to have a dedicated shutdown endpoint in the Flask app
+            # that, when called, would raise SystemExit or call a server-specific shutdown if available.
+            # Alternatively, the thread running serve() could periodically check exit_event if serve() was non-blocking,
+            # but it is blocking.
+            # For now, we'll make the thread a daemon and rely on main process exit,
+            # or for SIGHUP reloads, the thread will be joined.
+            waitress_serve(flask_app, host=host, port=port, threads=4) # threads=4 is an example
+        elif werkzeug_run_simple:
+            # werkzeug's run_simple also blocks and doesn't have a clean external shutdown.
+            # It can be stopped by killing the process or, for dev server, Ctrl+C.
+            # When run in a thread, similar issues to waitress.
+            # It does have a _reloader_loop that might be interruptible.
+            # Setting use_reloader=False is important if we manage reloads via SIGHUP.
+            werkzeug_run_simple(host, port, flask_app, use_reloader=False, use_debugger=False)
+        else:
+            logging.error("No suitable WSGI server (Waitress or Werkzeug) found for Config Server.")
+            return
+    except SystemExit:
+        logging.info("Config server shutting down (SystemExit caught).")
+    except Exception as e:
+        if not exit_event.is_set(): # Log error only if not during a planned shutdown
+            logging.error(f"Config server crashed: {e}", exc_info=True)
+    finally:
+        logging.info(f"Config server on http://{host}:{port} stopped.")
+        config_server_instance_global = None # Clear instance on stop
+
+
+def stop_config_server():
+    global config_server_thread_global, config_server_instance_global
+    logging.info("Attempting to shut down Config Server...")
+
+    # Signaling shutdown to a blocking WSGI server in a thread is complex.
+    # If waitress or werkzeug were run with a programmatic server object, we could call .shutdown() or similar.
+    # Since we call serve() or run_simple() which block, we rely on exit_event and thread joining.
+    # The most reliable way is if the server itself checks exit_event or has a shutdown endpoint.
+    # For now, we set exit_event, which should be checked by Flask routes if they are long-running (not typical).
+    # The server thread itself, if daemon, will be killed on app exit.
+    # For SIGHUP reloads where we want to stop/start it, joining the thread is key.
+    # If the server doesn't exit cleanly from exit_event, the join might hang or timeout.
+
+    # Flask's development server (werkzeug.serving.run_simple) can be stopped by sending a SIGINT to the process,
+    # or by making a request to a special /shutdown route (if implemented).
+    # Waitress might need a similar mechanism or a more direct control.
+    # For now, the primary mechanism is exit_event and thread join.
+    # If config_server_instance_global held a server object with a shutdown method, we'd call it here.
+    # Since it doesn't (waitress_serve and werkzeug_run_simple are blocking calls),
+    # we rely on the thread terminating when exit_event is set (if the server respects it) or during join.
+
+    if config_server_thread_global and config_server_thread_global.is_alive():
+        logging.info("Config server thread is alive. Waiting for it to join...")
+        # exit_event is already set by the main shutdown_application or handle_sighup logic if it's a full stop.
+        # If this is a specific stop for the config server (e.g. disabled in config), ensure exit_event is relevant.
+        # For simplicity, assume global exit_event is the main control.
+        config_server_thread_global.join(timeout=10) # Wait for thread to finish
+        if config_server_thread_global.is_alive():
+            logging.warning("Config server thread did not join in time. It might not support graceful shutdown perfectly.")
+        else:
+            logging.info("Config server thread joined.")
+    else:
+        logging.info("Config server thread already stopped or not started.")
+
+    config_server_thread_global = None
+    config_server_instance_global = None # Ensure cleaned up
+
+
 def create_and_start_and_watch_thread(
     f: Callable, name: str, arguments: List[str] = [], exp_backoff_limit: int = 0, camera_name_for_management: Optional[str] = None
 ) -> None:
@@ -520,9 +616,14 @@ def main(argv):
 def load_and_apply_configuration(initial_load=False, config_file_override=None):
     """Loads configuration and applies it by starting/stopping/reconfiguring threads."""
     global server_config, cameras_config, global_config, http_server_thread_global
+    global config_server_config # New global for config server settings
+    global config_server_thread_global # Manage config server thread
+    global flask_app_instance # Hold the created Flask app
 
     logging.info("Loading and applying configuration...")
     old_server_config = server_config if 'server_config' in globals() and not initial_load else {}
+    old_config_server_config = config_server_config if 'config_server_config' in globals() and not initial_load else {}
+
 
     config_path_to_load = config_file_override if config_file_override else FLAGS.config
     if not config_path_to_load:
@@ -530,12 +631,13 @@ def load_and_apply_configuration(initial_load=False, config_file_override=None):
         return
 
     # Load new configuration
-    new_server_config, new_cameras_config, new_global_config = config_load(config_path_to_load)
+    new_server_config, new_cameras_config, new_global_config, new_config_server_config = config_load(config_path_to_load)
 
     # Update global config variables
     server_config = new_server_config
     cameras_config = new_cameras_config
     global_config = new_global_config # This must be updated first as other things depend on it.
+    config_server_config = new_config_server_config # Store config server settings
 
     # Ensure pic_dir is set up after global_config is loaded/reloaded
     global_config["pic_dir"] = os.path.join(global_config.get("work_dir", "."), "photos")
@@ -543,8 +645,19 @@ def load_and_apply_configuration(initial_load=False, config_file_override=None):
 
     if logging.level_debug():
         logging.debug(
-            f"Loaded config: server: {server_config}, cameras: {cameras_config}, global: {global_config}"
+            f"Loaded config: server: {server_config}, cameras: {cameras_config}, global: {global_config}, config_server: {config_server_config}"
         )
+
+    # Import Flask app from config_server.py
+    # This is done here to ensure it's re-imported if fenetre.py itself is reloaded in a way that clears modules,
+    # though typically imports are cached. More importantly, it's to have access to the app object.
+    try:
+        from config_server import app as imported_flask_app
+        flask_app_instance = imported_flask_app # Store for use
+    except ImportError as e:
+        logging.error(f"Failed to import Flask app from config_server: {e}. Config server UI will not be available.")
+        flask_app_instance = None
+
 
     # (Re)link HTML files and update cameras.json
     # These depend on work_dir from global_config and camera details from cameras_config
@@ -736,6 +849,49 @@ def load_and_apply_configuration(initial_load=False, config_file_override=None):
         logging.info("HTTP server is now disabled in config. Stopping it.")
         stop_http_server()
 
+    # Manage Config Server (Flask App) Thread
+    if flask_app_instance: # Only proceed if Flask app was successfully imported
+        new_config_server_enabled = config_server_config.get("enabled", False)
+        # Use different defaults for host/port if necessary, e.g. from config_server.py or new defaults here
+        new_config_server_host = config_server_config.get("host", "0.0.0.0")
+        new_config_server_port = config_server_config.get("port", 8889) # Default from old config_server.py
+
+        old_config_server_host = old_config_server_config.get("host", "0.0.0.0")
+        old_config_server_port = old_config_server_config.get("port", 8889)
+
+        config_server_details_changed = (new_config_server_host != old_config_server_host or \
+                                         new_config_server_port != old_config_server_port)
+
+        if new_config_server_enabled:
+            if not config_server_thread_global or \
+               not config_server_thread_global.is_alive() or \
+               config_server_details_changed:
+
+                if config_server_thread_global and config_server_thread_global.is_alive():
+                    logging.info("Stopping existing Config Server due to re-configuration or it died...")
+                    stop_config_server() # This should handle join
+
+                logging.info("Starting Config Server as per new/updated configuration...")
+                # Ensure FLAGS.config (main config path) and FENETRE_PID_FILE are available
+                # These will be passed to run_config_server_func and set on flask_app_instance.config
+                main_config_file_path = FLAGS.config
+                pid_file_path = FENETRE_PID_FILE # Global constant in fenetre.py
+
+                config_server_thread_global = Thread(
+                    target=run_config_server_func,
+                    args=(new_config_server_host, new_config_server_port, flask_app_instance, main_config_file_path, pid_file_path),
+                    daemon=True, # Daemonize so it exits with main app, join handles graceful stop
+                    name="config_server_flask"
+                )
+                config_server_thread_global.start()
+                logging.info(f"Config Server (Flask) thread {config_server_thread_global.name} started.")
+        elif not new_config_server_enabled and config_server_thread_global and config_server_thread_global.is_alive():
+            logging.info("Config Server is now disabled in config. Stopping it.")
+            stop_config_server()
+    elif not flask_app_instance and config_server_config.get("enabled", False):
+        logging.warning("Config server is enabled in config, but Flask app instance could not be imported/created.")
+
+
     logging.info("Configuration loaded and applied.")
 
 
@@ -797,6 +953,9 @@ def shutdown_application():
 
     # Stop HTTP server
     stop_http_server()
+
+    # Stop Config Server
+    stop_config_server()
 
     # Stop Timelapse and Daylight threads
     global timelapse_thread_global, daylight_thread_global

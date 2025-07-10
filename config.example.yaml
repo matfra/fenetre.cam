@@ -9,6 +9,10 @@ http_server:
   port: 8888
   host: 0.0.0.0
   enabled: True
+config_server:
+  enabled: true       # Enable the web UI for configuration
+  host: "0.0.0.0"     # Host for the config server
+  port: 8889          # Port for the config server
 cameras:
   a-cool-http-cam-with-clouds:
     url: "https://isitfoggy.com/photos/latest.jpg"
