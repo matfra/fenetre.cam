@@ -77,19 +77,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Users can add it manually if the form allows adding arbitrary key-value pairs, or we add it as an optional common field.
     ];
 
-
-    // Order for common fields (can be refined)
-    const commonCameraFieldsOrder = [
-        'description', 'timeout_s', 'sky_area', 'ssim_area', 'ssim_setpoint',
-        'disabled', 'mozjpeg_optimize', 'postprocessing'
-        // 'snap_interval_s' can be added if a fixed interval is desired as a common option.
-        // If snap_interval_s is present, it overrides SSIM logic.
-        // The absence of snap_interval_s implies dynamic interval.
-        // This needs to be clear in the UI, perhaps by having snap_interval_s and if it's empty/0, ssim settings apply.
-        // For now, keeping snap_interval_s out of common template to encourage dynamic by default.
-        // Users can add it manually if the form allows adding arbitrary key-value pairs, or we add it as an optional common field.
-    ];
-
+    // NOTE: The duplicate declaration of commonCameraFieldsOrder that was here has been removed.
 
     const loadConfigBtn = document.getElementById('loadConfigBtn');
     const saveConfigBtn = document.getElementById('saveConfigBtn');
@@ -457,8 +445,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         processChildren(child, currentObject[key]);
                     }
                 } else if (child.tagName === 'INPUT' || child.tagName === 'TEXTAREA') {
-                    // This branch handles direct properties of an object, not items in an array directly.
-                    // Array items are handled within the 'array' fieldset logic.
+                    // This branch handles direct properties of an object that are input fields.
+                    // These inputs should have a data-key.
                     if (child.dataset.key) {
                         const keyParts = child.dataset.key.split('.');
                         const actualKey = keyParts[keyParts.length -1]; // The last part is the actual property name
@@ -473,6 +461,13 @@ document.addEventListener('DOMContentLoaded', () => {
                         } else {
                             currentObject[actualKey] = child.value;
                         }
+                    }
+                } else if (child.tagName === 'DIV') {
+                    // If it's a DIV that's not an array item container (which are handled by fieldset[data-type="array"] logic)
+                    // and doesn't have its own data-key (which would make it a field itself, not typical for DIVs here),
+                    // recurse into it to find nested fields. This handles container DIVs like .camera-source-group.
+                    if (!child.classList.contains('array-item') && !child.dataset.key) {
+                        processChildren(child, currentObject);
                     }
                 }
             }
