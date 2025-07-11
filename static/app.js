@@ -445,8 +445,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         processChildren(child, currentObject[key]);
                     }
                 } else if (child.tagName === 'INPUT' || child.tagName === 'TEXTAREA') {
-                    // This branch handles direct properties of an object, not items in an array directly.
-                    // Array items are handled within the 'array' fieldset logic.
+                    // This branch handles direct properties of an object that are input fields.
+                    // These inputs should have a data-key.
                     if (child.dataset.key) {
                         const keyParts = child.dataset.key.split('.');
                         const actualKey = keyParts[keyParts.length -1]; // The last part is the actual property name
@@ -461,6 +461,13 @@ document.addEventListener('DOMContentLoaded', () => {
                         } else {
                             currentObject[actualKey] = child.value;
                         }
+                    }
+                } else if (child.tagName === 'DIV') {
+                    // If it's a DIV that's not an array item container (which are handled by fieldset[data-type="array"] logic)
+                    // and doesn't have its own data-key (which would make it a field itself, not typical for DIVs here),
+                    // recurse into it to find nested fields. This handles container DIVs like .camera-source-group.
+                    if (!child.classList.contains('array-item') && !child.dataset.key) {
+                        processChildren(child, currentObject);
                     }
                 }
             }
