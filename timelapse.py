@@ -85,7 +85,6 @@ def create_timelapse(
     if os.path.exists(timelapse_filepath) and overwrite is False:
         raise FileExistsError(timelapse_filepath)
 
-    _generate_srt_file(dir, srt_filepath)
 
     ffmpeg_cmd = [
         "nice",
@@ -98,12 +97,6 @@ def create_timelapse(
         "glob",
         "-i",
         "{}".format(os.path.join(os.path.abspath(dir), "*.jpg")),
-        "-i",
-        srt_filepath,
-        "-c",
-        "copy",
-        "-c:s",
-        "mov_text",
     ]
     if overwrite:
         ffmpeg_cmd.append("-y")
