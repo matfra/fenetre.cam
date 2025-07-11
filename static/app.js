@@ -1,13 +1,95 @@
 document.addEventListener('DOMContentLoaded', () => {
+    // Define structures for postprocessing steps
+    const postprocessingTypes = {
+        crop: {
+            fields: { area: { type: 'text', default: '0,0,1920,1080' } },
+            order: ['area']
+        },
+        resize: {
+            fields: {
+                width: { type: 'number', default: 1280 },
+                height: { type: 'number', default: 720 }
+            },
+            order: ['width', 'height']
+        },
+        awb: { // Auto White Balance
+            fields: {}, // No specific fields, the type itself is the config
+            order: []
+        },
+        timestamp: {
+            fields: {
+                enabled: { type: 'checkbox', default: true },
+                position: { type: 'text', default: 'bottom_right' }, // Could be a select if predefined options
+                size: { type: 'number', default: 24 },
+                color: { type: 'text', default: 'white' }, // Could be a color picker or select
+                format: { type: 'text', default: '%Y-%m-%d %H:%M:%S %Z' }
+            },
+            order: ['enabled', 'position', 'size', 'color', 'format']
+        }
+        // Add other postprocessing types here as needed
+    };
+    const availablePostprocessingTypes = Object.keys(postprocessingTypes);
+
+    // Define structures for camera configurations
+    const cameraSourceTypes = {
+        url: {
+            fields: { url: { type: 'text', default: 'http://example.com/image.jpg' } },
+            order: ['url']
+        },
+        local_command: {
+            fields: { local_command: { type: 'text', default: 'ffmpeg -i http://source/stream -vframes 1 -q:v 2 -f singlejpeg -' } },
+            order: ['local_command']
+        },
+        gopro_ip: {
+            fields: {
+                gopro_ip: { type: 'text', default: '10.5.5.9' },
+                gopro_ble_identifier: { type: 'text', default: 'XXXX' },
+                gopro_root_ca: { type: 'textarea', default: '-----BEGIN CERTIFICATE-----\nPASTE_CA_HERE\n-----END CERTIFICATE-----' },
+                gopro_preset: { type: 'text', default: '65539' }, // Could be a select with known presets
+                gopro_utility_poll_interval_s: { type: 'number', default: 10 },
+                gopro_bluetooth_retry_delay_s: { type: 'number', default: 180 }
+            },
+            order: ['gopro_ip', 'gopro_ble_identifier', 'gopro_root_ca', 'gopro_preset', 'gopro_utility_poll_interval_s', 'gopro_bluetooth_retry_delay_s']
+        }
+    };
+    const availableCameraSourceTypes = Object.keys(cameraSourceTypes);
+
+    const commonCameraFields = {
+        description: { type: 'text', default: 'A new camera' },
+        // snap_interval_s: { type: 'number', default: 60 }, // If not set, implies dynamic SSIM-based interval
+        timeout_s: { type: 'number', default: 60 },
+        sky_area: { type: 'text', default: '0,0,1920,500' }, // Example, might need better default or placeholder
+        ssim_area: { type: 'text', default: '0,0,1920,1080' },
+        ssim_setpoint: { type: 'number', default: 0.90, step: 0.01 }, // For float input
+        disabled: { type: 'checkbox', default: false },
+        mozjpeg_optimize: { type: 'checkbox', default: false },
+        postprocessing: { type: 'array', default: [] } // Special handling: this will use the postprocessing logic
+    };
+    // Order for common fields (can be refined)
+    const commonCameraFieldsOrder = [
+        'description', 'timeout_s', 'sky_area', 'ssim_area', 'ssim_setpoint',
+        'disabled', 'mozjpeg_optimize', 'postprocessing'
+        // 'snap_interval_s' can be added if a fixed interval is desired as a common option.
+        // If snap_interval_s is present, it overrides SSIM logic.
+        // The absence of snap_interval_s implies dynamic interval.
+        // This needs to be clear in the UI, perhaps by having snap_interval_s and if it's empty/0, ssim settings apply.
+        // For now, keeping snap_interval_s out of common template to encourage dynamic by default.
+        // Users can add it manually if the form allows adding arbitrary key-value pairs, or we add it as an optional common field.
+    ];
+
+    // NOTE: The duplicate declaration of commonCameraFieldsOrder that was here has been removed.
+
     const loadConfigBtn = document.getElementById('loadConfigBtn');
     const saveConfigBtn = document.getElementById('saveConfigBtn');
     const reloadAppBtn = document.getElementById('reloadAppBtn');
+    const addCameraBtn = document.getElementById('addCameraBtn'); // Get the new button
     const configFormContainer = document.getElementById('configFormContainer');
     const statusMessage = document.getElementById('statusMessage');
 
     loadConfigBtn.addEventListener('click', fetchAndDisplayConfig);
     saveConfigBtn.addEventListener('click', saveConfiguration);
     reloadAppBtn.addEventListener('click', reloadApplication);
+    addCameraBtn.addEventListener('click', handleAddCamera); // Add event listener
 
     async function fetchAndDisplayConfig() {
         setStatus('Loading configuration...', 'info');
@@ -142,10 +224,123 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function addArrayItem(parentFieldset, baseKey, newIndex, templateItem) {
-        // templateItem is a sample of what an item should look like (e.g., empty object for complex items, or empty string)
-        const itemContainer = createArrayItemContainer(templateItem, `${baseKey.substring(0, baseKey.lastIndexOf('['))}[${newIndex}]`, newIndex, parentFieldset);
-        // Insert before the 'Add Item' button
-        parentFieldset.insertBefore(itemContainer, parentFieldset.querySelector('.add-item-btn'));
+        const itemKeyPrefix = baseKey.substring(0, baseKey.lastIndexOf('[')); // e.g., cameras.mycam.postprocessing
+        const actualKey = itemKeyPrefix.split('.').pop(); // e.g., postprocessing
+
+        if (actualKey === 'postprocessing') {
+            // Special handling for postprocessing items
+            const typeSelectorContainer = document.createElement('div');
+            typeSelectorContainer.classList.add('type-selector-container');
+
+            const selectLabel = document.createElement('label');
+            selectLabel.textContent = 'Select postprocessing type: ';
+            typeSelectorContainer.appendChild(selectLabel);
+
+            const typeSelect = document.createElement('select');
+            availablePostprocessingTypes.forEach(type => {
+                const option = document.createElement('option');
+                option.value = type;
+                option.textContent = type;
+                typeSelect.appendChild(option);
+            });
+            typeSelectorContainer.appendChild(typeSelect);
+
+            const confirmButton = document.createElement('button');
+            confirmButton.textContent = 'Add Selected Type';
+            confirmButton.type = 'button';
+            confirmButton.addEventListener('click', () => {
+                const selectedType = typeSelect.value;
+                typeSelectorContainer.remove(); // Remove selector UI
+
+                // Determine the new index for the actual item
+                // This needs to be robust if items can be removed out of order.
+                // For simplicity, assume newIndex is roughly correct for now, or re-calculate.
+                const currentItemCount = parentFieldset.querySelectorAll(':scope > .array-item, :scope > .postprocessing-item').length;
+                const itemKey = `${itemKeyPrefix}[${currentItemCount}]`;
+
+                const newItemContainer = renderPostprocessingItem(selectedType, itemKey, parentFieldset);
+                parentFieldset.insertBefore(newItemContainer, parentFieldset.querySelector('.add-item-btn'));
+            });
+            typeSelectorContainer.appendChild(confirmButton);
+
+            const cancelButton = document.createElement('button');
+            cancelButton.textContent = 'Cancel';
+            cancelButton.type = 'button';
+            cancelButton.addEventListener('click', () => {
+                typeSelectorContainer.remove();
+            });
+            typeSelectorContainer.appendChild(cancelButton);
+
+            // Insert the type selector before the 'Add Item' button
+            parentFieldset.insertBefore(typeSelectorContainer, parentFieldset.querySelector('.add-item-btn'));
+
+        } else {
+            // Default behavior for other arrays
+            const itemContainer = createArrayItemContainer(templateItem, `${itemKeyPrefix}[${newIndex}]`, newIndex, parentFieldset);
+            parentFieldset.insertBefore(itemContainer, parentFieldset.querySelector('.add-item-btn'));
+        }
+    }
+
+    function renderPostprocessingItem(type, itemBaseKey, parentFieldset) {
+        const itemContainer = document.createElement('div');
+        itemContainer.classList.add('postprocessing-item', 'array-item'); // Add array-item for consistent removal styling/logic
+        itemContainer.dataset.key = itemBaseKey; // e.g., cameras.cam1.postprocessing[0]
+        itemContainer.dataset.type = type; // Store the type
+
+        const typeDisplay = document.createElement('h5'); // Or a div with styling
+        typeDisplay.textContent = `Type: ${type}`;
+        itemContainer.appendChild(typeDisplay);
+
+        // Hidden input to store the type, will be picked up by getFormDataAsJson
+        const typeInput = document.createElement('input');
+        typeInput.type = 'hidden';
+        typeInput.dataset.key = `${itemBaseKey}.type`; // Path for the type property
+        typeInput.value = type;
+        itemContainer.appendChild(typeInput);
+
+        const typeDefinition = postprocessingTypes[type];
+        if (typeDefinition && typeDefinition.fields) {
+            typeDefinition.order.forEach(fieldName => {
+                const field = typeDefinition.fields[fieldName];
+                const fieldKey = `${itemBaseKey}.${fieldName}`; // e.g., cameras.cam1.postprocessing[0].area
+
+                const label = document.createElement('label');
+                label.textContent = fieldName;
+                label.htmlFor = fieldKey;
+                itemContainer.appendChild(label);
+
+                let input;
+                if (field.type === 'checkbox') {
+                    input = document.createElement('input');
+                    input.type = 'checkbox';
+                    input.checked = field.default;
+                } else if (field.type === 'number') {
+                    input = document.createElement('input');
+                    input.type = 'number';
+                    input.value = field.default;
+                } else { // 'text' or other
+                    input = document.createElement('input');
+                    input.type = 'text'; // Default to text
+                    input.value = field.default;
+                }
+                input.id = fieldKey;
+                input.dataset.key = fieldKey; // Crucial for getFormDataAsJson
+                itemContainer.appendChild(input);
+                itemContainer.appendChild(document.createElement('br'));
+            });
+        }
+
+        const removeButton = document.createElement('button');
+        removeButton.textContent = 'Remove This Step';
+        removeButton.type = 'button';
+        removeButton.classList.add('remove-item-btn');
+        removeButton.addEventListener('click', () => {
+            itemContainer.remove();
+            // Note: Re-indexing siblings or handling gaps in getFormDataAsJson might be needed for arrays.
+        });
+        itemContainer.appendChild(removeButton);
+
+        return itemContainer;
     }
 
 
@@ -250,8 +445,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         processChildren(child, currentObject[key]);
                     }
                 } else if (child.tagName === 'INPUT' || child.tagName === 'TEXTAREA') {
-                    // This branch handles direct properties of an object, not items in an array directly.
-                    // Array items are handled within the 'array' fieldset logic.
+                    // This branch handles direct properties of an object that are input fields.
+                    // These inputs should have a data-key.
                     if (child.dataset.key) {
                         const keyParts = child.dataset.key.split('.');
                         const actualKey = keyParts[keyParts.length -1]; // The last part is the actual property name
@@ -266,6 +461,13 @@ document.addEventListener('DOMContentLoaded', () => {
                         } else {
                             currentObject[actualKey] = child.value;
                         }
+                    }
+                } else if (child.tagName === 'DIV') {
+                    // If it's a DIV that's not an array item container (which are handled by fieldset[data-type="array"] logic)
+                    // and doesn't have its own data-key (which would make it a field itself, not typical for DIVs here),
+                    // recurse into it to find nested fields. This handles container DIVs like .camera-source-group.
+                    if (!child.classList.contains('array-item') && !child.dataset.key) {
+                        processChildren(child, currentObject);
                     }
                 }
             }
@@ -328,4 +530,188 @@ document.addEventListener('DOMContentLoaded', () => {
             statusMessage.classList.add('error');
         }
     }
+
+    // Automatically load the configuration when the page loads
+    fetchAndDisplayConfig();
+
+    function handleAddCamera() {
+        const cameraName = prompt("Enter a name for the new camera (e.g., 'front-yard-cam'):");
+        if (!cameraName || cameraName.trim() === "") {
+            setStatus("Camera name cannot be empty.", "error");
+            return;
+        }
+        if (/[.\s\[\]\#\*\/]/.test(cameraName)) {
+            setStatus("Camera name contains invalid characters (e.g., . / [ ] # * space). Please use a simple name.", "error");
+            return;
+        }
+
+        // Check if camera name already exists
+        // This requires knowing the current config structure. Assume 'cameras' is a top-level key.
+        // A simple check: see if a fieldset with this data-key already exists.
+        const existingCameraFieldset = configFormContainer.querySelector(`fieldset[data-key="cameras.${cameraName}"]`);
+        if (existingCameraFieldset) {
+            setStatus(`A camera with the name '${cameraName}' already exists.`, "error");
+            return;
+        }
+
+        let camerasFieldset = configFormContainer.querySelector('fieldset[data-key="cameras"]');
+        if (!camerasFieldset) {
+            // If no cameras section exists yet, create it.
+            // This might happen if the config is entirely empty or has no 'cameras' key.
+            camerasFieldset = document.createElement('fieldset');
+            const legend = document.createElement('legend');
+            legend.textContent = 'cameras';
+            camerasFieldset.appendChild(legend);
+            camerasFieldset.dataset.key = 'cameras';
+            camerasFieldset.dataset.type = 'object'; // 'cameras' is an object containing camera items
+            configFormContainer.appendChild(camerasFieldset); // Or insert in a specific order if needed
+        }
+
+        const newCameraFieldset = document.createElement('fieldset');
+        const newCameraLegend = document.createElement('legend');
+        newCameraLegend.textContent = cameraName;
+        newCameraFieldset.appendChild(newCameraLegend);
+        newCameraFieldset.dataset.key = `cameras.${cameraName}`; // This is how it will be identified in getFormDataAsJson
+        newCameraFieldset.dataset.type = 'object'; // Each camera is an object
+
+        // Add source type selector
+        const typeSelectorContainer = document.createElement('div');
+        typeSelectorContainer.classList.add('type-selector-container');
+        const selectLabel = document.createElement('label');
+        selectLabel.textContent = 'Select camera source type: ';
+        typeSelectorContainer.appendChild(selectLabel);
+
+        const sourceTypeSelect = document.createElement('select');
+        availableCameraSourceTypes.forEach(type => {
+            const option = document.createElement('option');
+            option.value = type;
+            option.textContent = type;
+            sourceTypeSelect.appendChild(option);
+        });
+        typeSelectorContainer.appendChild(sourceTypeSelect);
+
+        const confirmButton = document.createElement('button');
+        confirmButton.textContent = 'Confirm Source Type';
+        confirmButton.type = 'button';
+        confirmButton.addEventListener('click', () => {
+            const selectedSourceType = sourceTypeSelect.value;
+            typeSelectorContainer.remove(); // Remove selector UI
+            renderCameraItem(newCameraFieldset, cameraName, selectedSourceType);
+        });
+        typeSelectorContainer.appendChild(confirmButton);
+        newCameraFieldset.appendChild(typeSelectorContainer);
+
+        camerasFieldset.appendChild(newCameraFieldset);
+        setStatus(`Camera '${cameraName}' structure added. Configure and save.`, 'info');
+    }
+
+    function renderCameraItem(cameraFieldset, cameraNameKey, selectedSourceType) {
+        // cameraNameKey is the string name like "front-yard-cam"
+        // cameraFieldset is the fieldset for this specific camera.
+        // Its data-key should be `cameras.${cameraNameKey}`
+
+        const basePath = `cameras.${cameraNameKey}`; // Base path for data-keys
+
+        // Hidden input for the source type if needed for saving, though not directly part of fenetre config structure
+        // For now, the presence of url/local_command/gopro_ip keys will define the type.
+
+        // Render source-specific fields
+        const sourceTypeDefinition = cameraSourceTypes[selectedSourceType];
+        if (sourceTypeDefinition) {
+            const sourceGroup = document.createElement('div');
+            sourceGroup.classList.add('camera-source-group');
+            const groupLegend = document.createElement('h4');
+            groupLegend.textContent = `Source: ${selectedSourceType}`;
+            sourceGroup.appendChild(groupLegend);
+
+            sourceTypeDefinition.order.forEach(fieldName => {
+                const field = sourceTypeDefinition.fields[fieldName];
+                const fieldKey = `${basePath}.${fieldName}`;
+                appendFieldToForm(sourceGroup, fieldName, field, fieldKey);
+            });
+            cameraFieldset.appendChild(sourceGroup);
+        }
+
+        // Render common camera fields
+        const commonGroup = document.createElement('div');
+        commonGroup.classList.add('camera-common-group');
+        const commonLegend = document.createElement('h4');
+        commonLegend.textContent = 'Common Settings';
+        commonGroup.appendChild(commonLegend);
+
+        commonCameraFieldsOrder.forEach(fieldName => {
+            const field = commonCameraFields[fieldName];
+            const fieldKey = `${basePath}.${fieldName}`;
+
+            if (fieldName === 'postprocessing') {
+                // Create an empty fieldset for postprocessing array
+                const ppFieldset = document.createElement('fieldset');
+                const ppLegend = document.createElement('legend');
+                ppLegend.textContent = 'postprocessing (List)';
+                ppFieldset.appendChild(ppLegend);
+                ppFieldset.dataset.key = fieldKey; // e.g., cameras.mycam.postprocessing
+                ppFieldset.dataset.type = 'array';
+
+                const addButton = document.createElement('button');
+                addButton.textContent = 'Add Postprocessing Step';
+                addButton.type = 'button';
+                addButton.classList.add('add-item-btn');
+                // Ensure newIndex is calculated correctly based on items in this specific ppFieldset
+                addButton.addEventListener('click', () => {
+                     const currentPPItemCount = ppFieldset.querySelectorAll(':scope > .array-item, :scope > .postprocessing-item').length;
+                     addArrayItem(ppFieldset, fieldKey, currentPPItemCount, {}); // Pass empty object as template for postproc
+                });
+                ppFieldset.appendChild(addButton);
+                commonGroup.appendChild(ppFieldset);
+            } else {
+                appendFieldToForm(commonGroup, fieldName, field, fieldKey);
+            }
+        });
+        cameraFieldset.appendChild(commonGroup);
+
+        // Add a remove button for this camera
+        const removeCameraButton = document.createElement('button');
+        removeCameraButton.textContent = 'Remove This Camera';
+        removeCameraButton.type = 'button';
+        removeCameraButton.classList.add('remove-camera-btn');
+        removeCameraButton.addEventListener('click', () => {
+            cameraFieldset.remove();
+            setStatus(`Camera '${cameraNameKey}' removed from UI. Save to confirm.`, 'info');
+        });
+        cameraFieldset.appendChild(removeCameraButton);
+
+    }
+
+    // Helper function to append a single field (label + input) to a parent element
+    function appendFieldToForm(parentElement, fieldName, fieldConfig, fieldKey) {
+        const label = document.createElement('label');
+        label.textContent = fieldName;
+        label.htmlFor = fieldKey;
+        parentElement.appendChild(label);
+
+        let input;
+        if (fieldConfig.type === 'checkbox') {
+            input = document.createElement('input');
+            input.type = 'checkbox';
+            input.checked = fieldConfig.default;
+        } else if (fieldConfig.type === 'number') {
+            input = document.createElement('input');
+            input.type = 'number';
+            input.value = fieldConfig.default;
+            if (fieldConfig.step) input.step = fieldConfig.step;
+        } else if (fieldConfig.type === 'textarea') {
+            input = document.createElement('textarea');
+            input.value = fieldConfig.default;
+            input.rows = (fieldConfig.default.match(/\n/g) || []).length + 2;
+        } else { // 'text' or other
+            input = document.createElement('input');
+            input.type = 'text';
+            input.value = fieldConfig.default;
+        }
+        input.id = fieldKey;
+        input.dataset.key = fieldKey;
+        parentElement.appendChild(input);
+        parentElement.appendChild(document.createElement('br'));
+    }
+
 });
