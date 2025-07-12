@@ -69,35 +69,7 @@ def update_config():
 
 @app.route('/')
 def serve_ui_page():
-    config_file_path = app.config.get('FENETRE_CONFIG_FILE')
-    if not config_file_path or not os.path.exists(config_file_path):
-        return redirect('/list.html')
-
-    try:
-        with open(config_file_path, 'r') as f:
-            config = yaml.safe_load(f)
-    except Exception:
-        return redirect('/list.html')
-
-    ui_config = config.get('ui', {})
-    landing_page = ui_config.get('landing_page', 'list')
-
-    if landing_page == 'fullscreen':
-        camera_name = ui_config.get('fullscreen_camera')
-        if camera_name:
-            return redirect(f'/fullscreen.html?camera={camera_name}')
-        else:
-            return redirect('/list.html')
-
-    elif landing_page in ['list', 'map', 'camera']:
-        return redirect(f'/{landing_page}.html')
-
-    else:
-        return redirect('/list.html')
-
-@app.route('/<path:filename>')
-def serve_static(filename):
-    return send_from_directory(app.static_folder, filename)
+    return app.send_static_file('index.html')
 
 # --- API Endpoints for Visual Config Tool ---
 

@@ -82,7 +82,9 @@
     <div id="content">
         <span id="close">&times;</span>
         <h3 id="title"></h3>
-        <img id="image" src="" alt="Full size camera image">
+        <a id="image-link" href="#">
+            <img id="image" src="" alt="Full size camera image">
+        </a>
         <p id="filename"></p>
         <div id="links">
             <a id="link-today" href="#" target="_blank">Browse Today's Pictures</a>
@@ -139,17 +141,21 @@
                             imageElement.alt = `Full size image for ${camera.title}`;
                             filenameElement.textContent = filename;
 
+                            const imageLink = document.getElementById('image-link');
+                            imageLink.href = `fullscreen.html?camera=${encodeURIComponent(camera.title)}`;
+
                             const today = new Date();
                             const yesterday = new Date(today);
                             yesterday.setDate(today.getDate() - 1);
                             const todayStr = formatDate(today);
                             const yesterdayStr = formatDate(yesterday);
 
-                            linkToday.href = `${camera.url}/${todayStr}`;
+                            const photo_dir = `photos/${camera.title}`;
+                            linkToday.href = `${photo_dir}/${todayStr}`;
                             linkToday.textContent = `Today's Pictures (${todayStr})`;
-                            linkTimelapse.href = `${camera.url}/${yesterdayStr}/${yesterdayStr}.webm`;
+                            linkTimelapse.href = `${photo_dir}/${yesterdayStr}/${yesterdayStr}.webm`;
                             linkTimelapse.textContent = `Yesterday's Timelapse (${yesterdayStr})`;
-                            linkHistory.href = `${camera.url}/daylight.html`;
+                            linkHistory.href = `${photo_dir}/daylight.html`;
                             linkHistory.textContent = `All Time History for ${camera.title}`;
                         });
                 });

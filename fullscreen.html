@@ -9,6 +9,11 @@
     overflow: hidden;
     background-color: #000;
   }
+  a {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
   img {
     display: block;
     width: 100%;
@@ -19,26 +24,24 @@
 </head>
 <body>
 
-<img id="cameraImage" src="" alt="Loading camera feed...">
+<a id="cameraLink" href="#">
+  <img id="cameraImage" src="" alt="Loading camera feed...">
+</a>
 
 <script>
   const urlParams = new URLSearchParams(window.location.search);
   const cameraName = urlParams.get('camera');
   const imageElement = document.getElementById('cameraImage');
+  const cameraLink = document.getElementById('cameraLink');
 
   function updateImage() {
     if (cameraName) {
       // Add a cache-busting parameter to the URL.
       const imageUrl = `photos/${cameraName}/latest.jpg?t=${Date.now()}`;
       imageElement.src = imageUrl;
+      cameraLink.href = `camera.html?camera=${encodeURIComponent(cameraName)}`;
     } else {
       imageElement.alt = "No camera specified. Please add '?camera=CAMERA_NAME' to the URL.";
-    }
-  }
-
-  function openCameraPopup() {
-    if (cameraName) {
-      window.open(`camera.html?camera=${cameraName}`, '_blank', 'width=800,height=600,scrollbars=yes,resizable=yes');
     }
   }
 
@@ -52,9 +55,6 @@
   document.documentElement.requestFullscreen().catch(err => {
     console.log(`Error attempting to enable full-screen mode: ${err.message} (${err.name})`);
   });
-
-  // Open camera popup on click
-  document.addEventListener('click', openCameraPopup);
 </script>
 
 </body>

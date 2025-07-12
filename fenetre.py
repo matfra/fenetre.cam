@@ -468,18 +468,40 @@ def create_and_start_and_watch_thread(
         time.sleep(5) # Check every 5 seconds
 
 
+def generate_index_html(work_dir: str):
+    ui_config = global_config.get('ui', {})
+    landing_page = ui_config.get('landing_page', 'list')
+    redirect_url = f"{landing_page}.html"
+
+    if landing_page == 'fullscreen':
+        camera_name = ui_config.get('fullscreen_camera')
+        if camera_name:
+            redirect_url = f"fullscreen.html?camera={camera_name}"
+        else:
+            redirect_url = "list.html" # Fallback
+
+    index_content = f"""<!DOCTYPE html>
+<html>
+<head>
+    <title>Fenetre</title>
+    <meta http-equiv="refresh" content="0; url={redirect_url}" />
+</head>
+<body>
+    <p>If you are not redirected automatically, follow this <a href="{redirect_url}">link</a>.</p>
+</body>
+</html>"""
+
+    with open(os.path.join(work_dir, "index.html"), "w") as f:
+        f.write(index_content)
+
+
 def link_html_file(work_dir: str):
     current_dir = os.getcwd()
-    shutil.copy(
-        os.path.join(current_dir, "map.html"), os.path.join(work_dir, "map.html")
-    )
-    shutil.copy(
-        os.path.join(current_dir, "index.html"), os.path.join(work_dir, "index.html")
-    )
-    shutil.copy(
-        os.path.join(current_dir, "fullscreen.html"),
-        os.path.join(work_dir, "fullscreen.html"),
-    )
+    # Copy all html files
+    for file in os.listdir(current_dir):
+        if file.endswith(".html"):
+            shutil.copy(os.path.join(current_dir, file), os.path.join(work_dir, file))
+
     # Create the lib directory if it does not exist.
     if not os.path.exists(os.path.join(work_dir, "lib")):
         os.makedirs(os.path.join(work_dir, "lib"))
@@ -490,6 +512,7 @@ def link_html_file(work_dir: str):
                 os.path.join(current_dir, "lib", file),
                 os.path.join(work_dir, "lib", file),
             )
+    generate_index_html(work_dir)
 
 
 def update_cameras_metadata(cameras_configs: Dict, work_dir: str):
