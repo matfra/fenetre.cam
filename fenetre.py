@@ -29,7 +29,13 @@ from absl import app
 from absl import flags
 from absl import logging
 from PIL import Image
+
+import SSIM_PIL._gpu_strategy as gpu_strategy
+from pyopencl import Kernel as cl_Kernel
+gpu_strategy._kernel = cl_Kernel(gpu_strategy._program, 'convert')
+
 from SSIM_PIL import compare_ssim
+
 
 from timelapse import create_timelapse
 from daylight import run_end_of_day
