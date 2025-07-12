@@ -86,11 +86,11 @@
                 listItem = document.createElement('li');
                 listItem.dataset.title = camera.title;
 
+                const thumbnailLink = document.createElement('a');
+                thumbnailLink.href = `camera.html?camera=${encodeURIComponent(camera.title)}`;
                 const thumbnail = document.createElement('img');
                 thumbnail.alt = `${camera.title} thumbnail`;
-                thumbnail.addEventListener('click', () => {
-                    window.open(`camera.html?camera=${encodeURIComponent(camera.title)}`, '_blank', 'width=800,height=600,scrollbars=yes,resizable=yes');
-                });
+                thumbnailLink.appendChild(thumbnail);
 
                 const cameraInfo = document.createElement('div');
                 cameraInfo.className = 'camera-info';
@@ -107,7 +107,7 @@
 
                 cameraInfo.appendChild(cameraName);
                 cameraInfo.appendChild(lastPicture);
-                listItem.appendChild(thumbnail);
+                listItem.appendChild(thumbnailLink);
                 listItem.appendChild(cameraInfo);
                 listItem.appendChild(status);
                 cameraListElement.appendChild(listItem);
