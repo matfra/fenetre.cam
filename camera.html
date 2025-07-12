@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Camera View</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: rgba(0, 0, 0, 0.85);
+        }
+        #content {
+            position: relative;
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            max-width: 90vw;
+            max-height: 95vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+        #close {
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            font-size: 30px;
+            font-weight: bold;
+            color: #555;
+            cursor: pointer;
+            line-height: 1;
+        }
+        #close:hover {
+            color: #000;
+        }
+        #title {
+            margin: 0 0 15px 0;
+            font-size: 1.4em;
+            color: #333;
+        }
+        #image {
+            max-width: 100%;
+            max-height: 60vh;
+            object-fit: contain;
+            margin-bottom: 10px;
+            border-radius: 4px;
+            border: 1px solid #eee;
+        }
+        #filename {
+            margin: 0 0 15px 0;
+            font-family: 'Courier New', Courier, monospace;
+            color: #666;
+            background-color: #f5f5f5;
+            padding: 5px 10px;
+            border-radius: 3px;
+            font-size: 0.9em;
+        }
+        #links a {
+            display: block;
+            margin: 8px 0;
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            font-size: 0.9em;
+            min-width: 250px;
+            box-sizing: border-box;
+        }
+        #links a:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div id="content">
+        <span id="close">&times;</span>
+        <h3 id="title"></h3>
+        <a id="image-link" href="#">
+            <img id="image" src="" alt="Full size camera image">
+        </a>
+        <p id="filename"></p>
+        <div id="links">
+            <a id="link-today" href="#" target="_blank">Browse Today's Pictures</a>
+            <a id="link-timelapse" href="#" target="_blank">Yesterday's Timelapse</a>
+            <a id="link-history" href="#" target="_blank">All Time History</a>
+        </div>
+    </div>
+    <script>
+        const titleElement = document.getElementById('title');
+        const imageElement = document.getElementById('image');
+        const filenameElement = document.getElementById('filename');
+        const closeElement = document.getElementById('close');
+        const linkToday = document.getElementById('link-today');
+        const linkTimelapse = document.getElementById('link-timelapse');
+        const linkHistory = document.getElementById('link-history');
+
+        function formatDate(date) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        function updateCameraView() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const cameraName = urlParams.get('camera');
+            if (!cameraName) {
+                titleElement.textContent = "No camera specified.";
+                return;
+            }
+
+            fetch(`cameras.json`)
+                .then(response => response.json())
+                .then(cameras => {
+                    const camera = cameras.find(c => c.title === cameraName);
+                    if (!camera) {
+                        titleElement.textContent = `Camera "${cameraName}" not found.`;
+                        return;
+                    }
+
+                    titleElement.textContent = camera.title;
+
+                    fetch(camera.dynamic_metadata)
+                        .then(response => response.json())
+                        .then(metadata => {
+                            const lastPictureUrl = metadata.last_picture_url;
+                            if (!lastPictureUrl) return;
+
+                            const basePath = camera.dynamic_metadata.substring(0, camera.dynamic_metadata.lastIndexOf('/'));
+                            const fullImageUrl = `${basePath}/${lastPictureUrl}`;
+                            const filename = lastPictureUrl.substring(lastPictureUrl.lastIndexOf('/') + 1);
+
+                            imageElement.src = fullImageUrl;
+                            imageElement.alt = `Full size image for ${camera.title}`;
+                            filenameElement.textContent = filename;
+
+                            const imageLink = document.getElementById('image-link');
+                            imageLink.href = `fullscreen.html?camera=${encodeURIComponent(camera.title)}`;
+
+                            const today = new Date();
+                            const yesterday = new Date(today);
+                            yesterday.setDate(today.getDate() - 1);
+                            const todayStr = formatDate(today);
+                            const yesterdayStr = formatDate(yesterday);
+
+                            const photo_dir = `photos/${camera.title}`;
+                            linkToday.href = `${photo_dir}/${todayStr}`;
+                            linkToday.textContent = `Today's Pictures (${todayStr})`;
+                            linkTimelapse.href = `${photo_dir}/${yesterdayStr}/${yesterdayStr}.webm`;
+                            linkTimelapse.textContent = `Yesterday's Timelapse (${yesterdayStr})`;
+                            linkHistory.href = `${photo_dir}/daylight.html`;
+                            linkHistory.textContent = `All Time History for ${camera.title}`;
+                        });
+                });
+        }
+
+        closeElement.addEventListener('click', () => {
+            window.close();
+        });
+
+        // Initial load
+        updateCameraView();
+    </script>
+</body>
+</html>
