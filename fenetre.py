@@ -140,8 +140,28 @@ def update_latest_link(pic_path: str):
     os.rename(tmp_link, latest_link)
 
 
-def get_pic_from_local_command(cmd: str, timeout_s: int) -> Image.Image:
-    s = subprocess.run(cmd.split(" "), stdout=subprocess.PIPE, timeout=timeout_s)
+def get_pic_from_local_command(
+    cmd: str, timeout_s: int, camera_name: str, camera_config: Dict
+) -> Image.Image:
+    if camera_config.get("redirect_stderr"):
+        log_dir = global_config.get("log_dir")
+        if log_dir:
+            log_file_path = os.path.join(
+                log_dir, f"{camera_name}_stderr_{datetime.now().strftime('%Y-%m-%d')}.log"
+            )
+            with open(log_file_path, "a") as stderr_log:
+                s = subprocess.run(
+                    cmd.split(" "),
+                    stdout=subprocess.PIPE,
+                    stderr=stderr_log,
+                    timeout=timeout_s,
+                )
+        else:
+            s = subprocess.run(
+                cmd.split(" "), stdout=subprocess.PIPE, timeout=timeout_s
+            )
+    else:
+        s = subprocess.run(cmd.split(" "), stdout=subprocess.PIPE, timeout=timeout_s)
     return Image.open(BytesIO(s.stdout))
 
 
@@ -157,7 +177,9 @@ def snap(camera_name, camera_config: Dict):
             ua = global_config.get("user_agent", "")
             return get_pic_from_url(url, timeout, ua)
         if local_command is not None:
-            return get_pic_from_local_command(local_command, timeout)
+            return get_pic_from_local_command(
+                local_command, timeout, camera_name, camera_config
+            )
         if gopro_ip is not None:
             jpeg_bytes = capture_gopro_photo(
                 ip_address=gopro_ip,
