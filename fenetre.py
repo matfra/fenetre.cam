@@ -33,6 +33,7 @@ from SSIM_PIL import compare_ssim
 
 from timelapse import create_timelapse
 from daylight import run_end_of_day
+from archive import main as archive_main
 from gopro import capture_gopro_photo
 from gopro_utility import GoProUtilityThread, format_gopro_sd_card
 from postprocess import postprocess
@@ -583,10 +584,10 @@ def main(argv):
 
     # These queues are global and should persist across reloads if fenetre.py itself isn't restarted.
     # If reload implies restarting these loops, then re-initialization might be needed in reload_configuration_logic
-    global timelapse_q, daylight_q
+    global timelapse_q, daylight_q, archive_q
     timelapse_q = deque()
     daylight_q = deque()
-
+    archive_q = deque()
 
     # Timelapse and Daylight threads are started here.
     # Consider if they need to be managed (restarted) on config changes.
@@ -594,7 +595,7 @@ def main(argv):
     # If their core behavior (e.g., ffmpeg_options) changes, a restart might be cleaner.
     # However, these are long-running loops processing queues; restarting them might be disruptive.
     # Let's assume for now that updating global_config is sufficient for them.
-    global timelapse_thread_global, daylight_thread_global
+    global timelapse_thread_global, daylight_thread_global, archive_thread_global
     timelapse_thread_global = Thread(target=timelapse_loop, daemon=True, name="timelapse_loop")
     timelapse_thread_global.start()
     logging.info(f"Starting thread {timelapse_thread_global.name}")
@@ -602,6 +603,10 @@ def main(argv):
     daylight_thread_global = Thread(target=daylight_loop, daemon=True, name="daylight_loop")
     daylight_thread_global.start()
     logging.info(f"Starting thread {daylight_thread_global.name}")
+
+    archive_thread_global = Thread(target=archive_loop, daemon=True, name="archive_loop")
+    archive_thread_global.start()
+    logging.info(f"Starting thread {archive_thread_global.name}")
 
     try:
         while not exit_event.is_set():
@@ -1007,7 +1012,7 @@ def timelapse_loop():
                 logging.error(
                     f"There was an error creating the timelapse for dir: {dir}"
                 )
-        time.sleep(30)
+        time.sleep(1)
 
 
 def daylight_loop():
@@ -1021,7 +1026,23 @@ def daylight_loop():
                 f"Running daylight in {daily_pic_dir} with sky_area {sky_area}"
             )
             run_end_of_day(camera_name, daily_pic_dir, sky_area)
-        time.sleep(10)
+            archive_q.append(daily_pic_dir)
+        time.sleep(1)
+
+
+def archive_loop():
+    """
+    This is a loop with a blocking Thread to archive pictures one at a time.
+    """
+    while not exit_event.is_set():
+        if len(archive_q) > 0:
+            dir = archive_q.popleft()
+            try:
+                archive_main([])
+            except FileExistsError:
+                logging.warning(f"Found an existing timelapse in dir {dir}, Skipping.")
+        else:
+            time.sleep(1)
 
 
 if __name__ == "__main__":
