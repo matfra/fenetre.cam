@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Camera List</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+        }
+        h1 {
+            text-align: center;
+        }
+        #camera-list {
+            list-style-type: none;
+            padding: 0;
+            margin: 0;
+        }
+        #camera-list li {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            align-items: center;
+        }
+        #camera-list li:hover {
+            background-color: #f0f0f0;
+        }
+        #camera-list img {
+            width: 160px;
+            height: 90px;
+            object-fit: cover;
+            margin-right: 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            background-color: #ddd;
+        }
+        .camera-info {
+            flex-grow: 1;
+        }
+        .camera-name {
+            font-weight: bold;
+            font-size: 1.1em;
+        }
+        .last-picture {
+            color: #555;
+            font-size: 0.9em;
+        }
+        .status {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            margin-left: 20px;
+        }
+        .status.online {
+            background-color: #28a745;
+        }
+        .status.offline {
+            background-color: #dc3545;
+        }
+    </style>
+</head>
+<body>
+    <h1>Camera List</h1>
+    <ul id="camera-list"></ul>
+
+    <script>
+        const cameraListElement = document.getElementById('camera-list');
+
+        function parseTimestampFromFilename(filename) {
+            try {
+                // e.g. 2023-10-27T10-00-00PDT.jpg
+                const match = filename.match(/^(\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2})/);
+                if (!match) return null;
+                // This will parse as local time and get the correct epoch timestamp
+                const date = new Date(match[1]);
+                return isNaN(date.getTime()) ? null : date;
+            } catch (e) {
+                console.error("Error parsing timestamp from:", filename, e);
+                return null;
+            }
+        }
+
+        function updateCamera(camera) {
+            let listItem = document.querySelector(`li[data-title="${camera.title}"]`);
+            if (!listItem) {
+                listItem = document.createElement('li');
+                listItem.dataset.title = camera.title;
+
+                const thumbnail = document.createElement('img');
+                thumbnail.alt = `${camera.title} thumbnail`;
+                thumbnail.addEventListener('click', () => {
+                    window.open(`camera.html?camera=${encodeURIComponent(camera.title)}`, '_blank', 'width=800,height=600,scrollbars=yes,resizable=yes');
+                });
+
+                const cameraInfo = document.createElement('div');
+                cameraInfo.className = 'camera-info';
+
+                const cameraName = document.createElement('div');
+                cameraName.className = 'camera-name';
+                cameraName.textContent = camera.title;
+
+                const lastPicture = document.createElement('div');
+                lastPicture.className = 'last-picture';
+
+                const status = document.createElement('div');
+                status.className = 'status';
+
+                cameraInfo.appendChild(cameraName);
+                cameraInfo.appendChild(lastPicture);
+                listItem.appendChild(thumbnail);
+                listItem.appendChild(cameraInfo);
+                listItem.appendChild(status);
+                cameraListElement.appendChild(listItem);
+            }
+
+            const thumbnail = listItem.querySelector('img');
+            const lastPicture = listItem.querySelector('.last-picture');
+            const status = listItem.querySelector('.status');
+
+            fetch(camera.dynamic_metadata)
+                .then(response => {
+                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                    return response.json();
+                })
+                .then(metadata => {
+                    const lastPictureUrl = metadata.last_picture_url;
+                    if (!lastPictureUrl) {
+                        lastPicture.textContent = 'No picture available';
+                        status.className = 'status offline';
+                        return;
+                    };
+
+                    const basePath = camera.dynamic_metadata.substring(0, camera.dynamic_metadata.lastIndexOf('/'));
+                    const fullImageUrl = `${basePath}/${lastPictureUrl}`;
+                    const filename = lastPictureUrl.substring(lastPictureUrl.lastIndexOf('/') + 1);
+
+                    thumbnail.src = fullImageUrl;
+                    lastPicture.textContent = filename;
+
+                    const imageDate = parseTimestampFromFilename(filename);
+                    if (imageDate) {
+                        const now = new Date();
+                        const threeMinutesInMs = 3 * 60 * 1000;
+                        const isOnline = (now.getTime() - imageDate.getTime()) < threeMinutesInMs;
+                        status.className = `status ${isOnline ? 'online' : 'offline'}`;
+                    } else {
+                        lastPicture.textContent = `Could not parse date from: ${filename}`;
+                        status.className = 'status offline';
+                    }
+                })
+                .catch(error => {
+                    lastPicture.textContent = 'Error loading metadata';
+                    status.className = 'status offline';
+                    console.error(`Failed to load metadata for ${camera.title}:`, error);
+                });
+        }
+
+        function updateAllCameras() {
+            fetch('cameras.json')
+                .then(response => {
+                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                    return response.json();
+                })
+                .then(cameras => {
+                    cameras.forEach(updateCamera);
+                })
+                .catch(error => {
+                    console.error('Error loading cameras.json:', error);
+                    cameraListElement.innerHTML = '<li>Error loading camera list.</li>';
+                });
+        }
+
+        // Initial load and periodic refresh
+        updateAllCameras();
+        setInterval(updateAllCameras, 60000);
+    </script>
+</body>
+</html>

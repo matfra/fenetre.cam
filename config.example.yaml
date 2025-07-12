@@ -13,6 +13,9 @@ config_server:
   enabled: true       # Enable the web UI for configuration
   host: "0.0.0.0"     # Host for the config server
   port: 8889          # Port for the config server
+ui:
+  landing_page: "list" # list, map, camera, fullscreen
+  fullscreen_camera: "a-cool-http-cam-with-clouds"
 cameras:
   a-cool-http-cam-with-clouds:
     url: "https://isitfoggy.com/photos/latest.jpg"

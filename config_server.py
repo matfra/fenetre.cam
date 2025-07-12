@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, send_from_directory, send_file
+from flask import Flask, request, jsonify, send_from_directory, send_file, redirect
 import yaml
 import json # For handling JSON input
 import os
@@ -12,7 +12,7 @@ from io import BytesIO # For handling image data in memory
 # To serve UI from a specific directory, e.g. 'config_ui/static' and 'config_ui/templates'
 # We'll assume 'static' and a root HTML file for simplicity first.
 # If index.html is in 'static', it's simpler. If we want a template, then template_folder.
-app = Flask(__name__, static_folder='static')
+app = Flask(__name__, static_folder='.')
 
 # CONFIG_FILE_PATH and FENETRE_PID_FILE will now be passed via app.config
 # by fenetre.py when it runs this Flask app.
@@ -67,28 +67,37 @@ def update_config():
 
 # --- UI Serving Routes ---
 
-@app.route('/') # Changed from /ui to /
+@app.route('/')
 def serve_ui_page():
-    # Serves static/index.html, assuming index.html is the main page for the UI
-    # If index.html is not in the 'static' folder but e.g. in 'templates', use render_template
-    # For simplicity, let's assume we'll place index.html in the root of the static folder
-    # or serve it from a specific path if it's outside 'static_folder'
-    # A common pattern is to have a template for the main page.
-    # Let's serve 'index.html' from the root directory for now, or create a static/index.html later.
-    # For now, a simple placeholder or assume it's in static.
-    # Flask default static route is /static/<path:filename>
-    # To serve index.html at /ui, we can explicitly define a route.
-    # We will place index.html in a 'ui' subfolder within static, or serve it from project root.
-    # Let's assume we'll create a 'static/index.html' and access it via /static/index.html
-    # or create a specific route for /ui
+    config_file_path = app.config.get('FENETRE_CONFIG_FILE')
+    if not config_file_path or not os.path.exists(config_file_path):
+        return redirect('/list.html')
 
-    # This will serve 'static/index.html'
-    return app.send_static_file('index.html')
+    try:
+        with open(config_file_path, 'r') as f:
+            config = yaml.safe_load(f)
+    except Exception:
+        return redirect('/list.html')
 
+    ui_config = config.get('ui', {})
+    landing_page = ui_config.get('landing_page', 'list')
 
-# Flask automatically adds a static route if static_folder is set.
-# e.g., /static/app.js will be served from static/app.js
-# No need for specific routes for each static file if they are in the 'static' folder.
+    if landing_page == 'fullscreen':
+        camera_name = ui_config.get('fullscreen_camera')
+        if camera_name:
+            return redirect(f'/fullscreen.html?camera={camera_name}')
+        else:
+            return redirect('/list.html')
+
+    elif landing_page in ['list', 'map', 'camera']:
+        return redirect(f'/{landing_page}.html')
+
+    else:
+        return redirect('/list.html')
+
+@app.route('/<path:filename>')
+def serve_static(filename):
+    return send_from_directory(app.static_folder, filename)
 
 # --- API Endpoints for Visual Config Tool ---
 

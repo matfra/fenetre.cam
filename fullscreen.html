@@ -28,11 +28,17 @@
 
   function updateImage() {
     if (cameraName) {
-      // Add a cache-busting parameter to the URL. Make the tiemstamp be the number of minutes since the epoch.
-      const imageUrl = `photos/${cameraName}/latest.jpg?t=${Math.floor(Date.now() / 60000)}`;
+      // Add a cache-busting parameter to the URL.
+      const imageUrl = `photos/${cameraName}/latest.jpg?t=${Date.now()}`;
       imageElement.src = imageUrl;
     } else {
       imageElement.alt = "No camera specified. Please add '?camera=CAMERA_NAME' to the URL.";
+    }
+  }
+
+  function openCameraPopup() {
+    if (cameraName) {
+      window.open(`camera.html?camera=${cameraName}`, '_blank', 'width=800,height=600,scrollbars=yes,resizable=yes');
     }
   }
 
@@ -41,6 +47,14 @@
 
   // Refresh the image every 60 seconds
   setInterval(updateImage, 60000);
+
+  // Request fullscreen on load
+  document.documentElement.requestFullscreen().catch(err => {
+    console.log(`Error attempting to enable full-screen mode: ${err.message} (${err.name})`);
+  });
+
+  // Open camera popup on click
+  document.addEventListener('click', openCameraPopup);
 </script>
 
 </body>
