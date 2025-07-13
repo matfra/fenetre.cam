@@ -568,7 +568,8 @@ def update_cameras_metadata(cameras_configs: Dict, work_dir: str):
     We add to this file, never delete, but we do update the cameras if their info (i.e. coordinates) changed.
     """
 
-    updated_cameras_metadata = []
+    updated_cameras_metadata = {}
+    updated_cameras_metadata["cameras"] = []
 
     json_filepath = os.path.join(work_dir, "cameras.json")
     if os.path.exists(json_filepath):
@@ -580,7 +581,7 @@ def update_cameras_metadata(cameras_configs: Dict, work_dir: str):
                     logging.warning(
                         f"Camera {camera_metadata['title']} is not configured anymore. Delete it from {json_filepath} manually if you want to."
                     )
-                    updated_cameras_metadata.append(camera_metadata)
+                    updated_cameras_metadata["cameras"].append(camera_metadata)
 
     for cam in cameras_config:
         metadata = {}
@@ -596,7 +597,13 @@ def update_cameras_metadata(cameras_configs: Dict, work_dir: str):
         metadata["image"] = os.path.join("photos", cam, "latest.jpg")
         metadata["lat"] = cameras_config[cam].get("lat")
         metadata["lon"] = cameras_config[cam].get("lon")
-        updated_cameras_metadata.append(metadata)
+        updated_cameras_metadata["cameras"].append(metadata)
+
+    updated_cameras_metadata["global"] = {
+        "timelapse_file_extension": global_config.get(
+            "timelapse_file_extension", "mp4"
+        )
+    }
 
     with open(json_filepath, "w") as json_file:
         json.dump(updated_cameras_metadata, json_file, indent=4)

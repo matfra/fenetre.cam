@@ -265,17 +265,7 @@
         var markerCluster = L.markerClusterGroup();
         map.addLayer(markerCluster);
 
-        var cameraMarkers = {}; // To store references to map markers
-
-        // --- DOM Elements ---
-        const overlay = document.getElementById('image-overlay');
-        const overlayTitle = document.getElementById('overlay-title');
-        const overlayImage = document.getElementById('overlay-image');
-        const overlayFilename = document.getElementById('overlay-filename');
-        const overlayClose = document.getElementById('overlay-close');
-        const linkToday = document.getElementById('link-today');
-        const linkTimelapse = document.getElementById('link-timelapse');
-        const linkHistory = document.getElementById('link-history');
+        let cameraData = {}; // To store the full cameras.json data
 
         /**
          * Parses a timestamp from an image filename.
@@ -285,14 +275,19 @@
          */
         function parseTimestampFromFilename(filename) {
             try {
-                // Extracts "2025-05-31T11-00-24" from the filename
-                const match = filename.match(/(\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2})/);
-                if (match && match[1]) {
-                    // Replace the last dash with a colon for a valid ISO-like format
-                    const parsableString = match[1].replace(/-(\d{2})$/, ':$1');
-                    return new Date(parsableString);
-                }
-                return null; // Return null if no valid timestamp found
+                // e.g. 2023-10-27T10-00-00PDT.jpg
+                const match = filename.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2})-(\d{2})-(\d{2})/);
+                if (!match) return null;
+                // Parts are: [full_match, year, month, day, hour, minute, second]
+                const year = parseInt(match[1], 10);
+                const month = parseInt(match[2], 10) - 1; // Month is 0-indexed in JS
+                const day = parseInt(match[3], 10);
+                const hour = parseInt(match[4], 10);
+                const minute = parseInt(match[5], 10);
+                const second = parseInt(match[6], 10);
+
+                const date = new Date(year, month, day, hour, minute, second);
+                return isNaN(date.getTime()) ? null : date;
             } catch (e) {
                 console.error("Error parsing timestamp from:", filename, e);
                 return null;
@@ -384,10 +379,11 @@
             yesterday.setDate(today.getDate() - 1);
             const todayStr = formatDate(today);
             const yesterdayStr = formatDate(yesterday);
+            const timelapseExtension = cameraData.global.timelapse_file_extension || 'webm';
 
             linkToday.href = `${cameraUrl}/${todayStr}`;
             linkToday.textContent = `Today's Pictures (${todayStr})`;
-            linkTimelapse.href = `${cameraUrl}/${yesterdayStr}/${yesterdayStr}.webm`;
+            linkTimelapse.href = `${cameraUrl}/${yesterdayStr}/${yesterdayStr}.${timelapseExtension}`;
             linkTimelapse.textContent = `Yesterday's Timelapse (${yesterdayStr})`;
             linkHistory.href = `${cameraUrl}/daylight.html`;
             linkHistory.textContent = `All Time History for ${listItem.dataset.title}`;
@@ -409,7 +405,9 @@
         function loadCameras() {
             fetch('cameras.json')
                 .then(response => response.json())
-                .then(cameras => {
+                .then(data => {
+                    cameraData = data;
+                    const cameras = data.cameras;
                     markerCluster.clearLayers();
                     cameraMarkers = {};
                     const cameraListElement = document.getElementById('camera-list');

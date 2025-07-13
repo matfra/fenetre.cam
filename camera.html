@@ -118,7 +118,9 @@
 
             fetch(`cameras.json`)
                 .then(response => response.json())
-                .then(cameras => {
+                .then(data => {
+                    const cameras = data.cameras;
+                    const globalSettings = data.global;
                     const camera = cameras.find(c => c.title === cameraName);
                     if (!camera) {
                         titleElement.textContent = `Camera "${cameraName}" not found.`;
@@ -149,11 +151,12 @@
                             yesterday.setDate(today.getDate() - 1);
                             const todayStr = formatDate(today);
                             const yesterdayStr = formatDate(yesterday);
+                            const timelapseExtension = globalSettings.timelapse_file_extension || 'webm';
 
                             const photo_dir = `photos/${camera.title}`;
                             linkToday.href = `${photo_dir}/${todayStr}`;
                             linkToday.textContent = `Today's Pictures (${todayStr})`;
-                            linkTimelapse.href = `${photo_dir}/${yesterdayStr}/${yesterdayStr}.webm`;
+                            linkTimelapse.href = `${photo_dir}/${yesterdayStr}/${yesterdayStr}.${timelapseExtension}`;
                             linkTimelapse.textContent = `Yesterday's Timelapse (${yesterdayStr})`;
                             linkHistory.href = `${photo_dir}/daylight.html`;
                             linkHistory.textContent = `All Time History for ${camera.title}`;

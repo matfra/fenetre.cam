@@ -161,7 +161,7 @@ def archive_daydir(daydir: str, dry_run: bool = True, create_daylight_bands: boo
             )
         else:
             logging.warning(f"{daydir} does not contain a timelapse file.")
-            continue
+            return False
 
     logging.info(f"Archiving {daydir}. (dry run: {dry_run})")
     # Keep only 48 of the jpeg files in the subdirectory, distributed equally across all the existing files.

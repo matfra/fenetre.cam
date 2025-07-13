@@ -168,7 +168,8 @@
                     if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                     return response.json();
                 })
-                .then(cameras => {
+                .then(data => {
+                    const cameras = data.cameras;
                     cameras.forEach(updateCamera);
                 })
                 .catch(error => {
