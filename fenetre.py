@@ -568,27 +568,42 @@ def update_cameras_metadata(cameras_configs: Dict, work_dir: str):
     We add to this file, never delete, but we do update the cameras if their info (i.e. coordinates) changed.
     """
 
-    updated_cameras_metadata = {}
-    updated_cameras_metadata["cameras"] = []
-
+    updated_cameras_metadata = {"cameras": [], "global": {}}
     json_filepath = os.path.join(work_dir, "cameras.json")
-    if os.path.exists(json_filepath):
-        with open(json_filepath, "r") as json_file:
-            cameras_public_metadata = json.load(json_file)
 
-            for camera_metadata in cameras_public_metadata:
-                if camera_metadata["title"] not in cameras_config:
+    if os.path.exists(json_filepath):
+        try:
+            with open(json_filepath, "r") as json_file:
+                cameras_public_metadata = json.load(json_file)
+
+            # Handle both old (list) and new (dict) formats
+            if isinstance(cameras_public_metadata, list):
+                logging.warning(f"Old format detected for {json_filepath}. It will be updated to the new format.")
+                old_camera_list = cameras_public_metadata
+            elif isinstance(cameras_public_metadata, dict):
+                old_camera_list = cameras_public_metadata.get("cameras", [])
+            else:
+                logging.warning(f"Unrecognized format for {json_filepath}. It will be overwritten.")
+                old_camera_list = []
+
+            for camera_metadata in old_camera_list:
+                if camera_metadata.get("title") not in cameras_config:
                     logging.warning(
-                        f"Camera {camera_metadata['title']} is not configured anymore. Delete it from {json_filepath} manually if you want to."
+                        f"Camera {camera_metadata.get('title')} is not configured anymore. "
+                        f"Delete it from {json_filepath} manually if you want to."
                     )
                     updated_cameras_metadata["cameras"].append(camera_metadata)
+
+        except (json.JSONDecodeError, TypeError) as e:
+            logging.warning(f"Could not parse {json_filepath} or it has an invalid format. It will be overwritten. Error: {e}")
+
 
     for cam in cameras_config:
         metadata = {}
         metadata["title"] = cam
         metadata["url"] = f"map.html?camera={cam}"
         metadata["fullscreen_url"] = f"fullscreen.html?camera={cam}"
-        metadata["livefeed_url"] = cameras_config[cam].get("url" or "local_command")
+        metadata["livefeed_url"] = cameras_config[cam].get("url") or cameras_config[cam].get("local_command")
         metadata["description"] = cameras_config[cam].get("description", "")
         metadata["snap_interval_s"] = (
             cameras_config[cam].get("snap_interval_s") or "dynamic"
