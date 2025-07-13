@@ -4,3 +4,4 @@ venv
 *.pyc
 ssl
 *.swpconfig.dev.yaml
+fenetre.pid

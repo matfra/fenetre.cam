@@ -42,6 +42,8 @@ from postprocess import postprocess
 from waitress import serve as waitress_serve
 
 
+from config import config_load
+
 # Define flags at module level so they are available when module is imported
 flags.DEFINE_string("config", None, "path to YAML config file")
 flags.mark_flag_as_required("config")
@@ -58,25 +60,6 @@ http_server_thread_global = None # Global reference to the HTTP server thread
 config_server_thread_global = None # Global reference to the Config server thread
 config_server_instance_global = None # To manage the waitress/werkzeug server instance for shutdown
 exit_event = threading.Event() # Initialize globally
-
-
-def config_load(config_file_path: str) -> List[Dict]:
-    try:
-        with open(config_file_path, "r") as f:
-            config = yaml.safe_load(f)
-            res = []
-            # Ensure all expected sections are present, providing empty dicts if not
-            # Added 'config_server' section
-            for section in ["http_server", "cameras", "global", "config_server"]:
-                res.append(config.get(section, {}))
-            return res
-    except FileNotFoundError:
-        logging.error(f"Configuration file {config_file_path} not found.")
-        # Provide default empty configs to prevent crashes, though app might be non-functional
-        return [{}, {}, {}]
-    except yaml.YAMLError as e:
-        logging.error(f"Error parsing YAML configuration file {config_file_path}: {e}")
-        return [{}, {}, {}]
 
 
 def get_pic_from_url(url: str, timeout: int, ua: str = "") -> Image.Image:
