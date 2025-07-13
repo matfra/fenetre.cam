@@ -40,7 +40,7 @@ from SSIM_PIL import compare_ssim
 
 from timelapse import create_timelapse
 from daylight import run_end_of_day
-from archive import main as archive_main
+from archive import archive_daydir
 from gopro import capture_gopro_photo
 from gopro_utility import GoProUtilityThread, format_gopro_sd_card
 from postprocess import postprocess
@@ -1234,13 +1234,10 @@ def archive_loop():
     """
     while not exit_event.is_set():
         if len(archive_q) > 0:
-            dir = archive_q.popleft()
-            try:
-                archive_main([])
-            except FileExistsError:
-                logging.warning(f"Found an existing timelapse in dir {dir}, Skipping.")
+            daydir = archive_q.popleft()
+            archive_daydir(daydir=daydir, dry_run=True) #TODO: Verify behaviour and switch to False
         else:
-            time.sleep(1)
+            time.sleep(600)
 
 
 if __name__ == "__main__":

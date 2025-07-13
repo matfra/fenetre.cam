@@ -120,6 +120,54 @@ def is_dir_older_than_n_days(daydir, n_days=3):
     return (datetime.now() - dir_date).days > n_days
 
 
+def archive_daydir(daydir: str, dry_run: bool = True, create_daylight_bands: bool = False, create_timelapses: bool = False):
+    today_date = get_today_date()
+    if os.path.basename(daydir) == today_date:
+        logging.info(
+            f"Not archiving {daydir} as it's today and may still be in progress"
+        )
+        return False
+
+    if not is_dir_older_than_n_days(daydir):
+        # TODO(P3): Make the daydir customizable
+        logging.info(f"Skipping {daydir} as it is not old enough")
+        return False
+
+
+    if not check_dir_has_daylight_band(daydir):
+        if create_daylight_bands:
+            logging.info(f"Creating daylight band for {daydir}")
+            if not dry_run:
+                run_end_of_day(cam, daydir, sky_area)
+
+        logging.warning(f"{daydir} does not contain a daylight file. We are not archiving this.")
+        return False
+
+    # Check if the subdirectory contains a file name daylight.png and a file named $year-$month-$day.webm.
+    if not check_dir_has_timelapse(
+        daydir, global_config.get("timelapse_file_extension", "mp4")
+    ):
+        if create_timelapses:
+            logging.info(f"Creating timelapse for {daydir}")
+            create_timelapse(
+                dir=daydir,
+                overwrite=True,
+                ffmpeg_options=global_config.get(
+                    "ffmpeg_options", "-framerate 30"
+                ),
+                two_pass=global_config.get("ffmpeg_2pass", False),
+                file_ext=global_config.get("timelapse_file_extension", "mp4"),
+                dry_run=dry_run,
+            )
+        else:
+            logging.warning(f"{daydir} does not contain a timelapse file.")
+            continue
+
+    logging.info(f"Archiving {daydir}. (dry run: {dry_run})")
+    # Keep only 48 of the jpeg files in the subdirectory, distributed equally across all the existing files.
+    keep_only_a_subset_of_jpeg_files(daydir, dry_run=dry_run)
+
+
 def main(argv):
     del argv  # Unused.
 
@@ -127,7 +175,6 @@ def main(argv):
     global server_config, cameras_config, global_config
     server_config, cameras_config, global_config = config_load(FLAGS.config)
     global_config["pic_dir"] = os.path.join(global_config["work_dir"], "photos")
-    today_date = get_today_date()
     for cam in cameras_config:
         camera_dir = os.path.join(global_config["pic_dir"], cam)
         sky_area = cameras_config[cam].get("sky_area", None)
@@ -137,51 +184,7 @@ def main(argv):
             logging.warning(f"Could not find directory {camera_dir} for camera: {cam}.")
             continue
         for daydir in list_unarchived_dirs(camera_dir):
-            if os.path.basename(daydir) == today_date:
-                logging.info(
-                    f"Skipping {daydir} as it's today and may still be in progress"
-                )
-                continue
-
-            if not is_dir_older_than_n_days(daydir):
-                logging.info(f"Skipping {daydir} as it is not old enough")
-                continue
-
-            logging.info(f"Processing {daydir}")
-
-            if not check_dir_has_daylight_band(daydir):
-                if FLAGS.create_daylight_bands:
-                    logging.info(f"Creating daylight band for {daydir}")
-                    if not FLAGS.dry_run:
-                        run_end_of_day(cam, daydir, sky_area)
-
-                logging.warning(f"{daydir} does not contain a daylight file")
-                # Continue to the next subdirectory.
-                continue
-
-            # Check if the subdirectory contains a file name daylight.png and a file named $year-$month-$day.webm.
-            if not check_dir_has_timelapse(
-                daydir, global_config.get("timelapse_file_extension", "mp4")
-            ):
-                if FLAGS.create_timelapses:
-                    logging.info(f"Creating timelapse for {daydir}")
-                    create_timelapse(
-                        dir=daydir,
-                        overwrite=True,
-                        ffmpeg_options=global_config.get(
-                            "ffmpeg_options", "-framerate 30"
-                        ),
-                        two_pass=global_config.get("ffmpeg_2pass", False),
-                        file_ext=global_config.get("timelapse_file_extension", "mp4"),
-                        dry_run=FLAGS.dry_run,
-                    )
-                else:
-                    logging.warning(f"{daydir} does not contain a timelapse file.")
-                    continue
-
-            # Keep only 48 of the jpeg files in the subdirectory, distributed equally across all the existing files.
-            keep_only_a_subset_of_jpeg_files(daydir, dry_run=FLAGS.dry_run)
-
+            archive_daydir(daydir, FLAGS.dry_run, FLAGS.create_daylight_bands, FLAGS.create_timelapses)
 
 if __name__ == "__main__":
     FLAGS = flags.FLAGS
