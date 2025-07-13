@@ -29,7 +29,14 @@ from absl import app
 from absl import flags
 from absl import logging
 from PIL import Image
+
+import SSIM_PIL._gpu_strategy as gpu_strategy
+from pyopencl import Kernel as cl_Kernel
+
+gpu_strategy._kernel = cl_Kernel(gpu_strategy._program, "convert")
+
 from SSIM_PIL import compare_ssim
+
 
 from timelapse import create_timelapse
 from daylight import run_end_of_day
@@ -122,8 +129,29 @@ def update_latest_link(pic_path: str):
     os.rename(tmp_link, latest_link)
 
 
-def get_pic_from_local_command(cmd: str, timeout_s: int) -> Image.Image:
-    s = subprocess.run(cmd.split(" "), stdout=subprocess.PIPE, timeout=timeout_s)
+def get_pic_from_local_command(
+    cmd: str, timeout_s: int, camera_name: str, camera_config: Dict
+) -> Image.Image:
+    if camera_config.get("redirect_stderr"):
+        log_dir = global_config.get("log_dir")
+        if log_dir:
+            log_file_path = os.path.join(
+                log_dir,
+                f"{camera_name}_stderr_{datetime.now().strftime('%Y-%m-%d')}.log",
+            )
+            with open(log_file_path, "a") as stderr_log:
+                s = subprocess.run(
+                    cmd.split(" "),
+                    stdout=subprocess.PIPE,
+                    stderr=stderr_log,
+                    timeout=timeout_s,
+                )
+        else:
+            s = subprocess.run(
+                cmd.split(" "), stdout=subprocess.PIPE, timeout=timeout_s
+            )
+    else:
+        s = subprocess.run(cmd.split(" "), stdout=subprocess.PIPE, timeout=timeout_s)
     return Image.open(BytesIO(s.stdout))
 
 
@@ -135,11 +163,14 @@ def snap(camera_name, camera_config: Dict):
     gopro_root_ca = camera_config.get("gopro_root_ca")
 
     def capture() -> Image.Image:
+        logging.info(f"{camera_name}: Fetching new picture.")
         if url is not None:
             ua = global_config.get("user_agent", "")
             return get_pic_from_url(url, timeout, ua)
         if local_command is not None:
-            return get_pic_from_local_command(local_command, timeout)
+            return get_pic_from_local_command(
+                local_command, timeout, camera_name, camera_config
+            )
         if gopro_ip is not None:
             jpeg_bytes = capture_gopro_photo(
                 ip_address=gopro_ip,
@@ -206,7 +237,7 @@ def snap(camera_name, camera_config: Dict):
         if exit_event.is_set():
             logging.info(f"{camera_name}: Exiting snap loop.")
             return
-        logging.debug(f"{camera_name}: Sleeping {sleep_intervals[camera_name]}s")
+        logging.info(f"{camera_name}: Sleeping {sleep_intervals[camera_name]}s")
         time.sleep(sleep_intervals[camera_name])
         new_pic_dir, new_pic_filename = get_pic_dir_and_filename(camera_name)
         new_pic_fullpath = os.path.join(new_pic_dir, new_pic_filename)
@@ -225,7 +256,7 @@ def snap(camera_name, camera_config: Dict):
         new_pic = capture()
         new_exif = new_pic.info.get("exif")
         if new_pic is None:
-            logging.warning(f"{camera_name}: Could not fetch picture from {url}")
+            logging.warning(f"{camera_name}: Could not fetch picture.")
             continue
         if len(camera_config.get("postprocessing", [])) > 0:
             new_pic, new_exif = postprocess(
@@ -1213,9 +1244,4 @@ def archive_loop():
 
 
 if __name__ == "__main__":
-    # FLAGS = flags.FLAGS
-
-    # flags.DEFINE_string("config", None, "path to YAML config file")
-    # flags.mark_flag_as_required("config")
-    # FLAGS is now defined at module level
     app.run(main)

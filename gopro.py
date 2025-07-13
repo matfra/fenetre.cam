@@ -62,7 +62,7 @@ def _get_latest_file(
 
     media_entries = data.get("media") or data.get("results", {}).get("media")
     if not media_entries:
-        logging.warning("No media medias found on GoPro.")
+        logging.debug("No media medias found on GoPro.")
         return None, None
 
     latest_dir_info = media_entries[-1]

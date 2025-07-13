@@ -31,14 +31,14 @@ services:
     container_name: fenetre_webserver
     restart: unless-stopped
     ports:
-      - "5802:80"  # Expose port 8080 on the host to port 80 in the container
-      - "5803:443" # Expose port 5803 on the host to port 443 for HTTPS in the container
+      - "8888:80"  # Expose port 8080 on the host to port 80 in the container
+        #      - "5803:443" # Expose port 5803 on the host to port 443 for HTTPS in the container
     volumes:
       # Mount the same data directory to the Nginx container to serve it
       - /srv/fenetre/data:/usr/share/nginx/html:ro
       - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
       # Mount SSL certificates into the Nginx container
-      - ./ssl/cert.pem:/etc/nginx/ssl/cert.pem:ro
-      - ./ssl/key.pem:/etc/nginx/ssl/key.pem:ro
+      #      - ./ssl/cert.pem:/etc/nginx/ssl/cert.pem:ro
+      #      - ./ssl/key.pem:/etc/nginx/ssl/key.pem:ro
     depends_on:
       - fenetre

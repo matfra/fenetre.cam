@@ -69,10 +69,17 @@
         function parseTimestampFromFilename(filename) {
             try {
                 // e.g. 2023-10-27T10-00-00PDT.jpg
-                const match = filename.match(/^(\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2})/);
+                const match = filename.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2})-(\d{2})-(\d{2})/);
                 if (!match) return null;
-                // This will parse as local time and get the correct epoch timestamp
-                const date = new Date(match[1]);
+                // Parts are: [full_match, year, month, day, hour, minute, second]
+                const year = parseInt(match[1], 10);
+                const month = parseInt(match[2], 10) - 1; // Month is 0-indexed in JS
+                const day = parseInt(match[3], 10);
+                const hour = parseInt(match[4], 10);
+                const minute = parseInt(match[5], 10);
+                const second = parseInt(match[6], 10);
+
+                const date = new Date(year, month, day, hour, minute, second);
                 return isNaN(date.getTime()) ? null : date;
             } catch (e) {
                 console.error("Error parsing timestamp from:", filename, e);
