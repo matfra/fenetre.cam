@@ -4,9 +4,9 @@ import http.server
 import json
 import os
 import shutil
-import signal # Added for signal handling
+import signal  # Added for signal handling
 import subprocess
-import sys # Added for sys.exit
+import sys  # Added for sys.exit
 import threading
 import time
 from collections import deque
@@ -48,18 +48,22 @@ from config import config_load
 flags.DEFINE_string("config", None, "path to YAML config file")
 flags.mark_flag_as_required("config")
 
-FLAGS = flags.FLAGS # Define at module level
+FLAGS = flags.FLAGS  # Define at module level
 
 
 DEFAULT_SKY_AREA = "100,0,400,50"
 FENETRE_PID_FILE = os.environ.get("FENETRE_PID_FILE", "fenetre.pid")
 
 # Global dictionary to keep track of active camera threads and related utility threads
-active_camera_threads = {} # Stores {camera_name: {'watchdog': Thread, 'gopro_utility': GoProUtilityThread (optional)}}
-http_server_thread_global = None # Global reference to the HTTP server thread
-config_server_thread_global = None # Global reference to the Config server thread
-config_server_instance_global = None # To manage the waitress/werkzeug server instance for shutdown
-exit_event = threading.Event() # Initialize globally
+active_camera_threads = (
+    {}
+)  # Stores {camera_name: {'watchdog': Thread, 'gopro_utility': GoProUtilityThread (optional)}}
+http_server_thread_global = None  # Global reference to the HTTP server thread
+config_server_thread_global = None  # Global reference to the Config server thread
+config_server_instance_global = (
+    None  # To manage the waitress/werkzeug server instance for shutdown
+)
+exit_event = threading.Event()  # Initialize globally
 
 
 def get_pic_from_url(url: str, timeout: int, ua: str = "") -> Image.Image:
@@ -147,7 +151,9 @@ def snap(camera_name, camera_config: Dict):
             try:
                 i = Image.open(BytesIO(jpeg_bytes))
             except Image.UnidentifiedImageError:
-                logging.error(f"Failed to open image from GoPro: {gopro_ip}. Resetting gopro")
+                logging.error(
+                    f"Failed to open image from GoPro: {gopro_ip}. Resetting gopro"
+                )
                 format_gopro_sd_card(gopro_ip)
                 raise
             return Image.open(BytesIO(jpeg_bytes))
@@ -290,7 +296,7 @@ def server_run():
     try:
         httpd.serve_forever()
     except Exception as e:
-        if not exit_event.is_set(): # Log error only if not during a planned shutdown
+        if not exit_event.is_set():  # Log error only if not during a planned shutdown
             logging.error(f"HTTP server crashed: {e}", exc_info=True)
     finally:
         logging.info(f"HTTP server {server_address} stopped.")
@@ -301,12 +307,12 @@ def stop_http_server():
     if http_server_instance:
         logging.info("Attempting to shut down HTTP server...")
         http_server_instance.shutdown()
-        http_server_instance.server_close() # Important for releasing the port
+        http_server_instance.server_close()  # Important for releasing the port
         http_server_instance = None
         logging.info("HTTP server shut down.")
     if http_server_thread_global and http_server_thread_global.is_alive():
         logging.info("Waiting for HTTP server thread to join...")
-        http_server_thread_global.join(timeout=5) # Wait for thread to finish
+        http_server_thread_global.join(timeout=5)  # Wait for thread to finish
         if http_server_thread_global.is_alive():
             logging.warning("HTTP server thread did not join in time.")
         else:
@@ -315,13 +321,17 @@ def stop_http_server():
 
 
 # --- Config Server Management ---
-def run_config_server_func(host: str, port: int, flask_app, fenetre_config_file: str, fenetre_pid_file: str):
+def run_config_server_func(
+    host: str, port: int, flask_app, fenetre_config_file: str, fenetre_pid_file: str
+):
     """Runs the Flask config server."""
     # Pass necessary fenetre config to Flask app
     # This assumes config_server.py will be modified to pick these up
-    flask_app.config['FENETRE_CONFIG_FILE'] = fenetre_config_file
-    flask_app.config['FENETRE_PID_FILE_PATH'] = fenetre_pid_file
-    flask_app.config['EXIT_EVENT'] = exit_event # Pass exit_event for potential graceful shutdown
+    flask_app.config["FENETRE_CONFIG_FILE"] = fenetre_config_file
+    flask_app.config["FENETRE_PID_FILE_PATH"] = fenetre_pid_file
+    flask_app.config["EXIT_EVENT"] = (
+        exit_event  # Pass exit_event for potential graceful shutdown
+    )
 
     global config_server_instance_global
     try:
@@ -334,15 +344,17 @@ def run_config_server_func(host: str, port: int, flask_app, fenetre_config_file:
         # (e.g. due to a SystemExit from a Flask route, or if it handled signals itself),
         # the join might time out. This is a known limitation for cleanly stopping daemonized blocking servers.
         # A Flask shutdown route is a common pattern to make this more explicit if needed.
-        waitress_serve(flask_app, host=host, port=port, threads=4) # threads=4 is an example
+        waitress_serve(
+            flask_app, host=host, port=port, threads=4
+        )  # threads=4 is an example
     except SystemExit:
         logging.info("Config server shutting down (SystemExit caught).")
     except Exception as e:
-        if not exit_event.is_set(): # Log error only if not during a planned shutdown
+        if not exit_event.is_set():  # Log error only if not during a planned shutdown
             logging.error(f"Config server crashed: {e}", exc_info=True)
     finally:
         logging.info(f"Config server on http://{host}:{port} stopped.")
-        config_server_instance_global = None # Clear instance on stop
+        config_server_instance_global = None  # Clear instance on stop
 
 
 def stop_config_server():
@@ -371,46 +383,64 @@ def stop_config_server():
         # exit_event is already set by the main shutdown_application or handle_sighup logic if it's a full stop.
         # If this is a specific stop for the config server (e.g. disabled in config), ensure exit_event is relevant.
         # For simplicity, assume global exit_event is the main control.
-        config_server_thread_global.join(timeout=10) # Wait for thread to finish
+        config_server_thread_global.join(timeout=10)  # Wait for thread to finish
         if config_server_thread_global.is_alive():
-            logging.warning("Config server thread did not join in time. It might not support graceful shutdown perfectly.")
+            logging.warning(
+                "Config server thread did not join in time. It might not support graceful shutdown perfectly."
+            )
         else:
             logging.info("Config server thread joined.")
     else:
         logging.info("Config server thread already stopped or not started.")
 
     config_server_thread_global = None
-    config_server_instance_global = None # Ensure cleaned up
+    config_server_instance_global = None  # Ensure cleaned up
 
 
 def create_and_start_and_watch_thread(
-    f: Callable, name: str, arguments: List[str] = [], exp_backoff_limit: int = 0, camera_name_for_management: Optional[str] = None
+    f: Callable,
+    name: str,
+    arguments: List[str] = [],
+    exp_backoff_limit: int = 0,
+    camera_name_for_management: Optional[str] = None,
 ) -> None:
     failure_count = 0
     last_failure = datetime.now()
     # sleep_intervals is now managed globally by the reload logic if needed for specific cameras
     # global sleep_intervals
     # sleep_intervals = {} # This was problematic as it reset sleep_intervals on thread restart.
-                           # It should be initialized once globally or per camera by the main logic.
+    # It should be initialized once globally or per camera by the main logic.
 
-    thread_instance = None # Keep a reference to the running thread
+    thread_instance = None  # Keep a reference to the running thread
 
     while not exit_event.is_set():
         # Check if this thread (for a specific camera) should still be running
-        if camera_name_for_management and camera_name_for_management not in cameras_config:
-            logging.info(f"Camera {camera_name_for_management} removed from config. Watchdog {name} stopping.")
+        if (
+            camera_name_for_management
+            and camera_name_for_management not in cameras_config
+        ):
+            logging.info(
+                f"Camera {camera_name_for_management} removed from config. Watchdog {name} stopping."
+            )
             if thread_instance and thread_instance.is_alive():
                 # The 'snap' function needs to respect exit_event to terminate gracefully.
                 # Forcing a stop is harder; relying on exit_event being set for the thread.
-                logging.info(f"Thread {name} for {camera_name_for_management} should stop due to config removal.")
-            return # Exit the watchdog loop for this camera
+                logging.info(
+                    f"Thread {name} for {camera_name_for_management} should stop due to config removal."
+                )
+            return  # Exit the watchdog loop for this camera
 
         if not thread_instance or not thread_instance.is_alive():
             # Prune old thread reference from active_camera_threads if it matches this watchdog's managed camera
-            if camera_name_for_management and \
-               active_camera_threads.get(camera_name_for_management, {}).get('watchdog_thread') == thread_instance:
+            if (
+                camera_name_for_management
+                and active_camera_threads.get(camera_name_for_management, {}).get(
+                    "watchdog_thread"
+                )
+                == thread_instance
+            ):
                 # This ensures we don't clear another thread's reference if names collide or structure changes
-                pass # The new thread will be added below
+                pass  # The new thread will be added below
 
             thread_instance = Thread(target=f, daemon=False, name=name, args=arguments)
 
@@ -418,7 +448,9 @@ def create_and_start_and_watch_thread(
             if camera_name_for_management:
                 if camera_name_for_management not in active_camera_threads:
                     active_camera_threads[camera_name_for_management] = {}
-                active_camera_threads[camera_name_for_management]['watchdog_thread'] = thread_instance
+                active_camera_threads[camera_name_for_management][
+                    "watchdog_thread"
+                ] = thread_instance
                 # Also ensure sleep_intervals is initialized for this camera if not already
                 if camera_name_for_management not in sleep_intervals:
                     cam_conf = cameras_config.get(camera_name_for_management, {})
@@ -429,12 +461,13 @@ def create_and_start_and_watch_thread(
                         else 60.0
                     )
 
-
             exp_backoff_delay = min(exp_backoff_limit, 2**failure_count)
-            if datetime.now() - last_failure > timedelta(seconds=90): # Corrected timedelta
+            if datetime.now() - last_failure > timedelta(
+                seconds=90
+            ):  # Corrected timedelta
                 failure_count = 0
 
-            if failure_count > 0: # Only log and sleep if it's a restart
+            if failure_count > 0:  # Only log and sleep if it's a restart
                 logging.info(
                     f"Thread {name} (re)start attempt {failure_count}. Delaying {exp_backoff_delay}s."
                 )
@@ -447,22 +480,22 @@ def create_and_start_and_watch_thread(
                 logging.info(f"Thread {name} started.")
             except Exception as e:
                 logging.error(f"Failed to start thread {name}: {e}", exc_info=True)
-                thread_instance = None # Ensure we try to restart it
+                thread_instance = None  # Ensure we try to restart it
 
-        time.sleep(5) # Check every 5 seconds
+        time.sleep(5)  # Check every 5 seconds
 
 
 def generate_index_html(work_dir: str):
-    ui_config = global_config.get('ui', {})
-    landing_page = ui_config.get('landing_page', 'list')
+    ui_config = global_config.get("ui", {})
+    landing_page = ui_config.get("landing_page", "list")
     redirect_url = f"{landing_page}.html"
 
-    if landing_page == 'fullscreen':
-        camera_name = ui_config.get('fullscreen_camera')
+    if landing_page == "fullscreen":
+        camera_name = ui_config.get("fullscreen_camera")
         if camera_name:
             redirect_url = f"fullscreen.html?camera={camera_name}"
         else:
-            redirect_url = "list.html" # Fallback
+            redirect_url = "list.html"  # Fallback
 
     index_content = f"""<!DOCTYPE html>
 <html>
@@ -556,14 +589,16 @@ def main(argv):
 
     # Setup signal handling for SIGHUP for config reload and SIGINT/SIGTERM for graceful exit
     signal.signal(signal.SIGHUP, handle_sighup)
-    signal.signal(signal.SIGINT, signal_handler_exit) # Graceful exit on Ctrl+C
-    signal.signal(signal.SIGTERM, signal_handler_exit) # Graceful exit on kill/systemd stop
+    signal.signal(signal.SIGINT, signal_handler_exit)  # Graceful exit on Ctrl+C
+    signal.signal(
+        signal.SIGTERM, signal_handler_exit
+    )  # Graceful exit on kill/systemd stop
 
     # Initialize global sleep_intervals (important for camera threads)
     global sleep_intervals
     sleep_intervals = {}
 
-    load_and_apply_configuration(initial_load=True) # Uses FLAGS.config by default
+    load_and_apply_configuration(initial_load=True)  # Uses FLAGS.config by default
 
     # These queues are global and should persist across reloads if fenetre.py itself isn't restarted.
     # If reload implies restarting these loops, then re-initialization might be needed in reload_configuration_logic
@@ -579,24 +614,32 @@ def main(argv):
     # However, these are long-running loops processing queues; restarting them might be disruptive.
     # Let's assume for now that updating global_config is sufficient for them.
     global timelapse_thread_global, daylight_thread_global, archive_thread_global
-    timelapse_thread_global = Thread(target=timelapse_loop, daemon=True, name="timelapse_loop")
+    timelapse_thread_global = Thread(
+        target=timelapse_loop, daemon=True, name="timelapse_loop"
+    )
     timelapse_thread_global.start()
     logging.info(f"Starting thread {timelapse_thread_global.name}")
 
-    daylight_thread_global = Thread(target=daylight_loop, daemon=True, name="daylight_loop")
+    daylight_thread_global = Thread(
+        target=daylight_loop, daemon=True, name="daylight_loop"
+    )
     daylight_thread_global.start()
     logging.info(f"Starting thread {daylight_thread_global.name}")
 
-    archive_thread_global = Thread(target=archive_loop, daemon=True, name="archive_loop")
+    archive_thread_global = Thread(
+        target=archive_loop, daemon=True, name="archive_loop"
+    )
     archive_thread_global.start()
     logging.info(f"Starting thread {archive_thread_global.name}")
 
     try:
         while not exit_event.is_set():
             # Main loop can perform periodic checks or just wait for exit_event
-            time.sleep(1) # Keep main thread alive and responsive to signals
-    except KeyboardInterrupt: # Should be caught by SIGINT handler now
-        logging.info("KeyboardInterrupt caught in main loop (should have been handled by SIGINT). Exiting.")
+            time.sleep(1)  # Keep main thread alive and responsive to signals
+    except KeyboardInterrupt:  # Should be caught by SIGINT handler now
+        logging.info(
+            "KeyboardInterrupt caught in main loop (should have been handled by SIGINT). Exiting."
+        )
         # This path should ideally not be taken if SIGINT handler works as expected.
     finally:
         logging.info("Main loop exiting. Cleaning up...")
@@ -606,32 +649,47 @@ def main(argv):
 def load_and_apply_configuration(initial_load=False, config_file_override=None):
     """Loads configuration and applies it by starting/stopping/reconfiguring threads."""
     global server_config, cameras_config, global_config, http_server_thread_global
-    global config_server_config # New global for config server settings
-    global config_server_thread_global # Manage config server thread
-    global flask_app_instance # Hold the created Flask app
+    global config_server_config  # New global for config server settings
+    global config_server_thread_global  # Manage config server thread
+    global flask_app_instance  # Hold the created Flask app
 
     logging.info("Loading and applying configuration...")
-    old_server_config = server_config if 'server_config' in globals() and not initial_load else {}
-    old_config_server_config = config_server_config if 'config_server_config' in globals() and not initial_load else {}
-
+    old_server_config = (
+        server_config if "server_config" in globals() and not initial_load else {}
+    )
+    old_config_server_config = (
+        config_server_config
+        if "config_server_config" in globals() and not initial_load
+        else {}
+    )
 
     config_path_to_load = config_file_override if config_file_override else FLAGS.config
     if not config_path_to_load:
-        logging.error("No configuration file path specified (either via override or FLAGS.config). Cannot load configuration.")
+        logging.error(
+            "No configuration file path specified (either via override or FLAGS.config). Cannot load configuration."
+        )
         return
 
     # Load new configuration
-    new_server_config, new_cameras_config, new_global_config, new_config_server_config = config_load(config_path_to_load)
+    (
+        new_server_config,
+        new_cameras_config,
+        new_global_config,
+        new_config_server_config,
+    ) = config_load(config_path_to_load)
 
     # Update global config variables
     server_config = new_server_config
     cameras_config = new_cameras_config
-    global_config = new_global_config # This must be updated first as other things depend on it.
-    config_server_config = new_config_server_config # Store config server settings
+    global_config = (
+        new_global_config  # This must be updated first as other things depend on it.
+    )
+    config_server_config = new_config_server_config  # Store config server settings
 
     # Ensure pic_dir is set up after global_config is loaded/reloaded
-    global_config["pic_dir"] = os.path.join(global_config.get("work_dir", "."), "photos")
-
+    global_config["pic_dir"] = os.path.join(
+        global_config.get("work_dir", "."), "photos"
+    )
 
     if logging.level_debug():
         logging.debug(
@@ -643,11 +701,13 @@ def load_and_apply_configuration(initial_load=False, config_file_override=None):
     # though typically imports are cached. More importantly, it's to have access to the app object.
     try:
         from config_server import app as imported_flask_app
-        flask_app_instance = imported_flask_app # Store for use
-    except ImportError as e:
-        logging.error(f"Failed to import Flask app from config_server: {e}. Config server UI will not be available.")
-        flask_app_instance = None
 
+        flask_app_instance = imported_flask_app  # Store for use
+    except ImportError as e:
+        logging.error(
+            f"Failed to import Flask app from config_server: {e}. Config server UI will not be available."
+        )
+        flask_app_instance = None
 
     # (Re)link HTML files and update cameras.json
     # These depend on work_dir from global_config and camera details from cameras_config
@@ -655,39 +715,58 @@ def load_and_apply_configuration(initial_load=False, config_file_override=None):
         link_html_file(global_config["work_dir"])
         update_cameras_metadata(cameras_config, global_config["work_dir"])
     else:
-        logging.error("work_dir not set in global config. Cannot link HTML or update camera metadata.")
-
+        logging.error(
+            "work_dir not set in global config. Cannot link HTML or update camera metadata."
+        )
 
     # Manage Camera Threads
     # Stop threads for removed or disabled cameras
     current_camera_names = set(cameras_config.keys())
     threads_to_remove = []
-    for cam_name, thread_info in list(active_camera_threads.items()): # Iterate over a copy
-        if cam_name not in current_camera_names or cameras_config[cam_name].get("disabled", False):
-            logging.info(f"Camera {cam_name} removed or disabled. Stopping its threads.")
-            if 'watchdog_thread' in thread_info and thread_info['watchdog_thread'].is_alive():
-                 # The watchdog itself should detect camera removal due to camera_name_for_management
-                 # but we can also try to signal it more directly if needed, though exit_event is global.
-                 # For now, rely on watchdog's own check.
-                 pass # Watchdog will exit as camera_name_for_management is no longer in cameras_config
-            if 'gopro_utility' in thread_info and thread_info['gopro_utility'].is_alive():
-                thread_info['gopro_utility'].stop() # Assuming GoProUtilityThread has a stop method using exit_event
+    for cam_name, thread_info in list(
+        active_camera_threads.items()
+    ):  # Iterate over a copy
+        if cam_name not in current_camera_names or cameras_config[cam_name].get(
+            "disabled", False
+        ):
+            logging.info(
+                f"Camera {cam_name} removed or disabled. Stopping its threads."
+            )
+            if (
+                "watchdog_thread" in thread_info
+                and thread_info["watchdog_thread"].is_alive()
+            ):
+                # The watchdog itself should detect camera removal due to camera_name_for_management
+                # but we can also try to signal it more directly if needed, though exit_event is global.
+                # For now, rely on watchdog's own check.
+                pass  # Watchdog will exit as camera_name_for_management is no longer in cameras_config
+            if (
+                "gopro_utility" in thread_info
+                and thread_info["gopro_utility"].is_alive()
+            ):
+                thread_info[
+                    "gopro_utility"
+                ].stop()  # Assuming GoProUtilityThread has a stop method using exit_event
             threads_to_remove.append(cam_name)
 
     for cam_name in threads_to_remove:
         thread_info = active_camera_threads.get(cam_name, {})
-        watchdog_manager_thread = thread_info.get('watchdog_manager_thread')
-        snap_thread = thread_info.get('watchdog_thread') # The actual snap thread
-        gopro_thread = thread_info.get('gopro_utility')
+        watchdog_manager_thread = thread_info.get("watchdog_manager_thread")
+        snap_thread = thread_info.get("watchdog_thread")  # The actual snap thread
+        gopro_thread = thread_info.get("gopro_utility")
 
         # The watchdog_manager_thread is responsible for the snap_thread.
         # When camera_name_for_management is no longer in cameras_config,
         # the create_and_start_and_watch_thread (manager) loop should exit.
         if watchdog_manager_thread and watchdog_manager_thread.is_alive():
-            logging.debug(f"Joining watchdog_manager_thread for removed camera {cam_name}")
+            logging.debug(
+                f"Joining watchdog_manager_thread for removed camera {cam_name}"
+            )
             watchdog_manager_thread.join(timeout=5)
             if watchdog_manager_thread.is_alive():
-                logging.warning(f"Watchdog manager thread for {cam_name} did not join in time.")
+                logging.warning(
+                    f"Watchdog manager thread for {cam_name} did not join in time."
+                )
 
         # It's possible the snap_thread itself might still be alive if the manager didn't join it properly,
         # or if it's not a daemon and the manager exited abruptly.
@@ -695,11 +774,17 @@ def load_and_apply_configuration(initial_load=False, config_file_override=None):
         # but for a config reload, exit_event is not set globally.
         # The manager exiting is the primary mechanism for stopping the snap thread in a reload.
         if snap_thread and snap_thread.is_alive():
-             # This join might be redundant if the manager handles its child thread's lifecycle properly.
-             logging.debug(f"Watchdog manager for {cam_name} exited, checking snap thread {snap_thread.name} state.")
-             snap_thread.join(timeout=2) # Shorter timeout, as manager should have handled it.
-             if snap_thread.is_alive():
-                  logging.warning(f"Snap thread {snap_thread.name} for removed camera {cam_name} did not exit cleanly after manager.")
+            # This join might be redundant if the manager handles its child thread's lifecycle properly.
+            logging.debug(
+                f"Watchdog manager for {cam_name} exited, checking snap thread {snap_thread.name} state."
+            )
+            snap_thread.join(
+                timeout=2
+            )  # Shorter timeout, as manager should have handled it.
+            if snap_thread.is_alive():
+                logging.warning(
+                    f"Snap thread {snap_thread.name} for removed camera {cam_name} did not exit cleanly after manager."
+                )
 
         if gopro_thread and gopro_thread.is_alive():
             # GoProUtilityThread should have a stop() method that uses its internal exit_event.
@@ -707,13 +792,14 @@ def load_and_apply_configuration(initial_load=False, config_file_override=None):
             logging.debug(f"Joining gopro_utility thread for removed camera {cam_name}")
             gopro_thread.join(timeout=5)
             if gopro_thread.is_alive():
-                logging.warning(f"GoPro utility thread for {cam_name} did not join in time.")
+                logging.warning(
+                    f"GoPro utility thread for {cam_name} did not join in time."
+                )
 
-        if cam_name in active_camera_threads: # Ensure it's cleaned up
+        if cam_name in active_camera_threads:  # Ensure it's cleaned up
             del active_camera_threads[cam_name]
-        if cam_name in sleep_intervals: # Clean up sleep_intervals for removed cameras
+        if cam_name in sleep_intervals:  # Clean up sleep_intervals for removed cameras
             del sleep_intervals[cam_name]
-
 
     # Start threads for new or enabled cameras, or re-initialize if significant config changed
     # For simplicity, the watchdog create_and_start_and_watch_thread will handle restarts if the thread dies.
@@ -726,13 +812,20 @@ def load_and_apply_configuration(initial_load=False, config_file_override=None):
 
     for cam_name, cam_conf in cameras_config.items():
         if cam_conf.get("disabled", False):
-            if cam_name in active_camera_threads: # Ensure it's stopped if it was running
-                logging.info(f"Camera {cam_name} is now disabled. Ensuring its threads are stopped.")
+            if (
+                cam_name in active_camera_threads
+            ):  # Ensure it's stopped if it was running
+                logging.info(
+                    f"Camera {cam_name} is now disabled. Ensuring its threads are stopped."
+                )
                 # Logic similar to removal above
                 # This is somewhat redundant if the removal logic also checks disabled flag, but good for clarity
             continue
 
-        if cam_name not in active_camera_threads or not active_camera_threads[cam_name].get('watchdog_thread', {}).is_alive():
+        if (
+            cam_name not in active_camera_threads
+            or not active_camera_threads[cam_name].get("watchdog_thread", {}).is_alive()
+        ):
             logging.info(f"Starting/Restarting threads for camera {cam_name}")
             # Initialize sleep interval for this camera if it's new or its thread died
             fixed_snap_interval = cam_conf.get("snap_interval_s", None)
@@ -747,11 +840,15 @@ def load_and_apply_configuration(initial_load=False, config_file_override=None):
             # The create_and_start_and_watch_thread handles its own lifecycle including restarts on crash
             # We pass camera_name_for_management so the watchdog can terminate if the camera is removed from config
             needs_new_watchdog_thread = True
-            if cam_name in active_camera_threads and active_camera_threads[cam_name].get('watchdog_thread'):
-                if active_camera_threads[cam_name]['watchdog_thread'].is_alive():
-                    needs_new_watchdog_thread = False # Watchdog already running
+            if cam_name in active_camera_threads and active_camera_threads[
+                cam_name
+            ].get("watchdog_thread"):
+                if active_camera_threads[cam_name]["watchdog_thread"].is_alive():
+                    needs_new_watchdog_thread = False  # Watchdog already running
                 else:
-                    logging.info(f"Watchdog for {cam_name} found dead, will be restarted by its manager.")
+                    logging.info(
+                        f"Watchdog for {cam_name} found dead, will be restarted by its manager."
+                    )
                     # The watchdog manager itself will restart it.
                     # However, if we want to force a re-read of cam_conf by the snap function,
                     # we would need to stop the old watchdog and start a new one.
@@ -761,55 +858,92 @@ def load_and_apply_configuration(initial_load=False, config_file_override=None):
                     # This is a limitation of the current design.
 
             if needs_new_watchdog_thread:
-                 # Ensure old one is cleaned up if it exists but is dead.
-                if cam_name in active_camera_threads and active_camera_threads[cam_name].get('watchdog_thread'):
-                    active_camera_threads[cam_name]['watchdog_thread'].join(timeout=1) # Brief wait
+                # Ensure old one is cleaned up if it exists but is dead.
+                if cam_name in active_camera_threads and active_camera_threads[
+                    cam_name
+                ].get("watchdog_thread"):
+                    active_camera_threads[cam_name]["watchdog_thread"].join(
+                        timeout=1
+                    )  # Brief wait
 
                 cam_watchdog_thread = Thread(
-                    target=create_and_start_and_watch_thread, # This thread manages the actual snap_thread
-                    daemon=True, # Watchdog manager can be daemon
+                    target=create_and_start_and_watch_thread,  # This thread manages the actual snap_thread
+                    daemon=True,  # Watchdog manager can be daemon
                     name=watchdog_name,
-                    args=[snap, f"{cam_name}_snap", [cam_name, cam_conf], 86400, cam_name], # Pass cam_name for management
+                    args=[
+                        snap,
+                        f"{cam_name}_snap",
+                        [cam_name, cam_conf],
+                        86400,
+                        cam_name,
+                    ],  # Pass cam_name for management
                 )
                 cam_watchdog_thread.start()
-                if cam_name not in active_camera_threads: active_camera_threads[cam_name] = {}
-                active_camera_threads[cam_name]['watchdog_manager_thread'] = cam_watchdog_thread # differentiate manager from actual worker
+                if cam_name not in active_camera_threads:
+                    active_camera_threads[cam_name] = {}
+                active_camera_threads[cam_name][
+                    "watchdog_manager_thread"
+                ] = cam_watchdog_thread  # differentiate manager from actual worker
                 # Note: create_and_start_and_watch_thread itself will populate active_camera_threads[cam_name]['watchdog_thread']
 
             # GoPro utility thread management
             if cam_conf.get("gopro_ip"):
                 gopro_utility_needs_restart = True
-                if cam_name in active_camera_threads and active_camera_threads[cam_name].get('gopro_utility'):
-                    if active_camera_threads[cam_name]['gopro_utility'].is_alive():
-                         # TODO: Check if gopro_config changed significantly to warrant restart
+                if cam_name in active_camera_threads and active_camera_threads[
+                    cam_name
+                ].get("gopro_utility"):
+                    if active_camera_threads[cam_name]["gopro_utility"].is_alive():
+                        # TODO: Check if gopro_config changed significantly to warrant restart
                         gopro_utility_needs_restart = False
                     else:
-                        active_camera_threads[cam_name]['gopro_utility'].join(timeout=1) # Join dead thread
+                        active_camera_threads[cam_name]["gopro_utility"].join(
+                            timeout=1
+                        )  # Join dead thread
 
                 if gopro_utility_needs_restart:
-                    gopro_utility_thread = GoProUtilityThread(cam_conf, exit_event) # exit_event is global
+                    gopro_utility_thread = GoProUtilityThread(
+                        cam_conf, exit_event
+                    )  # exit_event is global
                     gopro_utility_thread.start()
-                    if cam_name not in active_camera_threads: active_camera_threads[cam_name] = {}
-                    active_camera_threads[cam_name]['gopro_utility'] = gopro_utility_thread
-            elif cam_name in active_camera_threads and active_camera_threads[cam_name].get('gopro_utility'):
+                    if cam_name not in active_camera_threads:
+                        active_camera_threads[cam_name] = {}
+                    active_camera_threads[cam_name][
+                        "gopro_utility"
+                    ] = gopro_utility_thread
+            elif cam_name in active_camera_threads and active_camera_threads[
+                cam_name
+            ].get("gopro_utility"):
                 # GoPro IP was removed, stop the utility thread
-                logging.info(f"GoPro IP removed for {cam_name}. Stopping GoPro utility thread.")
-                active_camera_threads[cam_name]['gopro_utility'].stop()
-                active_camera_threads[cam_name]['gopro_utility'].join(timeout=5)
-                del active_camera_threads[cam_name]['gopro_utility']
-        else: # Camera already in active_camera_threads and watchdog is presumed alive by its manager
+                logging.info(
+                    f"GoPro IP removed for {cam_name}. Stopping GoPro utility thread."
+                )
+                active_camera_threads[cam_name]["gopro_utility"].stop()
+                active_camera_threads[cam_name]["gopro_utility"].join(timeout=5)
+                del active_camera_threads[cam_name]["gopro_utility"]
+        else:  # Camera already in active_camera_threads and watchdog is presumed alive by its manager
             # This is where one might update existing running camera threads if their config changed.
             # For example, if cam_conf (new) is different from the one the thread was started with (old).
             # This is complex. For now, only new/removed cameras are fully handled by SIGHUP.
             # We must ensure sleep_intervals are updated for existing cameras if their snap_interval_s changed.
             fixed_snap_interval = cam_conf.get("snap_interval_s", None)
-            new_interval = float(fixed_snap_interval) if isinstance(fixed_snap_interval, (int, float)) else 60.0
-            if cam_name in sleep_intervals and sleep_intervals[cam_name] != new_interval and fixed_snap_interval is not None:
-                logging.info(f"Updating snap interval for camera {cam_name} from {sleep_intervals[cam_name]} to {new_interval}")
+            new_interval = (
+                float(fixed_snap_interval)
+                if isinstance(fixed_snap_interval, (int, float))
+                else 60.0
+            )
+            if (
+                cam_name in sleep_intervals
+                and sleep_intervals[cam_name] != new_interval
+                and fixed_snap_interval is not None
+            ):
+                logging.info(
+                    f"Updating snap interval for camera {cam_name} from {sleep_intervals[cam_name]} to {new_interval}"
+                )
                 sleep_intervals[cam_name] = new_interval
-            elif cam_name not in sleep_intervals : # Should have been initialized but as a safeguard
-                 sleep_intervals[cam_name] = new_interval
-
+            elif (
+                cam_name not in sleep_intervals
+            ):  # Should have been initialized but as a safeguard
+                sleep_intervals[cam_name] = new_interval
 
     # Manage HTTP Server Thread
     # Scenarios:
@@ -822,65 +956,108 @@ def load_and_apply_configuration(initial_load=False, config_file_override=None):
     server_port_changed = server_config.get("port") != old_server_config.get("port")
     server_host_changed = server_config.get("host") != old_server_config.get("host")
 
-    global http_server_thread_global # Ensure we're using the global var
+    global http_server_thread_global  # Ensure we're using the global var
 
     if new_server_enabled:
-        if not http_server_thread_global or not http_server_thread_global.is_alive() or server_port_changed or server_host_changed:
-            if http_server_thread_global: # Means it was running, so stop it first (due to config change or it died)
-                logging.info("Stopping existing HTTP server due to re-configuration or it died...")
-                stop_http_server() # This function handles shutdown and join
+        if (
+            not http_server_thread_global
+            or not http_server_thread_global.is_alive()
+            or server_port_changed
+            or server_host_changed
+        ):
+            if (
+                http_server_thread_global
+            ):  # Means it was running, so stop it first (due to config change or it died)
+                logging.info(
+                    "Stopping existing HTTP server due to re-configuration or it died..."
+                )
+                stop_http_server()  # This function handles shutdown and join
 
             logging.info("Starting HTTP server as per new/updated configuration...")
-            http_server_thread_global = Thread(target=server_run, daemon=True, name="http_server")
+            http_server_thread_global = Thread(
+                target=server_run, daemon=True, name="http_server"
+            )
             http_server_thread_global.start()
-            logging.info(f"HTTP server thread {http_server_thread_global.name} started.")
+            logging.info(
+                f"HTTP server thread {http_server_thread_global.name} started."
+            )
         # else: server is enabled and running with same config, do nothing.
-    elif not new_server_enabled and http_server_thread_global and http_server_thread_global.is_alive():
+    elif (
+        not new_server_enabled
+        and http_server_thread_global
+        and http_server_thread_global.is_alive()
+    ):
         logging.info("HTTP server is now disabled in config. Stopping it.")
         stop_http_server()
 
     # Manage Config Server (Flask App) Thread
-    if flask_app_instance: # Only proceed if Flask app was successfully imported
+    if flask_app_instance:  # Only proceed if Flask app was successfully imported
         new_config_server_enabled = config_server_config.get("enabled", False)
         # Use different defaults for host/port if necessary, e.g. from config_server.py or new defaults here
         new_config_server_host = config_server_config.get("host", "0.0.0.0")
-        new_config_server_port = config_server_config.get("port", 8889) # Default from old config_server.py
+        new_config_server_port = config_server_config.get(
+            "port", 8889
+        )  # Default from old config_server.py
 
         old_config_server_host = old_config_server_config.get("host", "0.0.0.0")
         old_config_server_port = old_config_server_config.get("port", 8889)
 
-        config_server_details_changed = (new_config_server_host != old_config_server_host or \
-                                         new_config_server_port != old_config_server_port)
+        config_server_details_changed = (
+            new_config_server_host != old_config_server_host
+            or new_config_server_port != old_config_server_port
+        )
 
         if new_config_server_enabled:
-            if not config_server_thread_global or \
-               not config_server_thread_global.is_alive() or \
-               config_server_details_changed:
+            if (
+                not config_server_thread_global
+                or not config_server_thread_global.is_alive()
+                or config_server_details_changed
+            ):
 
-                if config_server_thread_global and config_server_thread_global.is_alive():
-                    logging.info("Stopping existing Config Server due to re-configuration or it died...")
-                    stop_config_server() # This should handle join
+                if (
+                    config_server_thread_global
+                    and config_server_thread_global.is_alive()
+                ):
+                    logging.info(
+                        "Stopping existing Config Server due to re-configuration or it died..."
+                    )
+                    stop_config_server()  # This should handle join
 
-                logging.info("Starting Config Server as per new/updated configuration...")
+                logging.info(
+                    "Starting Config Server as per new/updated configuration..."
+                )
                 # Ensure FLAGS.config (main config path) and FENETRE_PID_FILE are available
                 # These will be passed to run_config_server_func and set on flask_app_instance.config
                 main_config_file_path = FLAGS.config
-                pid_file_path = FENETRE_PID_FILE # Global constant in fenetre.py
+                pid_file_path = FENETRE_PID_FILE  # Global constant in fenetre.py
 
                 config_server_thread_global = Thread(
                     target=run_config_server_func,
-                    args=(new_config_server_host, new_config_server_port, flask_app_instance, main_config_file_path, pid_file_path),
-                    daemon=True, # Daemonize so it exits with main app, join handles graceful stop
-                    name="config_server_flask"
+                    args=(
+                        new_config_server_host,
+                        new_config_server_port,
+                        flask_app_instance,
+                        main_config_file_path,
+                        pid_file_path,
+                    ),
+                    daemon=True,  # Daemonize so it exits with main app, join handles graceful stop
+                    name="config_server_flask",
                 )
                 config_server_thread_global.start()
-                logging.info(f"Config Server (Flask) thread {config_server_thread_global.name} started.")
-        elif not new_config_server_enabled and config_server_thread_global and config_server_thread_global.is_alive():
+                logging.info(
+                    f"Config Server (Flask) thread {config_server_thread_global.name} started."
+                )
+        elif (
+            not new_config_server_enabled
+            and config_server_thread_global
+            and config_server_thread_global.is_alive()
+        ):
             logging.info("Config Server is now disabled in config. Stopping it.")
             stop_config_server()
     elif not flask_app_instance and config_server_config.get("enabled", False):
-        logging.warning("Config server is enabled in config, but Flask app instance could not be imported/created.")
-
+        logging.warning(
+            "Config server is enabled in config, but Flask app instance could not be imported/created."
+        )
 
     logging.info("Configuration loaded and applied.")
 
@@ -892,27 +1069,29 @@ def handle_sighup(signum, frame):
     # to avoid issues with signal handlers and complex operations.
     # For now, directly calling, but be wary of re-entrancy or blocking issues.
     # A queue processed by the main loop would be more robust for production.
-    load_and_apply_configuration() # Uses FLAGS.config by default
+    load_and_apply_configuration()  # Uses FLAGS.config by default
 
 
 def signal_handler_exit(signum, frame):
     """Signal handler for SIGINT and SIGTERM to gracefully shut down."""
     signal_name = signal.Signals(signum).name
     logging.info(f"{signal_name} received. Initiating graceful shutdown...")
-    exit_event.set() # Signal all threads to exit
+    exit_event.set()  # Signal all threads to exit
     # The main loop's finally block will call shutdown_application()
 
 
 def shutdown_application():
     """Cleans up resources before exiting."""
     logging.info("Starting application shutdown sequence...")
-    exit_event.set() # Ensure it's set for all threads
+    exit_event.set()  # Ensure it's set for all threads
 
     # Stop camera threads and their utility threads
     for cam_name, thread_info in list(active_camera_threads.items()):
         logging.info(f"Stopping threads for camera {cam_name}...")
-        watchdog_manager = thread_info.get('watchdog_manager_thread') # The thread that runs create_and_start_and_watch_thread
-        gopro_utility = thread_info.get('gopro_utility')
+        watchdog_manager = thread_info.get(
+            "watchdog_manager_thread"
+        )  # The thread that runs create_and_start_and_watch_thread
+        gopro_utility = thread_info.get("gopro_utility")
 
         # The create_and_start_and_watch_thread loop itself respects exit_event.
         # The 'snap' thread started by it also respects exit_event.
@@ -920,26 +1099,31 @@ def shutdown_application():
         # GoProUtilityThread should also respect exit_event.
 
         if gopro_utility and gopro_utility.is_alive():
-            gopro_utility.join(timeout=10) # Wait for GoPro utility thread
+            gopro_utility.join(timeout=10)  # Wait for GoPro utility thread
             if gopro_utility.is_alive():
-                logging.warning(f"GoPro utility thread for {cam_name} did not exit gracefully.")
+                logging.warning(
+                    f"GoPro utility thread for {cam_name} did not exit gracefully."
+                )
 
         # The watchdog_manager_thread (which runs create_and_start_and_watch_thread) will exit once exit_event is set.
         # It, in turn, manages the actual snap_thread. The snap_thread also checks exit_event.
         if watchdog_manager and watchdog_manager.is_alive():
-             watchdog_manager.join(timeout=10) # Wait for the manager of the snap thread
-             if watchdog_manager.is_alive():
-                 logging.warning(f"Watchdog manager thread for {cam_name} did not exit gracefully.")
+            watchdog_manager.join(timeout=10)  # Wait for the manager of the snap thread
+            if watchdog_manager.is_alive():
+                logging.warning(
+                    f"Watchdog manager thread for {cam_name} did not exit gracefully."
+                )
 
         # The actual snap thread (watchdog_thread in older naming) is managed by create_and_start_and_watch_thread
         # and should have been joined by its manager if it was robust.
         # Double check if it's still there and alive (shouldn't be if manager joined)
-        snap_thread = thread_info.get('watchdog_thread')
+        snap_thread = thread_info.get("watchdog_thread")
         if snap_thread and snap_thread.is_alive():
             snap_thread.join(timeout=10)
             if snap_thread.is_alive():
-                logging.warning(f"Snap thread {snap_thread.name} for {cam_name} did not exit gracefully.")
-
+                logging.warning(
+                    f"Snap thread {snap_thread.name} for {cam_name} did not exit gracefully."
+                )
 
     # Stop HTTP server
     stop_http_server()
@@ -968,7 +1152,7 @@ def shutdown_application():
 
     logging.info("Application shutdown complete.")
     # sys.exit(0) # Explicitly exit. This might be too abrupt if called from signal handler context.
-                  # Rely on main thread exiting naturally after exit_event is processed.
+    # Rely on main thread exiting naturally after exit_event is processed.
 
 
 def timelapse_loop():
@@ -1029,9 +1213,9 @@ def archive_loop():
 
 
 if __name__ == "__main__":
-    #FLAGS = flags.FLAGS
+    # FLAGS = flags.FLAGS
 
-    #flags.DEFINE_string("config", None, "path to YAML config file")
-    #flags.mark_flag_as_required("config")
+    # flags.DEFINE_string("config", None, "path to YAML config file")
+    # flags.mark_flag_as_required("config")
     # FLAGS is now defined at module level
     app.run(main)
