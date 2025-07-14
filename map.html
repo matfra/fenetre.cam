@@ -265,6 +265,17 @@
         var markerCluster = L.markerClusterGroup();
         map.addLayer(markerCluster);
 
+        var cameraMarkers = {}; // To store references to map markers
+
+        // --- DOM Elements ---
+        const overlay = document.getElementById('image-overlay');
+        const overlayTitle = document.getElementById('overlay-title');
+        const overlayImage = document.getElementById('overlay-image');
+        const overlayFilename = document.getElementById('overlay-filename');
+        const overlayClose = document.getElementById('overlay-close');
+        const linkToday = document.getElementById('link-today');
+        const linkTimelapse = document.getElementById('link-timelapse');
+        const linkHistory = document.getElementById('link-history');
         let cameraData = {}; // To store the full cameras.json data
 
         /**
