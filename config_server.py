@@ -3,10 +3,7 @@ import yaml
 import json # For handling JSON input
 import os
 import signal
-from werkzeug.exceptions import BadRequest # Import BadRequest
-import requests # For fetching images from URLs
-from PIL import Image # For image processing (crop)
-from io import BytesIO # For handling image data in memory
+from ui_utils import link_html_file
 
 # app = Flask(__name__) # Default static folder is 'static'
 # To serve UI from a specific directory, e.g. 'config_ui/static' and 'config_ui/templates'
@@ -70,6 +67,23 @@ def update_config():
 @app.route('/')
 def serve_ui_page():
     return app.send_static_file('index.html')
+
+@app.route('/api/sync_ui', methods=['POST'])
+def sync_ui():
+    config_file_path = app.config.get('FENETRE_CONFIG_FILE')
+    if not config_file_path:
+        return jsonify({"error": "FENETRE_CONFIG_FILE not set in app config."}), 500
+    try:
+        with open(config_file_path, 'r') as f:
+            config = yaml.safe_load(f)
+        work_dir = config.get('global', {}).get('work_dir')
+        if not work_dir:
+            return jsonify({"error": "work_dir not set in global config."}), 500
+        
+        link_html_file(work_dir, config.get('global', {}))
+        return jsonify({"message": "UI files synchronized successfully."}), 200
+    except Exception as e:
+        return jsonify({"error": f"Error synchronizing UI files: {str(e)}"}), 500
 
 # --- API Endpoints for Visual Config Tool ---
 

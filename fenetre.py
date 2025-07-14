@@ -53,6 +53,8 @@ from waitress import serve as waitress_serve
 
 from config import config_load
 
+from ui_utils import link_html_file
+
 # Define flags at module level so they are available when module is imported
 flags.DEFINE_string("config", None, "path to YAML config file")
 flags.mark_flag_as_required("config")
@@ -521,51 +523,7 @@ def create_and_start_and_watch_thread(
         time.sleep(5)  # Check every 5 seconds
 
 
-def generate_index_html(work_dir: str):
-    ui_config = global_config.get("ui", {})
-    landing_page = ui_config.get("landing_page", "list")
-    redirect_url = f"{landing_page}.html"
 
-    if landing_page == "fullscreen":
-        camera_name = ui_config.get("fullscreen_camera")
-        if camera_name:
-            redirect_url = f"fullscreen.html?camera={camera_name}"
-        else:
-            redirect_url = "list.html"  # Fallback
-
-    index_content = f"""<!DOCTYPE html>
-<html>
-<head>
-    <title>Fenetre</title>
-    <meta http-equiv="refresh" content="0; url={redirect_url}" />
-</head>
-<body>
-    <p>If you are not redirected automatically, follow this <a href="{redirect_url}">link</a>.</p>
-</body>
-</html>"""
-
-    with open(os.path.join(work_dir, "index.html"), "w") as f:
-        f.write(index_content)
-
-
-def link_html_file(work_dir: str):
-    current_dir = os.getcwd()
-    # Copy all html files
-    for file in os.listdir(current_dir):
-        if file.endswith(".html"):
-            shutil.copy(os.path.join(current_dir, file), os.path.join(work_dir, file))
-
-    # Create the lib directory if it does not exist.
-    if not os.path.exists(os.path.join(work_dir, "lib")):
-        os.makedirs(os.path.join(work_dir, "lib"))
-    # Copy all the files in the lib directory from the current directory to the work_dir/lib directory.
-    for file in os.listdir(os.path.join(current_dir, "lib")):
-        if file.endswith(".js") or file.endswith(".css"):
-            shutil.copy(
-                os.path.join(current_dir, "lib", file),
-                os.path.join(work_dir, "lib", file),
-            )
-    generate_index_html(work_dir)
 
 
 def update_cameras_metadata(cameras_configs: Dict, work_dir: str):
@@ -758,6 +716,8 @@ def load_and_apply_configuration(initial_load=False, config_file_override=None):
         update_cameras_metadata(cameras_config, global_config["work_dir"])
     else:
         logging.error("work_dir not set in global config. Cannot update camera metadata.")
+
+    manage_camera_threads()
 
     manage_camera_threads()
 
