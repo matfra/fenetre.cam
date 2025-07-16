@@ -384,7 +384,7 @@
             overlayImage.alt = `Full size image for ${listItem.dataset.title}`;
             overlayFilename.textContent = listItem.dataset.filename || 'N/A'; // Show filename
 
-            const cameraUrl = listItem.dataset.url;
+            const photo_dir = `/photos/${listItem.dataset.title}`;
             const today = new Date();
             const yesterday = new Date(today);
             yesterday.setDate(today.getDate() - 1);
@@ -392,11 +392,11 @@
             const yesterdayStr = formatDate(yesterday);
             const timelapseExtension = cameraData.global.timelapse_file_extension || 'webm';
 
-            linkToday.href = `${cameraUrl}/${todayStr}`;
+            linkToday.href = `${photo_dir}/${todayStr}/`;
             linkToday.textContent = `Today's Pictures (${todayStr})`;
-            linkTimelapse.href = `${cameraUrl}/${yesterdayStr}/${yesterdayStr}.${timelapseExtension}`;
+            linkTimelapse.href = `${photo_dir}/${yesterdayStr}/${yesterdayStr}.${timelapseExtension}`;
             linkTimelapse.textContent = `Yesterday's Timelapse (${yesterdayStr})`;
-            linkHistory.href = `${cameraUrl}/daylight.html`;
+            linkHistory.href = `${photo_dir}/daylight.html`;
             linkHistory.textContent = `All Time History for ${listItem.dataset.title}`;
             overlay.style.display = 'flex';
         }
