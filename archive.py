@@ -175,6 +175,13 @@ def main(argv):
     global server_config, cameras_config, global_config
     server_config, cameras_config, global_config = config_load(FLAGS.config)
     global_config["pic_dir"] = os.path.join(global_config["work_dir"], "photos")
+
+    log_dir = global_config.get("log_dir")
+    if log_dir:
+        log_path = os.path.join(log_dir, "archive.log")
+        # Add a file handler to the absl logger
+        logging.get_absl_handler().use_absl_log_file("archive", log_dir)
+
     for cam in cameras_config:
         camera_dir = os.path.join(global_config["pic_dir"], cam)
         sky_area = cameras_config[cam].get("sky_area", None)
