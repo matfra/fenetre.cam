@@ -1,9 +1,20 @@
+import json
 import os
 import re
 import subprocess
 from typing import Optional
 
 from absl import app, flags, logging
+from PIL import Image
+
+def get_image_dimensions(image_path: str):
+    """Gets the dimensions of an image."""
+    try:
+        with Image.open(image_path) as img:
+            return img.size
+    except Exception as e:
+        logging.error(f"Error getting dimensions for {image_path}: {e}")
+        return None
 
 def is_raspberry_pi():
     """Checks if the current platform is a Raspberry Pi."""
@@ -25,12 +36,47 @@ def create_timelapse(
     if not os.path.exists(dir):
         raise FileNotFoundError(dir)
 
+    image_files = sorted([f for f in os.listdir(dir) if f.lower().endswith(".jpg")])
+    if not image_files:
+        logging.error(f"No JPG images found in {dir}.")
+        return False
+
+    first_image_path = os.path.join(dir, image_files[0])
+    width, height = get_image_dimensions(first_image_path)
+
+    if len(image_files) > 1200:
+        framerate = 60
+    else:
+        framerate = 30
+
     if is_raspberry_pi():
         ffmpeg_options = "-c:v h264_v4l2m2m -b:v 10M"
         file_ext = "mp4"
+        max_width = 1920
+        max_height = 1080
     else:
         ffmpeg_options = "-c:v libvpx-vp9 -b:v 0 -crf 30"
         file_ext = "webm"
+        max_width = 3840
+        max_height = 2160
+
+    aspect_ratio = width / height
+    if aspect_ratio > 16/9: # Wider
+        if width >= max_width:
+            scale_vf = f"scale={max_width}:-2"
+        elif width >= 2560:
+            scale_vf = "scale=2560:-2"
+        else:
+            scale_vf = "scale=1920:-2"
+    else: # Taller or 16:9
+        if height >= max_height:
+            scale_vf = f"scale=-2:{max_height}"
+        elif height >= 1440:
+            scale_vf = "scale=-2:1440"
+        elif height >= 1080:
+            scale_vf = "scale=-2:1080"
+        else:
+            scale_vf = "scale=-2:720"
 
     timelapse_filename = os.path.basename(dir) + "." + file_ext
     timelapse_filepath = os.path.join(dir, timelapse_filename)
@@ -54,8 +100,8 @@ def create_timelapse(
         "-i",
         os.path.join(os.path.abspath(dir), "*.jpg"),
         "-pix_fmt", "yuv420p",
-        "-framerate", "60",
-        "-vf", "scale=1920:-2,format=yuv420p",
+        "-framerate", str(framerate),
+        "-vf", f"{scale_vf},format=yuv420p",
     ]
     if overwrite:
         ffmpeg_cmd.append("-y")
@@ -77,7 +123,22 @@ def create_timelapse(
         if not dry_run:
             subprocess.run(final_cmd, cwd=tmp_dir, check=True)
 
-    return os.path.exists(timelapse_filepath)
+    if os.path.exists(timelapse_filepath):
+        # Update cameras.json
+        camera_name = os.path.basename(os.path.dirname(dir))
+        cameras_json_path = os.path.join(os.path.dirname(os.path.dirname(dir)), "cameras.json")
+        if os.path.exists(cameras_json_path):
+            with open(cameras_json_path, "r+") as f:
+                data = json.load(f)
+                for camera in data.get("cameras", []):
+                    if camera.get("title") == camera_name:
+                        camera["latest_timelapse"] = os.path.relpath(timelapse_filepath, os.path.dirname(cameras_json_path))
+                        f.seek(0)
+                        json.dump(data, f, indent=4)
+                        f.truncate()
+                        break
+        return True
+    return False
 
 
 def main(argv):

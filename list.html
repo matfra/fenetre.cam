@@ -225,12 +225,17 @@
                     yesterday.setDate(today.getDate() - 1);
                     const todayStr = formatDate(today);
                     const yesterdayStr = formatDate(yesterday);
-                    const timelapseExtension = cameraData.global.timelapse_file_extension || 'webm';
                     const photo_dir = `/photos/${camera.title}`;
 
                     linkFullscreen.href = `fullscreen.html?camera=${encodeURIComponent(camera.title)}`;
                     linkToday.href = `${photo_dir}/${todayStr}/`;
-                    linkTimelapse.href = `${photo_dir}/${yesterdayStr}/${yesterdayStr}.${timelapseExtension}`;
+                    if (camera.latest_timelapse) {
+                        linkTimelapse.href = camera.latest_timelapse;
+                        linkTimelapse.textContent = `Yesterday's Timelapse (${yesterdayStr})`;
+                        linkTimelapse.style.display = 'block';
+                    } else {
+                        linkTimelapse.style.display = 'none';
+                    }
                     linkHistory.href = `${photo_dir}/daylight.html`;
                 })
                 .catch(error => {
