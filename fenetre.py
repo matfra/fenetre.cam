@@ -254,7 +254,7 @@ def snap(camera_name, camera_config: Dict):
             )
 
         new_pic = capture()
-        new_exif = new_pic.info.get("exif")
+        new_exif = new_pic.info.get("exif") or b""
         if new_pic is None:
             logging.warning(f"{camera_name}: Could not fetch picture.")
             continue
