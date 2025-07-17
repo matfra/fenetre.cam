@@ -23,6 +23,7 @@ import os
 # - Make the queue for daylight and timelapse a file on the FS (use async read/write if necessary?)
 from config import config_load
 
+global_config = {}
 
 def keep_only_a_subset_of_jpeg_files(
     directory: str, dry_run=True, image_ext="jpg", files_to_keep=48
