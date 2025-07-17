@@ -153,11 +153,7 @@ def archive_daydir(daydir: str, dry_run: bool = True, create_daylight_bands: boo
             create_timelapse(
                 dir=daydir,
                 overwrite=True,
-                ffmpeg_options=global_config.get(
-                    "ffmpeg_options", "-framerate 30"
-                ),
                 two_pass=global_config.get("ffmpeg_2pass", False),
-                file_ext=global_config.get("timelapse_file_extension", "mp4"),
                 dry_run=dry_run,
             )
         else:

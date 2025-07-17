@@ -890,9 +890,7 @@ def timelapse_loop():
                 create_timelapse(
                     dir=dir,
                     overwrite=True,
-                    ffmpeg_options=global_config.get("ffmpeg_options", "-framerate 30"),
                     two_pass=global_config.get("ffmpeg_2pass", False),
-                    file_ext=global_config.get("timelapse_file_extension", "mp4"),
                     tmp_dir=global_config.get("tmp_dir"),
                 )
             except FileExistsError:
