@@ -161,3 +161,14 @@ Accessible from the main configuration UI, this tool helps visually define crop 
 
 *   While many settings can be reloaded dynamically, changes to certain fundamental aspects of existing, active camera threads (e.g., changing a camera's `url` or `postprocessing` steps) might not fully apply without a full restart of `fenetre.py`. The reload mechanism primarily handles adding/removing cameras, updating global settings, and specific dynamic parameters like `snap_interval_s`.
 *   The timelapse and daylight processing loops currently pick up changes to `global_config` (like `ffmpeg_options`) upon their next iteration but are not fully restarted.
+
+
+# Manual notes:
+If on Raspberry Pi using a Pi camera, you need to use the python system package for libcamera2
+
+```
+sudo apt install python3-numpy python3-picamera2
+
+python -m venv --system-site-packages venv
+./venv/bin/pip install -r requirements.txt
+```
