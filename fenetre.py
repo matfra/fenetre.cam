@@ -161,6 +161,41 @@ def get_pic_from_local_command(
     return Image.open(BytesIO(s.stdout))
 
 
+def get_pic_from_picamera2(camera_config: Dict) -> Image.Image:
+    """Captures a picture from a Raspberry Pi camera using the picamera2 library."""
+    from picamera2 import Picamera2
+    from libcamera import controls
+
+    picam2 = Picamera2()
+    
+    config = picam2.create_still_configuration()
+    
+    # Apply tuning file if specified
+    if camera_config.get("tuning_file"):
+        tuning = Picamera2.load_tuning_file(camera_config["tuning_file"])
+        picam2.configure(config, tuning=tuning)
+    else:
+        picam2.configure(config)
+
+    # Set controls
+    if camera_config.get("exposure_time"):
+        picam2.set_controls({"ExposureTime": camera_config["exposure_time"]})
+    if camera_config.get("analogue_gain"):
+        picam2.set_controls({"AnalogueGain": camera_config["analogue_gain"]})
+    if camera_config.get("denoise_mode"):
+        picam2.set_controls({"NoiseReductionMode": controls.draft.NoiseReductionModeEnum.HighQuality})
+
+
+    picam2.start()
+    time.sleep(1) # Allow time for sensor to settle
+    
+    # Capture to a memory buffer
+    buffer = picam2.capture_file("-")
+    picam2.stop()
+    
+    return Image.open(BytesIO(buffer))
+
+
 def snap(camera_name, camera_config: Dict):
     url = camera_config.get("url")
     timeout = camera_config.get("timeout_s", 60)
@@ -194,6 +229,8 @@ def snap(camera_name, camera_config: Dict):
                 format_gopro_sd_card(gopro_ip)
                 raise
             return Image.open(BytesIO(jpeg_bytes))
+        if camera_config.get("capture_method") == "picamera2":
+            return get_pic_from_picamera2(camera_config)
         # TODO(feature): Add more capture methods here
         return None  # type: ignore
 
