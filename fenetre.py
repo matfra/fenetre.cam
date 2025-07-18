@@ -53,6 +53,7 @@ from waitress import serve as waitress_serve
 
 from config import config_load
 
+from platform_utils import is_raspberry_pi
 from ui_utils import link_html_file
 
 # Define flags at module level so they are available when module is imported
@@ -249,7 +250,6 @@ def snap(camera_name, camera_config: Dict):
 
         if not previous_pic_dir == new_pic_dir:
             # This is a new day. We can now process the previous day.
-            timelapse_q.append(previous_pic_dir)
             daylight_q.append(
                 (
                     camera_name,
@@ -578,9 +578,7 @@ def update_cameras_metadata(cameras_configs: Dict, work_dir: str):
         updated_cameras_metadata["cameras"].append(metadata)
 
     updated_cameras_metadata["global"] = {
-        "timelapse_file_extension": global_config.get(
-            "timelapse_file_extension", "mp4"
-        )
+        "timelapse_file_extension": "mp4" if is_raspberry_pi() else "webm"
     }
 
     with open(json_filepath, "w") as json_file:
@@ -647,6 +645,15 @@ def main(argv):
     )
     archive_thread_global.start()
     logging.info(f"Starting thread {archive_thread_global.name}")
+
+    if global_config.get("timelapse_scheduler_enabled", True):
+        timelapse_scheduler_thread_global = Thread(
+            target=timelapse_scheduler_loop, daemon=True, name="timelapse_scheduler_loop"
+        )
+        timelapse_scheduler_thread_global.start()
+        logging.info(f"Starting thread {timelapse_scheduler_thread_global.name}")
+    else:
+        logging.info("Timelapse scheduler is disabled.")
 
     try:
         while not exit_event.is_set():
@@ -877,6 +884,18 @@ def shutdown_application():
     # Rely on main thread exiting naturally after exit_event is processed.
 
 
+def timelapse_scheduler_loop():
+    """
+    This is a loop that schedules timelapse creation for the current day periodically.
+    """
+    interval = global_config.get("timelapse_scheduler_interval_s", 1200)
+    while not exit_event.is_set():
+        for camera_name in cameras_config:
+            pic_dir, _ = get_pic_dir_and_filename(camera_name)
+            timelapse_q.append(pic_dir)
+        logging.info(f"Timelapse scheduler sleeping for {interval} seconds.")
+        time.sleep(interval)
+
 def timelapse_loop():
     """
     This is a loop with a blocking Thread to create timelapses one at a time.
@@ -891,7 +910,6 @@ def timelapse_loop():
                     dir=dir,
                     overwrite=True,
                     two_pass=global_config.get("ffmpeg_2pass", False),
-                    tmp_dir=global_config.get("tmp_dir"),
                 )
             except FileExistsError:
                 logging.warning(f"Found an existing timelapse in dir {dir}, Skipping.")
@@ -913,6 +931,7 @@ def daylight_loop():
                 f"Running daylight in {daily_pic_dir} with sky_area {sky_area}"
             )
             run_end_of_day(camera_name, daily_pic_dir, sky_area)
+            timelapse_q.append(daily_pic_dir)
             archive_q.append(daily_pic_dir)
         time.sleep(1)
 

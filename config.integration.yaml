@@ -1,6 +1,8 @@
 cameras: {}
 global:
   ffmpeg_2pass: true
+  timelapse_scheduler_enabled: true
+  timelapse_scheduler_interval_s: 1200
   log_dir: /tmp/fenetre/logs
   timezone: America/Los_Angeles
   work_dir: /tmp/fenetre/data

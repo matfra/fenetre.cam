@@ -154,6 +154,7 @@
                     <div class="links">
                         <a class="link-fullscreen" href="#" target="_blank">Fullscreen</a>
                         <a class="link-today" href="#" target="_blank">Today's Pictures</a>
+                        <a class="link-timelapse-today" href="#" target="_blank">Today's Timelapse</a>
                         <a class="link-timelapse" href="#" target="_blank">Yesterday's Timelapse</a>
                         <a class="link-history" href="#" target="_blank">History</a>
                     </div>
@@ -188,6 +189,7 @@
             const filenameLink = listItem.querySelector('.camera-details .filename');
             const linkFullscreen = listItem.querySelector('.link-fullscreen');
             const linkToday = listItem.querySelector('.link-today');
+            const linkTimelapseToday = listItem.querySelector('.link-timelapse-today');
             const linkTimelapse = listItem.querySelector('.link-timelapse');
             const linkHistory = listItem.querySelector('.link-history');
 
@@ -225,14 +227,22 @@
                     yesterday.setDate(today.getDate() - 1);
                     const todayStr = formatDate(today);
                     const yesterdayStr = formatDate(yesterday);
+                    const timelapseExtension = cameraData.global.timelapse_file_extension || 'webm';
                     const photo_dir = `/photos/${camera.title}`;
 
                     linkFullscreen.href = `fullscreen.html?camera=${encodeURIComponent(camera.title)}`;
                     linkToday.href = `${photo_dir}/${todayStr}/`;
+
+                    const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+                    const minutesElapsed = (today - startOfDay) / 60000;
+                    const cacheBuster = Math.floor(minutesElapsed / 20);
+                    linkTimelapseToday.href = `${photo_dir}/${todayStr}/${todayStr}.${timelapseExtension}?v=${cacheBuster}`;
+                    linkTimelapseToday.textContent = `Today's Timelapse`;
+
                     if (camera.latest_timelapse) {
                         linkTimelapse.href = camera.latest_timelapse;
-                        linkTimelapse.textContent = `Yesterday's Timelapse (${yesterdayStr})`;
-                        linkTimelapse.style.display = 'block';
+                        linkTimelapse.textContent = `Yesterday's Timelapse`;
+                        linkTimelapse.style.display = 'inline-block';
                     } else {
                         linkTimelapse.style.display = 'none';
                     }

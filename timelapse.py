@@ -7,24 +7,9 @@ from typing import Optional
 from absl import app, flags, logging
 from PIL import Image
 
-def get_image_dimensions(image_path: str):
-    """Gets the dimensions of an image."""
-    try:
-        with Image.open(image_path) as img:
-            return img.size
-    except Exception as e:
-        logging.error(f"Error getting dimensions for {image_path}: {e}")
-        return None
+from platform_utils import is_raspberry_pi
 
-def is_raspberry_pi():
-    """Checks if the current platform is a Raspberry Pi."""
-    try:
-        with open('/proc/device-tree/model', 'r') as f:
-            if 'raspberry pi' in f.read().lower():
-                return True
-    except FileNotFoundError:
-        pass
-    return False
+def get_image_dimensions(image_path: str):
 
 def create_timelapse(
     dir: str,
@@ -95,12 +80,12 @@ def create_timelapse(
         "-hide_banner",
         "-loglevel",
         "warning",
+        "-framerate", str(framerate),
         "-pattern_type",
         "glob",
         "-i",
         os.path.join(os.path.abspath(dir), "*.jpg"),
         "-pix_fmt", "yuv420p",
-        "-framerate", str(framerate),
         "-vf", f"{scale_vf},format=yuv420p",
     ]
     if overwrite:
