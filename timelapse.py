@@ -21,7 +21,7 @@ def get_image_dimensions(image_path: str):
 def create_timelapse(
     dir: str,
     overwrite: bool,
-    two_pass: bool = False,
+    two_pass: Optional[bool],
     tmp_dir: Optional[str] = "/dev/shm/fenetre",
     dry_run: bool = False,
 ) -> bool:
@@ -36,21 +36,26 @@ def create_timelapse(
     first_image_path = os.path.join(dir, image_files[0])
     width, height = get_image_dimensions(first_image_path)
 
-    if len(image_files) > 1200:
-        framerate = 60
-    else:
-        framerate = 30
 
     if is_raspberry_pi():
-        ffmpeg_options = "-c:v h264_v4l2m2m -b:v 10M"
+        ffmpeg_options = "-c:v h264_v4l2m2m -b:v 5M"
         file_ext = "mp4"
         max_width = 1920
         max_height = 1080
+        framerate = 30
+        two_pass = False # multi pass encoding not supported with hardware encoder
     else:
         ffmpeg_options = "-c:v libvpx-vp9 -b:v 0 -crf 30"
         file_ext = "webm"
         max_width = 3840
         max_height = 2160
+        if two_pass is None:
+            two_pass = True # VP9 can take advantage of multiple pass
+        if len(image_files) > 1200:
+            framerate = 60
+        else:
+            framerate = 30
+
 
     aspect_ratio = width / height
     if aspect_ratio > 16/9: # Wider
