@@ -10,6 +10,13 @@ from PIL import Image
 from platform_utils import is_raspberry_pi
 
 def get_image_dimensions(image_path: str):
+    """Gets the dimensions of an image."""
+    try:
+        with Image.open(image_path) as img:
+            return img.size
+    except Exception as e:
+        logging.error(f"Error getting dimensions for {image_path}: {e}")
+        return None
 
 def create_timelapse(
     dir: str,
