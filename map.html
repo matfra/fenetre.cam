@@ -384,19 +384,27 @@
             overlayImage.alt = `Full size image for ${listItem.dataset.title}`;
             overlayFilename.textContent = listItem.dataset.filename || 'N/A'; // Show filename
 
-            const cameraUrl = listItem.dataset.url;
+            const photo_dir = `/photos/${listItem.dataset.title}`;
             const today = new Date();
             const yesterday = new Date(today);
             yesterday.setDate(today.getDate() - 1);
             const todayStr = formatDate(today);
             const yesterdayStr = formatDate(yesterday);
-            const timelapseExtension = cameraData.global.timelapse_file_extension || 'webm';
+            const photo_dir = `/photos/${listItem.dataset.title}`;
 
-            linkToday.href = `${cameraUrl}/${todayStr}`;
+            linkToday.href = `${photo_dir}/${todayStr}/`;
             linkToday.textContent = `Today's Pictures (${todayStr})`;
-            linkTimelapse.href = `${cameraUrl}/${yesterdayStr}/${yesterdayStr}.${timelapseExtension}`;
-            linkTimelapse.textContent = `Yesterday's Timelapse (${yesterdayStr})`;
-            linkHistory.href = `${cameraUrl}/daylight.html`;
+
+            const camera = cameraData.cameras.find(c => c.title === listItem.dataset.title);
+            if (camera && camera.latest_timelapse) {
+                linkTimelapse.href = camera.latest_timelapse;
+                linkTimelapse.textContent = `Yesterday's Timelapse (${yesterdayStr})`;
+                linkTimelapse.style.display = 'block';
+            } else {
+                linkTimelapse.style.display = 'none';
+            }
+
+            linkHistory.href = `${photo_dir}/daylight.html`;
             linkHistory.textContent = `All Time History for ${listItem.dataset.title}`;
             overlay.style.display = 'flex';
         }

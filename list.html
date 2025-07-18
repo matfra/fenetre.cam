@@ -7,6 +7,7 @@
             font-family: Arial, sans-serif;
             margin: 0;
             padding: 20px;
+            background-color: #f4f4f4;
         }
         h1 {
             text-align: center;
@@ -15,47 +16,89 @@
             list-style-type: none;
             padding: 0;
             margin: 0;
+            max-width: 800px;
+            margin: auto;
         }
-        #camera-list li {
-            padding: 10px;
-            border-bottom: 1px solid #eee;
+        .camera-item {
+            background-color: #fff;
+            margin-bottom: 10px;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            cursor: pointer;
+            overflow: hidden;
+        }
+        .camera-header {
             display: flex;
             align-items: center;
+            padding: 10px;
         }
-        #camera-list li:hover {
-            background-color: #f0f0f0;
-        }
-        #camera-list img {
-            width: 160px;
-            height: 90px;
+        .camera-header img {
+            width: 120px;
+            height: 67.5px;
             object-fit: cover;
-            margin-right: 20px;
-            border-radius: 5px;
-            cursor: pointer;
-            background-color: #ddd;
+            margin-right: 15px;
+            border-radius: 4px;
         }
         .camera-info {
             flex-grow: 1;
         }
         .camera-name {
             font-weight: bold;
-            font-size: 1.1em;
         }
-        .last-picture {
-            color: #555;
+        .last-picture-time {
             font-size: 0.9em;
+            color: #666;
         }
         .status {
-            width: 20px;
-            height: 20px;
+            width: 15px;
+            height: 15px;
             border-radius: 50%;
-            margin-left: 20px;
+            margin-left: 15px;
         }
-        .status.online {
-            background-color: #28a745;
+        .status.online { background-color: #28a745; }
+        .status.offline { background-color: #dc3545; }
+
+        .camera-details {
+            display: none;
+            padding: 15px;
+            border-top: 1px solid #eee;
         }
-        .status.offline {
-            background-color: #dc3545;
+        .camera-details.active {
+            display: block;
+        }
+        .camera-details img {
+            width: 100%;
+            height: auto;
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+        .camera-details .filename {
+            font-family: monospace;
+            font-size: 0.9em;
+            color: #333;
+            margin-bottom: 15px;
+            word-wrap: break-word;
+        }
+        .camera-details .links a {
+            display: inline-block;
+            background-color: #007bff;
+            color: white;
+            padding: 8px 12px;
+            margin: 5px;
+            text-align: center;
+            text-decoration: none;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+        .camera-details .links a:hover {
+            background-color: #0056b3;
+        }
+        @media (max-width: 600px) {
+            body { padding: 10px; }
+            .camera-header img { width: 80px; height: 45px; }
+            .camera-details .links a {
+                display: block;
+            }
         }
     </style>
 </head>
@@ -68,17 +111,14 @@
 
         function parseTimestampFromFilename(filename) {
             try {
-                // e.g. 2023-10-27T10-00-00PDT.jpg
                 const match = filename.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2})-(\d{2})-(\d{2})/);
                 if (!match) return null;
-                // Parts are: [full_match, year, month, day, hour, minute, second]
                 const year = parseInt(match[1], 10);
-                const month = parseInt(match[2], 10) - 1; // Month is 0-indexed in JS
+                const month = parseInt(match[2], 10) - 1;
                 const day = parseInt(match[3], 10);
                 const hour = parseInt(match[4], 10);
                 const minute = parseInt(match[5], 10);
                 const second = parseInt(match[6], 10);
-
                 const date = new Date(year, month, day, hour, minute, second);
                 return isNaN(date.getTime()) ? null : date;
             } catch (e) {
@@ -87,90 +127,140 @@
             }
         }
 
-        function updateCamera(camera) {
+        function formatDate(date) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        function createCameraListItem(camera) {
+            const listItem = document.createElement('li');
+            listItem.className = 'camera-item';
+            listItem.dataset.title = camera.title;
+
+            listItem.innerHTML = `
+                <div class="camera-header">
+                    <img src="" alt="${camera.title} thumbnail">
+                    <div class="camera-info">
+                        <div class="camera-name">${camera.title}</div>
+                        <div class="last-picture-time">Loading...</div>
+                    </div>
+                    <div class="status"></div>
+                </div>
+                <div class="camera-details">
+                    <img src="" alt="Full image for ${camera.title}">
+                    <a class="filename" href="#" download></a>
+                    <div class="links">
+                        <a class="link-fullscreen" href="#" target="_blank">Fullscreen</a>
+                        <a class="link-today" href="#" target="_blank">Today's Pictures</a>
+                        <a class="link-timelapse-today" href="#" target="_blank">Today's Timelapse</a>
+                        <a class="link-timelapse" href="#" target="_blank">Yesterday's Timelapse</a>
+                        <a class="link-history" href="#" target="_blank">History</a>
+                    </div>
+                </div>
+            `;
+
+            listItem.querySelector('.camera-header').addEventListener('click', () => {
+                const details = listItem.querySelector('.camera-details');
+                const isActive = details.classList.toggle('active');
+                
+                document.querySelectorAll('.camera-details.active').forEach(otherDetails => {
+                    if (otherDetails !== details) {
+                        otherDetails.classList.remove('active');
+                    }
+                });
+            });
+
+            return listItem;
+        }
+
+        function updateCamera(camera, cameraData) {
             let listItem = document.querySelector(`li[data-title="${camera.title}"]`);
             if (!listItem) {
-                listItem = document.createElement('li');
-                listItem.dataset.title = camera.title;
-
-                const thumbnailLink = document.createElement('a');
-                thumbnailLink.href = `camera.html?camera=${encodeURIComponent(camera.title)}`;
-                const thumbnail = document.createElement('img');
-                thumbnail.alt = `${camera.title} thumbnail`;
-                thumbnailLink.appendChild(thumbnail);
-
-                const cameraInfo = document.createElement('div');
-                cameraInfo.className = 'camera-info';
-
-                const cameraName = document.createElement('div');
-                cameraName.className = 'camera-name';
-                cameraName.textContent = camera.title;
-
-                const lastPicture = document.createElement('div');
-                lastPicture.className = 'last-picture';
-
-                const status = document.createElement('div');
-                status.className = 'status';
-
-                cameraInfo.appendChild(cameraName);
-                cameraInfo.appendChild(lastPicture);
-                listItem.appendChild(thumbnailLink);
-                listItem.appendChild(cameraInfo);
-                listItem.appendChild(status);
+                listItem = createCameraListItem(camera);
                 cameraListElement.appendChild(listItem);
             }
 
-            const thumbnail = listItem.querySelector('img');
-            const lastPicture = listItem.querySelector('.last-picture');
+            const thumbImg = listItem.querySelector('.camera-header img');
+            const lastPictureTime = listItem.querySelector('.last-picture-time');
             const status = listItem.querySelector('.status');
+            const detailsImg = listItem.querySelector('.camera-details img');
+            const filenameLink = listItem.querySelector('.camera-details .filename');
+            const linkFullscreen = listItem.querySelector('.link-fullscreen');
+            const linkToday = listItem.querySelector('.link-today');
+            const linkTimelapseToday = listItem.querySelector('.link-timelapse-today');
+            const linkTimelapse = listItem.querySelector('.link-timelapse');
+            const linkHistory = listItem.querySelector('.link-history');
 
             fetch(camera.dynamic_metadata)
-                .then(response => {
-                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-                    return response.json();
-                })
+                .then(response => response.ok ? response.json() : Promise.reject('Network response was not ok.'))
                 .then(metadata => {
                     const lastPictureUrl = metadata.last_picture_url;
                     if (!lastPictureUrl) {
-                        lastPicture.textContent = 'No picture available';
+                        lastPictureTime.textContent = 'No picture available';
                         status.className = 'status offline';
                         return;
-                    };
+                    }
 
                     const basePath = camera.dynamic_metadata.substring(0, camera.dynamic_metadata.lastIndexOf('/'));
-                    const fullImageUrl = `${basePath}/${lastPictureUrl}`;
+                    const fullImageUrl = `/${basePath}/${lastPictureUrl}`;
                     const filename = lastPictureUrl.substring(lastPictureUrl.lastIndexOf('/') + 1);
 
-                    thumbnail.src = fullImageUrl;
-                    lastPicture.textContent = filename;
+                    thumbImg.src = fullImageUrl;
+                    detailsImg.src = fullImageUrl;
+                    filenameLink.textContent = filename;
+                    filenameLink.href = fullImageUrl;
 
                     const imageDate = parseTimestampFromFilename(filename);
                     if (imageDate) {
-                        const now = new Date();
-                        const threeMinutesInMs = 3 * 60 * 1000;
-                        const isOnline = (now.getTime() - imageDate.getTime()) < threeMinutesInMs;
+                        lastPictureTime.textContent = `Last picture: ${imageDate.toLocaleString()}`;
+                        const isOnline = (new Date() - imageDate) < 3 * 60 * 1000;
                         status.className = `status ${isOnline ? 'online' : 'offline'}`;
                     } else {
-                        lastPicture.textContent = `Could not parse date from: ${filename}`;
+                        lastPictureTime.textContent = 'Could not parse date from: ' + filename;
                         status.className = 'status offline';
                     }
+
+                    const today = new Date();
+                    const yesterday = new Date(today);
+                    yesterday.setDate(today.getDate() - 1);
+                    const todayStr = formatDate(today);
+                    const yesterdayStr = formatDate(yesterday);
+                    const timelapseExtension = cameraData.global.timelapse_file_extension || 'webm';
+                    const photo_dir = `/photos/${camera.title}`;
+
+                    linkFullscreen.href = `fullscreen.html?camera=${encodeURIComponent(camera.title)}`;
+                    linkToday.href = `${photo_dir}/${todayStr}/`;
+
+                    const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+                    const minutesElapsed = (today - startOfDay) / 60000;
+                    const cacheBuster = Math.floor(minutesElapsed / 20);
+                    linkTimelapseToday.href = `${photo_dir}/${todayStr}/${todayStr}.${timelapseExtension}?v=${cacheBuster}`;
+                    linkTimelapseToday.textContent = `Today's Timelapse`;
+
+                    if (camera.latest_timelapse) {
+                        linkTimelapse.href = camera.latest_timelapse;
+                        linkTimelapse.textContent = `Yesterday's Timelapse`;
+                        linkTimelapse.style.display = 'inline-block';
+                    } else {
+                        linkTimelapse.style.display = 'none';
+                    }
+                    linkHistory.href = `${photo_dir}/daylight.html`;
                 })
                 .catch(error => {
-                    lastPicture.textContent = 'Error loading metadata';
+                    lastPictureTime.textContent = 'Error loading metadata';
                     status.className = 'status offline';
                     console.error(`Failed to load metadata for ${camera.title}:`, error);
                 });
         }
 
         function updateAllCameras() {
-            fetch('cameras.json')
-                .then(response => {
-                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-                    return response.json();
-                })
+            fetch('/cameras.json')
+                .then(response => response.ok ? response.json() : Promise.reject('Network response was not ok.'))
                 .then(data => {
                     const cameras = data.cameras;
-                    cameras.forEach(updateCamera);
+                    cameras.forEach(camera => updateCamera(camera, data));
                 })
                 .catch(error => {
                     console.error('Error loading cameras.json:', error);
@@ -178,7 +268,6 @@
                 });
         }
 
-        // Initial load and periodic refresh
         updateAllCameras();
         setInterval(updateAllCameras, 60000);
     </script>

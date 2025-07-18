@@ -1,0 +1,17 @@
+cameras: {}
+global:
+  ffmpeg_2pass: true
+  timelapse_scheduler_enabled: true
+  timelapse_scheduler_interval_s: 1200
+  log_dir: /tmp/fenetre/logs
+  timezone: America/Los_Angeles
+  work_dir: /tmp/fenetre/data
+  work_dir_max_size_GB: 10
+http_server:
+  enabled: false
+  host: 0.0.0.0
+  port: 8888
+config_server:
+  enabled: true
+  host: 0.0.0.0
+  port: 8889

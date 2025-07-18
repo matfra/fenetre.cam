@@ -23,6 +23,7 @@ import os
 # - Make the queue for daylight and timelapse a file on the FS (use async read/write if necessary?)
 from config import config_load
 
+global_config = {}
 
 def keep_only_a_subset_of_jpeg_files(
     directory: str, dry_run=True, image_ext="jpg", files_to_keep=48
@@ -152,11 +153,7 @@ def archive_daydir(daydir: str, dry_run: bool = True, create_daylight_bands: boo
             create_timelapse(
                 dir=daydir,
                 overwrite=True,
-                ffmpeg_options=global_config.get(
-                    "ffmpeg_options", "-framerate 30"
-                ),
                 two_pass=global_config.get("ffmpeg_2pass", False),
-                file_ext=global_config.get("timelapse_file_extension", "mp4"),
                 dry_run=dry_run,
             )
         else:
@@ -175,6 +172,13 @@ def main(argv):
     global server_config, cameras_config, global_config
     server_config, cameras_config, global_config = config_load(FLAGS.config)
     global_config["pic_dir"] = os.path.join(global_config["work_dir"], "photos")
+
+    log_dir = global_config.get("log_dir")
+    if log_dir:
+        log_path = os.path.join(log_dir, "archive.log")
+        # Add a file handler to the absl logger
+        logging.get_absl_handler().use_absl_log_file("archive", log_dir)
+
     for cam in cameras_config:
         camera_dir = os.path.join(global_config["pic_dir"], cam)
         sky_area = cameras_config[cam].get("sky_area", None)
