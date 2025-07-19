@@ -10,6 +10,8 @@ from prometheus_client import Counter, generate_latest, REGISTRY, Gauge
 pictures_taken_total = Counter('pictures_taken_total', 'Total number of pictures taken', ['camera_name'])
 last_successfully_picture_taken_timestamp = Gauge('last_successfully_picture_taken_timestamp', 'Timestamp of the last successfully taken picture', ['camera_name'])
 capture_failures_total = Counter('capture_failures_total', 'Total number of capture failures', ['camera_name'])
+timelapses_created_total = Counter('timelapses_created_total', 'Total number of timelapses created', ['camera_name'])
+
 
 # app = Flask(__name__) # Default static folder is 'static'
 # To serve UI from a specific directory, e.g. 'config_ui/static' and 'config_ui/templates'

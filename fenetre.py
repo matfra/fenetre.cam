@@ -54,7 +54,7 @@ from waitress import serve as waitress_serve
 from astral.sun import sun
 from astral import LocationInfo
 
-from config_server import pictures_taken_total, last_successfully_picture_taken_timestamp, capture_failures_total
+from config_server import pictures_taken_total, last_successfully_picture_taken_timestamp, capture_failures_total, timelapses_created_total
 from config import config_load
 
 from platform_utils import is_raspberry_pi
@@ -988,11 +988,15 @@ def timelapse_loop():
             dir = timelapse_q.popleft()
             result = False
             try:
-                create_timelapse(
+                result = create_timelapse(
                     dir=dir,
                     overwrite=True,
                     two_pass=global_config.get("ffmpeg_2pass", False),
                 )
+                if result:
+                    camera_name = os.path.basename(os.path.dirname(os.path.normpath(dir)))
+                    timelapses_created_total.labels(camera_name=camera_name).inc()
+
             except FileExistsError:
                 logging.warning(f"Found an existing timelapse in dir {dir}, Skipping.")
             if result is False:
