@@ -54,7 +54,7 @@ from waitress import serve as waitress_serve
 from astral.sun import sun
 from astral import LocationInfo
 
-from config_server import pictures_taken_total, last_successfully_picture_taken_timestamp, capture_failures_total, timelapses_created_total, camera_directory_size_bytes, work_dir_size_bytes, total_directories, archived_directories, timelapse_directories_total, daylight_directories_total
+from config_server import metric_pictures_taken_total, metric_last_successful_picture_timestamp, metric_capture_failures_total, metric_timelapses_created_total, metric_camera_directory_size_bytes, metric_work_directory_size_bytes, metric_directories_total, metric_directories_archived_total, metric_directories_timelapse_total, metric_directories_daylight_total
 from config import config_load
 
 from platform_utils import is_raspberry_pi
@@ -297,8 +297,8 @@ def snap(camera_name, camera_config: Dict):
             camera_config.get("mozjpeg_optimize", False),
             previous_exif,
         )
-        pictures_taken_total.labels(camera_name=camera_name).inc()
-        last_successfully_picture_taken_timestamp.labels(camera_name=camera_name).set_to_current_time()
+        metric_pictures_taken_total.labels(camera_name=camera_name).inc()
+        metric_last_successful_picture_timestamp.labels(camera_name=camera_name).set_to_current_time()
         update_latest_link(previous_pic_fullpath)
         metadata = {
             # We want the relative path to the picture file, from the metadata file
@@ -590,7 +590,7 @@ def create_and_start_and_watch_thread(
                     f"Thread {name} (re)start attempt {failure_count}. Delaying {exp_backoff_delay}s."
                 )
                 if camera_name_for_management:
-                    capture_failures_total.labels(camera_name=camera_name_for_management).inc()
+                    metric_capture_failures_total.labels(camera_name=camera_name_for_management).inc()
                 time.sleep(exp_backoff_delay)
 
             failure_count += 1
@@ -1001,7 +1001,7 @@ def timelapse_loop():
                 )
                 if result:
                     camera_name = os.path.basename(os.path.dirname(os.path.normpath(dir)))
-                    timelapses_created_total.labels(camera_name=camera_name).inc()
+                    metric_timelapses_created_total.labels(camera_name=camera_name).inc()
 
             except FileExistsError:
                 logging.warning(f"Found an existing timelapse in dir {dir}, Skipping.")
@@ -1063,7 +1063,7 @@ def disk_management_loop():
                 continue
 
             current_size_bytes = get_dir_size(camera_dir)
-            camera_directory_size_bytes.labels(camera_name=camera_name).set(current_size_bytes)
+            metric_camera_directory_size_bytes.labels(camera_name=camera_name).set(current_size_bytes)
             
             limit_bytes = camera_limit_gb * (1024**3)
 
@@ -1086,7 +1086,7 @@ def disk_management_loop():
         if global_limit_gb is not None:
             work_dir = global_config.get("work_dir")
             current_work_dir_size = get_dir_size(work_dir)
-            work_dir_size_bytes.set(current_work_dir_size)
+            metric_work_directory_size_bytes.set(current_work_dir_size)
             global_limit_bytes = global_limit_gb * (1024**3)
 
             if current_work_dir_size > global_limit_bytes:

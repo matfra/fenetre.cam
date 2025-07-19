@@ -7,16 +7,16 @@ from ui_utils import link_html_file
 from prometheus_client import Counter, generate_latest, REGISTRY, Gauge
 
 # Create metrics
-pictures_taken_total = Counter('pictures_taken_total', 'Total number of pictures taken', ['camera_name'])
-last_successfully_picture_taken_timestamp = Gauge('last_successfully_picture_taken_timestamp', 'Timestamp of the last successfully taken picture', ['camera_name'])
-capture_failures_total = Counter('capture_failures_total', 'Total number of capture failures', ['camera_name'])
-timelapses_created_total = Counter('timelapses_created_total', 'Total number of timelapses created', ['camera_name'])
-camera_directory_size_bytes = Gauge('camera_directory_size_bytes', 'Size of the camera directory in bytes', ['camera_name'])
-work_dir_size_bytes = Gauge('work_dir_size_bytes', 'Size of the work directory in bytes')
-total_directories = Gauge('total_directories', 'Total number of directories', ['camera_name'])
-archived_directories = Gauge('archived_directories', 'Number of archived directories', ['camera_name'])
-timelapse_directories_total = Gauge('timelapse_directories_total', 'Number of directories with a timelapse file', ['camera_name'])
-daylight_directories_total = Gauge('daylight_directories_total', 'Number of directories with a daylight.png file', ['camera_name'])
+metric_pictures_taken_total = Counter('pictures_taken_total', 'Total number of pictures taken', ['camera_name'])
+metric_last_successful_picture_timestamp = Gauge('last_successfully_picture_taken_timestamp', 'Timestamp of the last successfully taken picture', ['camera_name'])
+metric_capture_failures_total = Counter('capture_failures_total', 'Total number of capture failures', ['camera_name'])
+metric_timelapses_created_total = Counter('timelapses_created_total', 'Total number of timelapses created', ['camera_name'])
+metric_camera_directory_size_bytes = Gauge('camera_directory_size_bytes', 'Size of the camera directory in bytes', ['camera_name'])
+metric_work_directory_size_bytes = Gauge('work_dir_size_bytes', 'Size of the work directory in bytes')
+metric_directories_total = Gauge('total_directories', 'Total number of directories', ['camera_name'])
+metric_directories_archived_total = Gauge('archived_directories', 'Number of archived directories', ['camera_name'])
+metric_directories_timelapse_total = Gauge('timelapse_directories_total', 'Number of directories with a timelapse file', ['camera_name'])
+metric_directories_daylight_total = Gauge('daylight_directories_total', 'Number of directories with a daylight.png file', ['camera_name'])
 
 
 

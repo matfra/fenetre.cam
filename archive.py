@@ -22,7 +22,7 @@ import os
 # - If missing timelapses and daylight are found, offer to add the in the queue
 # - Make the queue for daylight and timelapse a file on the FS (use async read/write if necessary?)
 from config import config_load
-from config_server import total_directories, archived_directories, timelapse_directories_total, daylight_directories_total
+from config_server import metric_directories_total, metric_directories_archived_total, metric_directories_timelapse_total, metric_directories_daylight_total
 
 
 def scan_and_publish_metrics(camera_name: str, camera_dir: str, global_config: dict):
@@ -31,7 +31,7 @@ def scan_and_publish_metrics(camera_name: str, camera_dir: str, global_config: d
         return
 
     subdirs = [d.path for d in os.scandir(camera_dir) if d.is_dir()]
-    total_directories.labels(camera_name=camera_name).set(len(subdirs))
+    metric_directories_total.labels(camera_name=camera_name).set(len(subdirs))
 
     archived_count = 0
     timelapse_count = 0
@@ -45,9 +45,9 @@ def scan_and_publish_metrics(camera_name: str, camera_dir: str, global_config: d
         if check_dir_has_daylight_band(subdir):
             daylight_count += 1
 
-    archived_directories.labels(camera_name=camera_name).set(archived_count)
-    timelapse_directories_total.labels(camera_name=camera_name).set(timelapse_count)
-    daylight_directories_total.labels(camera_name=camera_name).set(daylight_count)
+    metric_directories_archived_total.labels(camera_name=camera_name).set(archived_count)
+    metric_directories_timelapse_total.labels(camera_name=camera_name).set(timelapse_count)
+    metric_directories_daylight_total.labels(camera_name=camera_name).set(daylight_count)
 
 
 def keep_only_a_subset_of_jpeg_files(
