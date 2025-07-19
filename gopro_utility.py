@@ -1,3 +1,7 @@
+""" Utility functions for GoPro 11+
+
+Most of the code here is copied from tutorial modules at https://github.com/gopro/OpenGoPro.git
+"""
 import sys
 import os
 import threading
