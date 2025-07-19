@@ -51,6 +51,9 @@ import logging as std_logging
 from waitress import serve as waitress_serve
 
 
+from astral.sun import sun
+from astral import LocationInfo
+
 from config import config_load
 
 from platform_utils import is_raspberry_pi
@@ -196,6 +199,36 @@ def get_pic_from_picamera2(camera_config: Dict) -> Image.Image:
     return Image.open(BytesIO(buffer))
 
 
+def is_sunrise_or_sunset(camera_config: Dict, global_config: Dict) -> bool:
+    """
+    Determines if the current time is within the sunrise or sunset window for a given camera.
+    """
+    if not camera_config.get("sunrise_sunset", {}).get("enabled", False):
+        return False
+
+    latitude = camera_config.get("latitude")
+    longitude = camera_config.get("longitude")
+    if latitude is None or longitude is None:
+        return False
+
+    try:
+        tz = pytz.timezone(global_config["timezone"])
+        now = datetime.now(tz)
+        location = LocationInfo(latitude=latitude, longitude=longitude)
+        s = sun(location.observer, date=now.date(), tzinfo=location.timezone)
+        
+        sunrise_start = s["sunrise"] - timedelta(minutes=30)
+        sunrise_end = s["sunrise"] + timedelta(minutes=30)
+        sunset_start = s["sunset"] - timedelta(minutes=30)
+        sunset_end = s["sunset"] + timedelta(minutes=30)
+
+        return (sunrise_start <= now <= sunrise_end) or (sunset_start <= now <= sunset_end)
+
+    except Exception as e:
+        logging.error(f"Error calculating sunrise/sunset: {e}")
+        return False
+
+
 def snap(camera_name, camera_config: Dict):
     url = camera_config.get("url")
     timeout = camera_config.get("timeout_s", 60)
@@ -280,8 +313,15 @@ def snap(camera_name, camera_config: Dict):
         if exit_event.is_set():
             logging.info(f"{camera_name}: Exiting snap loop.")
             return
-        logging.info(f"{camera_name}: Sleeping {sleep_intervals[camera_name]}s")
-        time.sleep(sleep_intervals[camera_name])
+
+        current_sleep_interval = sleep_intervals[camera_name]
+        if is_sunrise_or_sunset(camera_config, global_config):
+            current_sleep_interval = global_config.get("sunrise_sunset_interval_s", 10)
+            logging.info(f"{camera_name}: Sunrise/sunset detected, using fast interval: {current_sleep_interval}s")
+
+        logging.info(f"{camera_name}: Sleeping {current_sleep_interval}s")
+        time.sleep(current_sleep_interval)
+
         new_pic_dir, new_pic_filename = get_pic_dir_and_filename(camera_name)
         new_pic_fullpath = os.path.join(new_pic_dir, new_pic_filename)
 

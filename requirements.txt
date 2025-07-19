@@ -1,26 +1,47 @@
-logzero  # see github.com/metachris/logzero
+# Mandatory dependencies
 pytz
 pyyaml
+astral
+
+absl-py
+# pillow # Use system
+logzero  # see github.com/metachris/logzero
+
+# For GoPro and fetching pics from URL. 
+requests
+
+# Only if using raspberry pi camera
+#picamera2
+#rpi-libcamera #Requires libcap-dev and libcamera-dev
+
 #dev only
 mock
 black
 pytest
-requests
-ffmpeg-python
-absl-py
-pillow
+
+
+
+ffmpeg-python # Maybe not required anymore
+
 # SSIM
 SSIM-PIL
-numpi
-pyopencl
+# numpi #use systems
+# pyopencl #use system
 python-daemon
+
 #Pictures
 mozjpeg-lossless-optimization
+
 opencv-python
 siphash24
 scikit-image
+
+# For GoPro only
 open-gopro
 bleak
+
 Flask
 PyYAML
+
+# For admin server
 waitress

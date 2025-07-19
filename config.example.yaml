@@ -5,6 +5,7 @@ global:
   log_dir: /Users/fenetre/logs
   work_dir_max_size_GB: 10
   timezone: "America/Los_Angeles"
+  sunrise_sunset_interval_s: 10
 http_server:
   port: 8888
   host: 0.0.0.0
@@ -26,6 +27,10 @@ cameras:
     ssim_area: 0,80,1920,700
     ssim_setpoint: 0.93
     timeout_s: 20 # Default value is not specified
+    latitude: 37.7749
+    longitude: -122.4194
+    sunrise_sunset:
+      enabled: True
     postprocessing:
       - type: "crop"
         area: "0,0,1920,1080"
