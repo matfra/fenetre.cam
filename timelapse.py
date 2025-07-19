@@ -33,6 +33,18 @@ def create_timelapse(
         logging.error(f"No JPG images found in {dir}.")
         return False
 
+    # Delete 0-byte images
+    for image_file in image_files:
+        image_path = os.path.join(dir, image_file)
+        if os.path.getsize(image_path) == 0:
+            logging.warning(f"Deleting 0-byte image: {image_path}")
+            os.remove(image_path)
+            image_files.remove(image_file)
+
+    if not image_files:
+        logging.error(f"No valid JPG images found in {dir} after removing 0-byte files.")
+        return False
+
     first_image_path = os.path.join(dir, image_files[0])
     width, height = get_image_dimensions(first_image_path)
 
