@@ -5,7 +5,7 @@ import tempfile
 import signal
 from unittest.mock import patch, mock_open
 
-import json # Moved to top
+import json
 # Add project root to allow importing admin_server
 import sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -50,11 +50,10 @@ class ConfigServerTestCase(unittest.TestCase):
         self.assertEqual(response.json, self.test_config_data)
 
     def test_get_config_not_found(self):
-        os.unlink(self.temp_config_file.name) # Delete the file
+        os.unlink(self.temp_config_file.name)
         response = self.app.get('/config')
         self.assertEqual(response.status_code, 404)
         self.assertIn("Configuration file not found", response.json['error'])
-        # Recreate for other tests if necessary, though setUp does this per test
         self.temp_config_file = tempfile.NamedTemporaryFile(mode="w+", delete=False, suffix=".yaml")
         yaml.dump(self.test_config_data, self.temp_config_file)
         self.temp_config_file.close()
@@ -62,7 +61,7 @@ class ConfigServerTestCase(unittest.TestCase):
 
 # ... (other parts of the class) ...
 
-    def test_update_config_success(self): # Ensure this is correctly indented
+    def test_update_config_success(self):
         new_config_data_json = {"global": {"setting": "new_value"}, "cameras": {"cam2": {"url": "http://newhost"}}}
 
         response = self.app.put('/config',
@@ -71,26 +70,23 @@ class ConfigServerTestCase(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn("Configuration updated successfully (saved as YAML)", response.json['message'])
 
-        # Verify the content of config.yaml
         with open(self.temp_config_file.name, 'r') as f:
             updated_data_yaml = yaml.safe_load(f)
-        self.assertEqual(updated_data_yaml, new_config_data_json) # Compare the structures
+        self.assertEqual(updated_data_yaml, new_config_data_json)
 
-    def test_update_config_invalid_json(self): # Renamed from test_update_config_invalid_yaml
-        invalid_json_string = '{"global": {"setting": "value"}, "broken": [1,2,' # Intentionally broken JSON
+    def test_update_config_invalid_json(self):
+        invalid_json_string = '{"global": {"setting": "value"}, "broken": [1,2,'
         response = self.app.put('/config', data=invalid_json_string, content_type='application/json')
-        self.assertEqual(response.status_code, 400) # Bad request due to invalid JSON
+        self.assertEqual(response.status_code, 400)
         self.assertIn("Invalid JSON format in request body", response.json['error'])
 
     def test_update_config_empty_body(self):
-        # Sending an empty body with application/json might be treated by Flask as no JSON data or empty data.
-        # The get_json(silent=True) would return None.
         response = self.app.put('/config', data='', content_type='application/json')
         self.assertEqual(response.status_code, 400)
-        self.assertIn("Invalid JSON format in request body or empty body.", response.json['error']) # Updated expected message
+        self.assertIn("Invalid JSON format in request body or empty body.", response.json['error'])
 
-    def test_update_config_not_dict_root_json(self): # Renamed
-        invalid_json_list = json.dumps(["item1", "item2"]) # JSON array, not a dict
+    def test_update_config_not_dict_root_json(self):
+        invalid_json_list = json.dumps(["item1", "item2"])
         response = self.app.put('/config', data=invalid_json_list, content_type='application/json')
         self.assertEqual(response.status_code, 400)
         self.assertIn("Root element of the configuration must be a dictionary", response.json['error'])
@@ -99,8 +95,8 @@ class ConfigServerTestCase(unittest.TestCase):
         new_config_data_json = {"global": {"setting": "new_value"}}
         response = self.app.put('/config',
                                  data=json.dumps(new_config_data_json),
-                                 content_type='text/plain') # Wrong content type
-        self.assertEqual(response.status_code, 415) # Unsupported Media Type
+                                 content_type='text/plain')
+        self.assertEqual(response.status_code, 415)
         self.assertIn("Request body must be JSON", response.json['error'])
 
 

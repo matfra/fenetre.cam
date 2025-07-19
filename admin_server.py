@@ -20,14 +20,9 @@ metric_directories_daylight_total = Gauge('daylight_directories_total', 'Number 
 
 
 
-# app = Flask(__name__) # Default static folder is 'static'
-# To serve UI from a specific directory, e.g. 'config_ui/static' and 'config_ui/templates'
-# We'll assume 'static' and a root HTML file for simplicity first.
-# If index.html is in 'static', it's simpler. If we want a template, then template_folder.
 app = Flask(__name__, static_folder='.')
 
-# CONFIG_FILE_PATH and FENETRE_PID_FILE will now be passed via app.config
-# by fenetre.py when it runs this Flask app.
+# CONFIG_FILE_PATH and FENETRE_PID_FILE are passed by fenetre.py.
 # ADMIN_SERVER_HOST and ADMIN_SERVER_PORT are also managed by fenetre.py.
 
 @app.route('/metrics')
@@ -55,7 +50,7 @@ def update_config():
         return jsonify({"error": "FENETRE_CONFIG_FILE not set in app config."}), 500
     try:
         if not request.is_json:
-            return jsonify({"error": "Request body must be JSON."}), 415 # Unsupported Media Type
+            return jsonify({"error": "Request body must be JSON."}), 415
 
         new_config_json = request.get_json()
         if not new_config_json:
@@ -67,18 +62,17 @@ def update_config():
         # Convert JSON to YAML
         try:
             new_config_yaml = yaml.dump(new_config_json, sort_keys=False, default_flow_style=False, indent=2)
-        except yaml.YAMLError as e: # Error during YAML conversion
+        except yaml.YAMLError as e:
             return jsonify({"error": f"Error converting JSON to YAML: {str(e)}"}), 500
 
         with open(config_file_path, 'w') as f:
             f.write(new_config_yaml)
 
         return jsonify({"message": "Configuration updated successfully (saved as YAML). Reload is required to apply changes."}), 200
-    except BadRequest: # Catch errors from request.get_json() like malformed JSON
+    except BadRequest:
         return jsonify({"error": "Invalid JSON format in request body or empty body."}), 400
-    except Exception as e: # Catch other unexpected errors
-        # Log the exception e for debugging on the server side
-        print(f"Unexpected error in update_config: {e}") # Or use app.logger
+    except Exception as e:
+        print(f"Unexpected error in update_config: {e}")
         return jsonify({"error": f"Error processing configuration: {str(e)}"}), 500
 
 # --- UI Serving Routes ---
@@ -128,12 +122,10 @@ def capture_for_ui(camera_name):
 
     if not url:
         # For V1, only support URL-based cameras for this feature.
-        # Local commands or GoPro would require more complex handling or IPC.
         return jsonify({"error": f"Camera '{camera_name}' does not have a URL configured. Only URL cameras supported for UI capture."}), 400
 
     try:
         # Replicate parts of fenetre.py's get_pic_from_url logic
-        # Consider adding User-Agent from global config if defined
         global_config = config.get('global', {})
         ua = global_config.get('user_agent', 'Fenetre Config UI/1.0')
         headers = {"Accept": "image/*,*"}
@@ -141,10 +133,10 @@ def capture_for_ui(camera_name):
             requests_version = requests.__version__
             headers = {"User-Agent": f"{ua} v{requests_version}"}
 
-        timeout = camera_config.get('timeout_s', 20) # Default timeout for UI capture
+        timeout = camera_config.get('timeout_s', 20)
 
         r = requests.get(url, timeout=timeout, headers=headers, stream=True)
-        r.raise_for_status() # Raises an HTTPError if the HTTP request returned an unsuccessful status code
+        r.raise_for_status()
 
         # Determine content type
         content_type = r.headers.get('content-type', 'application/octet-stream')
@@ -154,7 +146,6 @@ def capture_for_ui(camera_name):
                 content_type = 'image/jpeg'
             elif '.png' in url.lower():
                 content_type = 'image/png'
-            # Add more inferences if needed, or PIL can try to determine format later
 
         img_bytes = BytesIO(r.content)
         img_bytes.seek(0)
@@ -203,7 +194,6 @@ def preview_crop():
         img = Image.open(file.stream)
 
         # Crop box is (left, upper, right, lower)
-        # Our input is x, y, width, height where x,y is top-left
         crop_box = (x, y, x + width, y + height)
 
         # Ensure crop box is within image bounds
@@ -229,17 +219,16 @@ def preview_crop():
         img_io.seek(0)
 
         mimetype = f'image/{img_format.lower()}'
-        if img_format == 'JPEG' and not mimetype.endswith('jpeg'): # common case
+        if img_format == 'JPEG' and not mimetype.endswith('jpeg'):
              mimetype = 'image/jpeg'
 
         return send_file(img_io, mimetype=mimetype)
 
-    except FileNotFoundError: # Should not happen with BytesIO from request.files
+    except FileNotFoundError:
         return jsonify({"error": "Image file somehow not found after upload."}), 500
-    except IOError: # Error from PIL (e.g., cannot open image)
+    except IOError:
         return jsonify({"error": "Cannot process image file. It might be corrupted or not a supported format."}), 400
     except Exception as e:
-        # Log error e
         print(f"Error in preview_crop: {e}")
         return jsonify({"error": f"Error during image processing: {str(e)}"}), 500
 
@@ -248,8 +237,6 @@ def preview_crop():
 def reload_config():
     """
     Signals the main fenetre.py process to reload its configuration.
-    This is a placeholder and will be more fully implemented in fenetre.py
-    by having fenetre.py listen for a signal (e.g., SIGHUP or SIGUSR1).
     """
     fenetre_pid_file_path = app.config.get('FENETRE_PID_FILE_PATH')
     if not fenetre_pid_file_path:
@@ -261,22 +248,21 @@ def reload_config():
                 pid_str = f.read().strip()
                 if pid_str:
                     pid = int(pid_str)
-                    # Send SIGHUP (1) to the process. SIGHUP is often used to signal daemons to reload configuration.
-                    # Ensure fenetre.py is set up to handle this signal.
-                    os.kill(pid, signal.SIGHUP) # signal.SIGHUP should be available as signal was imported
+                    # Send SIGHUP to the process to trigger a configuration reload.
+                    os.kill(pid, signal.SIGHUP)
                     return jsonify({"message": f"Reload signal sent to process {pid}."}), 200
                 else:
                     return jsonify({"error": "PID file is empty."}), 500
         else:
             return jsonify({"error": f"PID file not found: {fenetre_pid_file_path}. Cannot signal reload."}), 404
 
-    except FileNotFoundError: # Should be caught by os.path.exists, but as a safeguard
+    except FileNotFoundError:
          return jsonify({"error": f"PID file not found: {fenetre_pid_file_path}. Cannot signal reload."}), 404
     except ProcessLookupError:
         return jsonify({"error": f"Process with PID read from {fenetre_pid_file_path} not found. It might have exited."}), 500
-    except ValueError: # Error converting pid_str to int
+    except ValueError:
         return jsonify({"error": f"Invalid PID found in {fenetre_pid_file_path}."}), 500
-    except Exception as e: # Catch-all for other errors like permission issues with os.kill
+    except Exception as e:
         return jsonify({"error": f"Error signaling reload: {str(e)}"}), 500
 
 # The run_server() function and if __name__ == '__main__': block are removed.

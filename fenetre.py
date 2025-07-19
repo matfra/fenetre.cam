@@ -4,9 +4,9 @@ import http.server
 import json
 import os
 import shutil
-import signal  # Added for signal handling
+import signal
 import subprocess
-import sys  # Added for sys.exit
+import sys
 import threading
 import time
 from collections import deque
@@ -47,7 +47,6 @@ from postprocess import postprocess
 
 import logging as std_logging
 
-# Import waitress directly, as it's now a requirement
 from waitress import serve as waitress_serve
 
 
@@ -60,11 +59,11 @@ from config import config_load
 from platform_utils import is_raspberry_pi
 from ui_utils import link_html_file
 
-# Define flags at module level so they are available when module is imported
+# Define flags at module level
 flags.DEFINE_string("config", None, "path to YAML config file")
 flags.mark_flag_as_required("config")
 
-FLAGS = flags.FLAGS  # Define at module level
+FLAGS = flags.FLAGS
 
 
 DEFAULT_SKY_AREA = "100,0,400,50"
@@ -73,14 +72,14 @@ FENETRE_PID_FILE = os.environ.get("FENETRE_PID_FILE", "fenetre.pid")
 # Global dictionary to keep track of active camera threads and related utility threads
 active_camera_threads = (
     {}
-)  # Stores {camera_name: {'watchdog': Thread, 'gopro_utility': GoProUtilityThread (optional)}}
-http_server_thread_global = None  # Global reference to the HTTP server thread
-http_server_instance = None # Global reference to the HTTP server instance
-admin_server_thread_global = None  # Global reference to the Config server thread
-admin_server_instance_global = (
-    None  # To manage the waitress/werkzeug server instance for shutdown
 )
-exit_event = threading.Event()  # Initialize globally
+http_server_thread_global = None
+http_server_instance = None
+admin_server_thread_global = None
+admin_server_instance_global = (
+    None
+)
+exit_event = threading.Event()
 
 
 def get_pic_from_url(url: str, timeout: int, ua: str = "") -> Image.Image:
@@ -191,7 +190,7 @@ def get_pic_from_picamera2(camera_config: Dict) -> Image.Image:
 
 
     picam2.start()
-    time.sleep(1) # Allow time for sensor to settle
+    time.sleep(1)
     
     # Capture to a memory buffer
     buffer = picam2.capture_file("-")
@@ -265,8 +264,7 @@ def snap(camera_name, camera_config: Dict):
             return Image.open(BytesIO(jpeg_bytes))
         if camera_config.get("capture_method") == "picamera2":
             return get_pic_from_picamera2(camera_config)
-        # TODO(feature): Add more capture methods here
-        return None  # type: ignore
+        return None
 
     # Initialization before the main loop
     previous_pic_dir, previous_pic_filename = get_pic_dir_and_filename(camera_name)
@@ -301,7 +299,6 @@ def snap(camera_name, camera_config: Dict):
         metric_last_successful_picture_timestamp.labels(camera_name=camera_name).set_to_current_time()
         update_latest_link(previous_pic_fullpath)
         metadata = {
-            # We want the relative path to the picture file, from the metadata file
             "last_picture_url": os.path.relpath(
                 previous_pic_fullpath,
                 os.path.join(previous_pic_fullpath, os.path.pardir, os.path.pardir),
@@ -312,7 +309,6 @@ def snap(camera_name, camera_config: Dict):
             json.dump(metadata, f, indent=4)
             logging.debug(f"{camera_name}: Updated metadata file {metadata_path}")
 
-        # This is a good time to exit if the exit event is set.
         if exit_event.is_set():
             logging.info(f"{camera_name}: Exiting snap loop.")
             return
@@ -353,12 +349,8 @@ def snap(camera_name, camera_config: Dict):
             )
             ssim_setpoint = camera_config.get("ssim_setpoint", 0.85)
             if ssim < ssim_setpoint:
-                # We need to capture more frequently to get interesting things.
-                # sleep_intervals[camera_name] -= 100*(ssim_setpoint-ssim)
                 sleep_intervals[camera_name] = sleep_intervals[camera_name] * 0.9
             else:
-                # We slow down the pace progressively (to make the timelapse less boring)
-                # sleep_intervals[camera_name] += 2
                 sleep_intervals[camera_name] += 0.5
             if logging.level_debug():
                 logging.debug(
@@ -405,14 +397,13 @@ def server_run():
     server_address = (server_config["host"], server_config["port"])
     logging.info(f"Starting HTTP Server on {server_address}")
     httpd = server_class(server_address, handler_class)
-    # Make httpd accessible for shutdown
     global http_server_instance
     http_server_instance = httpd
     logging.info(f"HTTP server instance {http_server_instance} started.")
     try:
         httpd.serve_forever()
     except Exception as e:
-        if not exit_event.is_set():  # Log error only if not during a planned shutdown
+        if not exit_event.is_set():
             logging.error(f"HTTP server crashed: {e}", exc_info=True)
     finally:
         logging.info(f"HTTP server {server_address} stopped.")
@@ -423,12 +414,12 @@ def stop_http_server():
     if http_server_instance:
         logging.info("Attempting to shut down HTTP server...")
         http_server_instance.shutdown()
-        http_server_instance.server_close()  # Important for releasing the port
+        http_server_instance.server_close()
         http_server_instance = None
         logging.info("HTTP server shut down.")
     if http_server_thread_global and http_server_thread_global.is_alive():
         logging.info("Waiting for HTTP server thread to join...")
-        http_server_thread_global.join(timeout=5)  # Wait for thread to finish
+        http_server_thread_global.join(timeout=5)
         if http_server_thread_global.is_alive():
             logging.warning("HTTP server thread did not join in time.")
         else:
@@ -440,38 +431,28 @@ def stop_http_server():
 def run_admin_server_func(
     host: str, port: int, flask_app, fenetre_config_file: str, fenetre_pid_file: str
 ):
-    """Runs the Flask config server."""
-    # Pass necessary fenetre config to Flask app
-    # This assumes admin_server.py will be modified to pick these up
+    """Runs the Flask admin server."""
     flask_app.config["FENETRE_CONFIG_FILE"] = fenetre_config_file
     flask_app.config["FENETRE_PID_FILE_PATH"] = fenetre_pid_file
     flask_app.config["EXIT_EVENT"] = (
-        exit_event  # Pass exit_event for potential graceful shutdown
+        exit_event
     )
 
     global admin_server_instance_global
     try:
         logger = std_logging.getLogger('waitress')
-        logging.info(f"Starting Config Server with Waitress on http://{host}:{port}")
-        # Waitress is used directly as it's a requirement.
-        # For shutdown: Waitress doesn't have a simple programmatic shutdown for `serve()` from another thread.
-        # The thread running `waitress_serve` is a daemon, so it will exit when the main application exits.
-        # For SIGHUP reloads (where the thread is stopped and restarted), the `join(timeout=10)`
-        # in `stop_admin_server` will wait for it. If Waitress doesn't exit on its own
-        # (e.g. due to a SystemExit from a Flask route, or if it handled signals itself),
-        # the join might time out. This is a known limitation for cleanly stopping daemonized blocking servers.
-        # A Flask shutdown route is a common pattern to make this more explicit if needed.
+        logging.info(f"Starting admin server with Waitress on http://{host}:{port}")
         waitress_serve(
             flask_app, host=host, port=port, threads=4, _quiet=True
-        )  # threads=4 is an example
+        )
     except SystemExit:
-        logging.info("Config server shutting down (SystemExit caught).")
+        logging.info("admin server shutting down (SystemExit caught).")
     except Exception as e:
-        if not exit_event.is_set():  # Log error only if not during a planned shutdown
-            logging.error(f"Config server crashed: {e}", exc_info=True)
+        if not exit_event.is_set():
+            logging.error(f"admin server crashed: {e}", exc_info=True)
     finally:
-        logging.info(f"Config server on http://{host}:{port} stopped.")
-        admin_server_instance_global = None  # Clear instance on stop
+        logging.info(f"admin server on http://{host}:{port} stopped.")
+        admin_server_instance_global = None
 
 
 

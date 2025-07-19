@@ -15,12 +15,6 @@ from timelapse import create_timelapse
 import os
 
 
-# TODO:
-# - Make an archival loop instead of relying one external crontab
-# for d in $(ls -1 /srv/fenetre/data/photos/) ; do /srv/fenetre/venv/bin/python /srv/fenetre/archive.py --camera_dir=/srv/fenetre/data/photos/$d --dry_run=False ; done
-# - mark for archiving and only archive after N days
-# - If missing timelapses and daylight are found, offer to add the in the queue
-# - Make the queue for daylight and timelapse a file on the FS (use async read/write if necessary?)
 from config import config_load
 from admin_server import metric_directories_total, metric_directories_archived_total, metric_directories_timelapse_total, metric_directories_daylight_total
 
@@ -59,7 +53,6 @@ def keep_only_a_subset_of_jpeg_files(
       directory: The directory to keep the jpeg files.
     """
 
-    # Get a list of all the jpeg files in the directory.
     jpeg_files = glob.glob(os.path.join(directory, f"*.{image_ext}"))
 
     # Sort the jpeg files by their creation time.
@@ -104,9 +97,7 @@ def list_unarchived_dirs(camera_dir, archived_marker_file="archived"):
             and subdirectory[8:9].isdigit()
         ):
             daydir = os.path.join(camera_dir, subdirectory)
-            # Count the number of jpg files in the subdirectory.
             photos_count = len(glob.glob(os.path.join(daydir, "*.jpg")))
-            # Check if the subdirectory contains a file named archived.
             if os.path.isfile(os.path.join(daydir, archived_marker_file)):
                 if photos_count > 48:
                     logging.warning(
@@ -115,7 +106,6 @@ def list_unarchived_dirs(camera_dir, archived_marker_file="archived"):
                     )
                 else:
                     logging.debug(f"{daydir} is already archived.")
-                    # Continue to the next subdirectory.
                     continue
             res.append(daydir)
     return res
