@@ -69,8 +69,9 @@ def run_end_of_day(camera_name, day_dir_path, sky_area):
         sky_area = DEFAULT_SKY_AREA
     create_daily_band(day_dir_path, parse_sky_area(sky_area))
     year, month, _ = os.path.split(day_dir_path)[-1].split("-")
-    create_monthly_image(f"{year}-{month}", os.path.join(day_dir_path, ".."))
-    generate_html(camera_dir=f"photos/{camera_name}")
+    camera_dir=os.path.join(day_dir_path, os.path.pardir)
+    create_monthly_image(f"{year}-{month}", camera_dir)
+    generate_html(camera_dir=camera_dir)
 
 
 
