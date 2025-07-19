@@ -22,7 +22,7 @@ import os
 # - If missing timelapses and daylight are found, offer to add the in the queue
 # - Make the queue for daylight and timelapse a file on the FS (use async read/write if necessary?)
 from config import config_load
-from config_server import metric_directories_total, metric_directories_archived_total, metric_directories_timelapse_total, metric_directories_daylight_total
+from admin_server import metric_directories_total, metric_directories_archived_total, metric_directories_timelapse_total, metric_directories_daylight_total
 
 
 def scan_and_publish_metrics(camera_name: str, camera_dir: str, global_config: dict):

@@ -7,8 +7,8 @@ def config_load(config_file_path: str) -> list[dict]:
             config = yaml.safe_load(f)
             res = []
             # Ensure all expected sections are present, providing empty dicts if not
-            # Added 'config_server' section
-            for section in ["http_server", "cameras", "global", "config_server"]:
+            # Added 'admin_server' section
+            for section in ["http_server", "cameras", "global", "admin_server"]:
                 res.append(config.get(section, {}))
             return res
     except FileNotFoundError:

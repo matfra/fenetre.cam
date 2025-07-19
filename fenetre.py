@@ -54,7 +54,7 @@ from waitress import serve as waitress_serve
 from astral.sun import sun
 from astral import LocationInfo
 
-from config_server import metric_pictures_taken_total, metric_last_successful_picture_timestamp, metric_capture_failures_total, metric_timelapses_created_total, metric_camera_directory_size_bytes, metric_work_directory_size_bytes, metric_directories_total, metric_directories_archived_total, metric_directories_timelapse_total, metric_directories_daylight_total
+from admin_server import metric_pictures_taken_total, metric_last_successful_picture_timestamp, metric_capture_failures_total, metric_timelapses_created_total, metric_camera_directory_size_bytes, metric_work_directory_size_bytes, metric_directories_total, metric_directories_archived_total, metric_directories_timelapse_total, metric_directories_daylight_total
 from config import config_load
 
 from platform_utils import is_raspberry_pi
@@ -76,8 +76,8 @@ active_camera_threads = (
 )  # Stores {camera_name: {'watchdog': Thread, 'gopro_utility': GoProUtilityThread (optional)}}
 http_server_thread_global = None  # Global reference to the HTTP server thread
 http_server_instance = None # Global reference to the HTTP server instance
-config_server_thread_global = None  # Global reference to the Config server thread
-config_server_instance_global = (
+admin_server_thread_global = None  # Global reference to the Config server thread
+admin_server_instance_global = (
     None  # To manage the waitress/werkzeug server instance for shutdown
 )
 exit_event = threading.Event()  # Initialize globally
@@ -437,19 +437,19 @@ def stop_http_server():
 
 
 # --- Config Server Management ---
-def run_config_server_func(
+def run_admin_server_func(
     host: str, port: int, flask_app, fenetre_config_file: str, fenetre_pid_file: str
 ):
     """Runs the Flask config server."""
     # Pass necessary fenetre config to Flask app
-    # This assumes config_server.py will be modified to pick these up
+    # This assumes admin_server.py will be modified to pick these up
     flask_app.config["FENETRE_CONFIG_FILE"] = fenetre_config_file
     flask_app.config["FENETRE_PID_FILE_PATH"] = fenetre_pid_file
     flask_app.config["EXIT_EVENT"] = (
         exit_event  # Pass exit_event for potential graceful shutdown
     )
 
-    global config_server_instance_global
+    global admin_server_instance_global
     try:
         logger = std_logging.getLogger('waitress')
         logging.info(f"Starting Config Server with Waitress on http://{host}:{port}")
@@ -457,7 +457,7 @@ def run_config_server_func(
         # For shutdown: Waitress doesn't have a simple programmatic shutdown for `serve()` from another thread.
         # The thread running `waitress_serve` is a daemon, so it will exit when the main application exits.
         # For SIGHUP reloads (where the thread is stopped and restarted), the `join(timeout=10)`
-        # in `stop_config_server` will wait for it. If Waitress doesn't exit on its own
+        # in `stop_admin_server` will wait for it. If Waitress doesn't exit on its own
         # (e.g. due to a SystemExit from a Flask route, or if it handled signals itself),
         # the join might time out. This is a known limitation for cleanly stopping daemonized blocking servers.
         # A Flask shutdown route is a common pattern to make this more explicit if needed.
@@ -471,12 +471,12 @@ def run_config_server_func(
             logging.error(f"Config server crashed: {e}", exc_info=True)
     finally:
         logging.info(f"Config server on http://{host}:{port} stopped.")
-        config_server_instance_global = None  # Clear instance on stop
+        admin_server_instance_global = None  # Clear instance on stop
 
 
 
-def stop_config_server():
-    global config_server_thread_global, config_server_instance_global
+def stop_admin_server():
+    global admin_server_thread_global, admin_server_instance_global
     logging.info("Attempting to shut down Config Server...")
 
     # Signaling shutdown to a blocking WSGI server in a thread is complex.
@@ -492,17 +492,17 @@ def stop_config_server():
     # or by making a request to a special /shutdown route (if implemented).
     # Waitress might need a similar mechanism or a more direct control.
     # For now, the primary mechanism is exit_event and thread join.
-    # If config_server_instance_global held a server object with a shutdown method, we'd call it here.
+    # If admin_server_instance_global held a server object with a shutdown method, we'd call it here.
     # Since it doesn't (waitress_serve and werkzeug_run_simple are blocking calls),
     # we rely on the thread terminating when exit_event is set (if the server respects it) or during join.
 
-    if config_server_thread_global and config_server_thread_global.is_alive():
+    if admin_server_thread_global and admin_server_thread_global.is_alive():
         logging.info("Config server thread is alive. Waiting for it to join...")
         # exit_event is already set by the main shutdown_application or handle_sighup logic if it's a full stop.
         # If this is a specific stop for the config server (e.g. disabled in config), ensure exit_event is relevant.
         # For simplicity, assume global exit_event is the main control.
-        config_server_thread_global.join(timeout=10)  # Wait for thread to finish
-        if config_server_thread_global.is_alive():
+        admin_server_thread_global.join(timeout=10)  # Wait for thread to finish
+        if admin_server_thread_global.is_alive():
             logging.warning(
                 "Config server thread did not join in time. It might not support graceful shutdown perfectly."
             )
@@ -511,8 +511,8 @@ def stop_config_server():
     else:
         logging.info("Config server thread already stopped or not started.")
 
-    config_server_thread_global = None
-    config_server_instance_global = None  # Ensure cleaned up
+    admin_server_thread_global = None
+    admin_server_instance_global = None  # Ensure cleaned up
 
 
 def create_and_start_and_watch_thread(
@@ -772,20 +772,20 @@ def load_and_apply_configuration(initial_load=False, config_file_override=None):
         return
 
     # Load new configuration
-    new_server_config, new_cameras_config, new_global_config, new_config_server_config = config_load(config_path_to_load)
+    new_server_config, new_cameras_config, new_global_config, new_admin_server_config = config_load(config_path_to_load)
 
     if initial_load:
-        global server_config, global_config, config_server_config, flask_app_instance
+        global server_config, global_config, admin_server_config, flask_app_instance
         server_config = new_server_config
         global_config = new_global_config
-        config_server_config = new_config_server_config
+        admin_server_config = new_admin_server_config
         global_config["pic_dir"] = os.path.join(global_config.get("work_dir", "."), "photos")
 
         try:
-            from config_server import app as imported_flask_app
+            from admin_server import app as imported_flask_app
             flask_app_instance = imported_flask_app
         except ImportError as e:
-            logging.error(f"Failed to import Flask app from config_server: {e}. Config server UI will not be available.")
+            logging.error(f"Failed to import Flask app from admin_server: {e}. Config server UI will not be available.")
             flask_app_instance = None
 
         # Start HTTP Server if enabled
@@ -794,16 +794,16 @@ def load_and_apply_configuration(initial_load=False, config_file_override=None):
             http_server_thread_global.start()
 
         # Start Config Server if enabled
-        if config_server_config.get("enabled", False) and flask_app_instance:
+        if admin_server_config.get("enabled", False) and flask_app_instance:
             main_config_file_path = FLAGS.config
             pid_file_path = FENETRE_PID_FILE
-            config_server_thread_global = Thread(
-                target=run_config_server_func,
-                args=(config_server_config.get("host"), config_server_config.get("port"), flask_app_instance, main_config_file_path, pid_file_path),
+            admin_server_thread_global = Thread(
+                target=run_admin_server_func,
+                args=(admin_server_config.get("host"), admin_server_config.get("port"), flask_app_instance, main_config_file_path, pid_file_path),
                 daemon=True,
-                name="config_server_flask",
+                name="admin_server_flask",
             )
-            config_server_thread_global.start()
+            admin_server_thread_global.start()
 
     # Update cameras_config and manage camera threads
     cameras_config = new_cameras_config
@@ -946,7 +946,7 @@ def shutdown_application():
     stop_http_server()
 
     # Stop Config Server
-    stop_config_server()
+    stop_admin_server()
 
     # Stop Timelapse and Daylight threads
     global timelapse_thread_global, daylight_thread_global

@@ -28,7 +28,7 @@ app = Flask(__name__, static_folder='.')
 
 # CONFIG_FILE_PATH and FENETRE_PID_FILE will now be passed via app.config
 # by fenetre.py when it runs this Flask app.
-# CONFIG_SERVER_HOST and CONFIG_SERVER_PORT are also managed by fenetre.py.
+# ADMIN_SERVER_HOST and ADMIN_SERVER_PORT are also managed by fenetre.py.
 
 @app.route('/metrics')
 def metrics():

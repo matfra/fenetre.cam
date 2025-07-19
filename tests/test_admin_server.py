@@ -6,11 +6,11 @@ import signal
 from unittest.mock import patch, mock_open
 
 import json # Moved to top
-# Add project root to allow importing config_server
+# Add project root to allow importing admin_server
 import sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from config_server import app as flask_app
+from admin_server import app as flask_app
 
 
 class ConfigServerTestCase(unittest.TestCase):
@@ -30,9 +30,9 @@ class ConfigServerTestCase(unittest.TestCase):
         self.temp_pid_file.write(str(os.getpid())) # Write a dummy PID
         self.temp_pid_file.close()
 
-        # Patch the module-level variables in config_server directly
-        self.config_path_patch = patch('config_server.CONFIG_FILE_PATH', self.temp_config_file.name)
-        self.pid_path_patch = patch('config_server.FENETRE_PID_FILE', self.temp_pid_file.name)
+        # Patch the module-level variables in admin_server directly
+        self.config_path_patch = patch('admin_server.CONFIG_FILE_PATH', self.temp_config_file.name)
+        self.pid_path_patch = patch('admin_server.FENETRE_PID_FILE', self.temp_pid_file.name)
 
         self.config_path_patch.start()
         self.pid_path_patch.start()
