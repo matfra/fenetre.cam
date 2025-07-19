@@ -1,6 +1,7 @@
 data
 config.yaml
 venv
+venv-*
 *.pyc
 ssl
 *.swpconfig.dev.yaml
