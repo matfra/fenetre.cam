@@ -5,11 +5,204 @@ import time
 import requests
 import socket
 import asyncio
-from typing import Dict, Optional
+import enum
+from typing import Dict, Optional, Any, Callable, Awaitable, TypeVar
+
+
 from absl import logging
 
+from bleak import BleakScanner, BleakClient
+from bleak.backends.device import BLEDevice as BleakDevice
+from bleak.backends.characteristic import BleakGATTCharacteristic
+import re
 
-from resources.OpenGoPro.demos.python.tutorial.tutorial_modules import enable_wifi
+T = TypeVar("T")
+
+GOPRO_BASE_UUID = "b5f9{}-aa8d-11e3-9046-0002a5d5c51b"
+noti_handler_T = Callable[[BleakGATTCharacteristic, bytearray], Awaitable[None]]
+
+class GoProUuid(str, enum.Enum):
+    """UUIDs to write to and receive responses from"""
+
+    COMMAND_REQ_UUID = GOPRO_BASE_UUID.format("0072")
+    COMMAND_RSP_UUID = GOPRO_BASE_UUID.format("0073")
+    SETTINGS_REQ_UUID = GOPRO_BASE_UUID.format("0074")
+    SETTINGS_RSP_UUID = GOPRO_BASE_UUID.format("0075")
+    CONTROL_QUERY_SERVICE_UUID = "0000fea6-0000-1000-8000-00805f9b34fb"
+    INTERNAL_UUID = "00002a19-0000-1000-8000-00805f9b34fb"
+    QUERY_REQ_UUID = GOPRO_BASE_UUID.format("0076")
+    QUERY_RSP_UUID = GOPRO_BASE_UUID.format("0077")
+    WIFI_AP_SSID_UUID = GOPRO_BASE_UUID.format("0002")
+    WIFI_AP_PASSWORD_UUID = GOPRO_BASE_UUID.format("0003")
+    NETWORK_MANAGEMENT_REQ_UUID = GOPRO_BASE_UUID.format("0091")
+    NETWORK_MANAGEMENT_RSP_UUID = GOPRO_BASE_UUID.format("0092")
+
+    @classmethod
+    def dict_by_uuid(cls, value_creator: Callable[["GoProUuid"], T]) -> dict["GoProUuid", T]:
+        """Build a dict where the keys are each UUID defined here and the values are built from the input value_creator.
+
+        Args:
+            value_creator (Callable[[GoProUuid], T]): callable to create the values from each UUID
+
+        Returns:
+            dict[GoProUuid, T]: uuid-to-value mapping.
+        """
+        return {uuid: value_creator(uuid) for uuid in cls}
+
+
+def exception_handler(loop: asyncio.AbstractEventLoop, context: dict[str, Any]) -> None:
+    """Catch exceptions from non-main thread
+
+    Args:
+        loop (asyncio.AbstractEventLoop): loop to catch exceptions in
+        context (Dict[str, Any]): exception context
+    """
+    msg = context.get("exception", context["message"])
+    logging.error(f"Caught exception {str(loop)}: {msg}")
+    logging.critical("This is unexpected and unrecoverable.")
+
+
+async def connect_ble(notification_handler: noti_handler_T, identifier: str | None = None) -> BleakClient:
+    """Connect to a GoPro, then pair, and enable notifications
+
+    If identifier is None, the first discovered GoPro will be connected to.
+
+    Retry 10 times
+
+    Args:
+        notification_handler (noti_handler_T): callback when notification is received
+        identifier (str, optional): Last 4 digits of GoPro serial number. Defaults to None.
+
+    Raises:
+        Exception: couldn't establish connection after retrying 10 times
+
+    Returns:
+        BleakClient: connected client
+    """
+
+    asyncio.get_event_loop().set_exception_handler(exception_handler)
+
+    RETRIES = 10
+    for retry in range(RETRIES):
+        try:
+            # Map of discovered devices indexed by name
+            devices: dict[str, BleakDevice] = {}
+
+            # Scan for devices
+            logging.info("Scanning for bluetooth devices...")
+
+            # Scan callback to also catch nonconnectable scan responses
+            # pylint: disable=cell-var-from-loop
+            def _scan_callback(device: BleakDevice, _: Any) -> None:
+                # Add to the dict if not unknown
+                if device.name and device.name != "Unknown":
+                    devices[device.name] = device
+
+            # Scan until we find devices
+            matched_devices: list[BleakDevice] = []
+            while len(matched_devices) == 0:
+                # Now get list of connectable advertisements
+                for device in await BleakScanner.discover(timeout=5, detection_callback=_scan_callback):
+                    if device.name and device.name != "Unknown":
+                        devices[device.name] = device
+                # Log every device we discovered
+                for d in devices:
+                    logging.info(f"\tDiscovered: {d}")
+                # Now look for our matching device(s)
+                token = re.compile(identifier or r"GoPro [A-Z0-9]{4}")
+                matched_devices = [device for name, device in devices.items() if token.match(name)]
+                logging.info(f"Found {len(matched_devices)} matching devices.")
+
+            # Connect to first matching Bluetooth device
+            device = matched_devices[0]
+
+            logging.info(f"Establishing BLE connection to {device}...")
+            client = BleakClient(device)
+            await client.connect(timeout=15)
+            logging.info("BLE Connected!")
+
+            # Try to pair (on some OS's this will expectedly fail)
+            logging.info("Attempting to pair...")
+            try:
+                await client.pair()
+            except NotImplementedError:
+                # This is expected on Mac
+                pass
+            logging.info("Pairing complete!")
+
+            # Enable notifications on all notifiable characteristics
+            logging.info("Enabling notifications...")
+            for service in client.services:
+                for char in service.characteristics:
+                    if "notify" in char.properties:
+                        logging.info(f"Enabling notification on char {char.uuid}")
+                        await client.start_notify(char, notification_handler)
+            logging.info("Done enabling notifications")
+            logging.info("BLE Connection is ready for communication.")
+
+            return client
+        except Exception as exc:  # pylint: disable=broad-exception-caught
+            logging.error(f"Connection establishment failed: {exc}")
+            logging.warning(f"Retrying #{retry}")
+
+    raise RuntimeError(f"Couldn't establish BLE connection after {RETRIES} retries")
+
+
+async def enable_wifi(identifier: str | None = None) -> tuple[str, str, BleakClient]:
+    """Connect to a GoPro via BLE, find its WiFi AP SSID and password, and enable its WiFI AP
+
+    If identifier is None, the first discovered GoPro will be connected to.
+
+    Args:
+        identifier (str, optional): Last 4 digits of GoPro serial number. Defaults to None.
+
+    Returns:
+        Tuple[str, str]: ssid, password
+    """
+    # Synchronization event to wait until notification response is received
+    event = asyncio.Event()
+    client: BleakClient
+
+    async def notification_handler(characteristic: BleakGATTCharacteristic, data: bytearray) -> None:
+        uuid = GoProUuid(client.services.characteristics[characteristic.handle].uuid)
+        logging.info(f'Received response at {uuid}: {data.hex(":")}')
+
+        # If this is the correct handle and the status is success, the command was a success
+        if uuid is GoProUuid.COMMAND_RSP_UUID and data[2] == 0x00:
+            logging.info("Command sent successfully")
+        # Anything else is unexpected. This shouldn't happen
+        else:
+            logging.error("Unexpected response")
+
+        # Notify the writer
+        event.set()
+
+    client = await connect_ble(notification_handler, identifier)
+
+    # Read from WiFi AP SSID BleUUID
+    ssid_uuid = GoProUuid.WIFI_AP_SSID_UUID
+    logging.info(f"Reading the WiFi AP SSID at {ssid_uuid}")
+    ssid = (await client.read_gatt_char(ssid_uuid.value)).decode()
+    logging.info(f"SSID is {ssid}")
+
+    # Read from WiFi AP Password BleUUID
+    password_uuid = GoProUuid.WIFI_AP_PASSWORD_UUID
+    logging.info(f"Reading the WiFi AP password at {password_uuid}")
+    password = (await client.read_gatt_char(password_uuid.value)).decode()
+    logging.info(f"Password is {password}")
+
+    # Write to the Command Request BleUUID to enable WiFi
+    logging.info("Enabling the WiFi AP")
+    event.clear()
+    request = bytes([0x03, 0x17, 0x01, 0x01])
+    command_request_uuid = GoProUuid.COMMAND_REQ_UUID
+    logging.debug(f"Writing to {command_request_uuid}: {request.hex(':')}")
+    await client.write_gatt_char(command_request_uuid.value, request, response=True)
+    await event.wait()  # Wait to receive the notification response
+    logging.info("WiFi AP is enabled")
+
+    return ssid, password, client
+
 
 def format_gopro_sd_card(ip_address: str):
     """
