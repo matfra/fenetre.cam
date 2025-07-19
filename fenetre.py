@@ -55,7 +55,7 @@ from waitress import serve as waitress_serve
 from astral.sun import sun
 from astral import LocationInfo
 
-from admin_server import metric_pictures_taken_total, metric_last_successful_picture_timestamp, metric_capture_failures_total, metric_timelapses_created_total, metric_camera_directory_size_bytes, metric_work_directory_size_bytes, metric_directories_total, metric_directories_archived_total, metric_directories_timelapse_total, metric_directories_daylight_total, metric_picture_width_pixels, metric_picture_height_pixels, metric_picture_size_bytes, metric_picture_iso, metric_picture_focal_length_mm, metric_picture_aperture, metric_picture_exposure_time_seconds, metric_picture_white_balance
+from admin_server import metric_pictures_taken_total, metric_last_successful_picture_timestamp, metric_capture_failures_total, metric_timelapses_created_total, metric_camera_directory_size_bytes, metric_work_directory_size_bytes, metric_directories_total, metric_directories_archived_total, metric_directories_timelapse_total, metric_directories_daylight_total, metric_picture_width_pixels, metric_picture_height_pixels, metric_picture_size_bytes, metric_picture_iso, metric_picture_focal_length_mm, metric_picture_aperture, metric_picture_exposure_time_seconds, metric_picture_white_balance, metric_processing_time_seconds, metric_sleep_time_seconds
 from config import config_load
 
 from platform_utils import is_raspberry_pi
@@ -82,6 +82,8 @@ admin_server_instance_global = (
     None
 )
 exit_event = threading.Event()
+timelapse_queue_file = None
+timelapse_queue_lock = threading.Lock()
 
 
 def get_pic_from_url(url: str, timeout: int, ua: str = "") -> Image.Image:
@@ -341,9 +343,11 @@ def snap(camera_name, camera_config: Dict):
             current_sleep_interval = global_config.get("sunrise_sunset_interval_s", 10)
             logging.info(f"{camera_name}: Sunrise/sunset detected, using fast interval: {current_sleep_interval}s")
 
+        metric_sleep_time_seconds.labels(camera_name=camera_name).set(current_sleep_interval)
         logging.info(f"{camera_name}: Sleeping {current_sleep_interval}s")
         time.sleep(current_sleep_interval)
 
+        start_time = time.time()
         new_pic_dir, new_pic_filename = get_pic_dir_and_filename(camera_name)
         new_pic_fullpath = os.path.join(new_pic_dir, new_pic_filename)
 
@@ -379,6 +383,9 @@ def snap(camera_name, camera_config: Dict):
                 logging.debug(
                     f"{camera_name}: ssim {ssim}, setpoint: {ssim_setpoint}, new sleep interval: {sleep_intervals[camera_name]}s"
                 )
+        
+        end_time = time.time()
+        metric_processing_time_seconds.labels(camera_name=camera_name).set(end_time - start_time)
         previous_pic = new_pic
         previous_exif = new_exif
         previous_pic_dir = new_pic_dir

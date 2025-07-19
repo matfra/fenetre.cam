@@ -25,6 +25,9 @@ metric_picture_focal_length_mm = Gauge('picture_focal_length_mm', 'Focal length 
 metric_picture_aperture = Gauge('picture_aperture', 'Aperture value of the captured picture', ['camera_name'])
 metric_picture_exposure_time_seconds = Gauge('picture_exposure_time_seconds', 'Exposure time of the captured picture in seconds', ['camera_name'])
 metric_picture_white_balance = Gauge('picture_white_balance', 'White balance value of the captured picture', ['camera_name'])
+metric_processing_time_seconds = Gauge('processing_time_seconds', 'Time it took to fetch and process a new picture', ['camera_name'])
+metric_sleep_time_seconds = Gauge('sleep_time_seconds', 'Time the camera sleeps between pictures', ['camera_name'])
+
 
 
 
