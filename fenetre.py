@@ -29,6 +29,8 @@ from absl import app
 from absl import flags
 from absl import logging
 from PIL import Image
+from PIL.ExifTags import TAGS
+
 
 import SSIM_PIL._gpu_strategy as gpu_strategy
 from pyopencl import Kernel as cl_Kernel
@@ -53,7 +55,7 @@ from waitress import serve as waitress_serve
 from astral.sun import sun
 from astral import LocationInfo
 
-from admin_server import metric_pictures_taken_total, metric_last_successful_picture_timestamp, metric_capture_failures_total, metric_timelapses_created_total, metric_camera_directory_size_bytes, metric_work_directory_size_bytes, metric_directories_total, metric_directories_archived_total, metric_directories_timelapse_total, metric_directories_daylight_total
+from admin_server import metric_pictures_taken_total, metric_last_successful_picture_timestamp, metric_capture_failures_total, metric_timelapses_created_total, metric_camera_directory_size_bytes, metric_work_directory_size_bytes, metric_directories_total, metric_directories_archived_total, metric_directories_timelapse_total, metric_directories_daylight_total, metric_picture_width_pixels, metric_picture_height_pixels, metric_picture_size_bytes, metric_picture_iso, metric_picture_focal_length_mm, metric_picture_aperture, metric_picture_exposure_time_seconds, metric_picture_white_balance
 from config import config_load
 
 from platform_utils import is_raspberry_pi
@@ -229,6 +231,22 @@ def is_sunrise_or_sunset(camera_config: Dict, global_config: Dict) -> bool:
         return False
 
 
+def update_image_metrics(camera_name: str, pic: Image.Image, pic_bytes: bytes):
+    """Update prometheus metrics with image data."""
+    metric_picture_width_pixels.labels(camera_name=camera_name).set(pic.width)
+    metric_picture_height_pixels.labels(camera_name=camera_name).set(pic.height)
+    metric_picture_size_bytes.labels(camera_name=camera_name).set(len(pic_bytes))
+
+    exif_data = pic.getexif()
+    if exif_data:
+        exif = {TAGS.get(key, key): value for key, value in exif_data.items()}
+        metric_picture_iso.labels(camera_name=camera_name).set(exif.get("ISOSpeedRatings", 0))
+        metric_picture_focal_length_mm.labels(camera_name=camera_name).set(exif.get("FocalLength", 0))
+        metric_picture_aperture.labels(camera_name=camera_name).set(exif.get("FNumber", 0))
+        metric_picture_exposure_time_seconds.labels(camera_name=camera_name).set(exif.get("ExposureTime", 0))
+        metric_picture_white_balance.labels(camera_name=camera_name).set(exif.get("WhiteBalance", 0))
+
+
 def snap(camera_name, camera_config: Dict):
     url = camera_config.get("url")
     timeout = camera_config.get("timeout_s", 60)
@@ -289,6 +307,11 @@ def snap(camera_name, camera_config: Dict):
     # Capture loop
     while not exit_event.is_set():
         # Immediately save the previous pic to disk.
+        jpeg_io = BytesIO()
+        previous_pic.convert("RGB").save(jpeg_io, format="JPEG", quality=90, exif=previous_exif)
+        jpeg_io.seek(0)
+        jpeg_bytes = jpeg_io.read()
+        update_image_metrics(camera_name, previous_pic, jpeg_bytes)
         write_pic_to_disk(
             previous_pic,
             previous_pic_fullpath,

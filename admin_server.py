@@ -17,6 +17,14 @@ metric_directories_total = Gauge('total_directories', 'Total number of directori
 metric_directories_archived_total = Gauge('archived_directories', 'Number of archived directories', ['camera_name'])
 metric_directories_timelapse_total = Gauge('timelapse_directories_total', 'Number of directories with a timelapse file', ['camera_name'])
 metric_directories_daylight_total = Gauge('daylight_directories_total', 'Number of directories with a daylight.png file', ['camera_name'])
+metric_picture_width_pixels = Gauge('picture_width_pixels', 'Width of the captured picture in pixels', ['camera_name'])
+metric_picture_height_pixels = Gauge('picture_height_pixels', 'Height of the captured picture in pixels', ['camera_name'])
+metric_picture_size_bytes = Gauge('picture_size_bytes', 'Size of the captured picture in bytes', ['camera_name'])
+metric_picture_iso = Gauge('picture_iso', 'ISO value of the captured picture', ['camera_name'])
+metric_picture_focal_length_mm = Gauge('picture_focal_length_mm', 'Focal length of the captured picture in mm', ['camera_name'])
+metric_picture_aperture = Gauge('picture_aperture', 'Aperture value of the captured picture', ['camera_name'])
+metric_picture_exposure_time_seconds = Gauge('picture_exposure_time_seconds', 'Exposure time of the captured picture in seconds', ['camera_name'])
+metric_picture_white_balance = Gauge('picture_white_balance', 'White balance value of the captured picture', ['camera_name'])
 
 
 
