@@ -45,3 +45,4 @@ PyYAML
 
 # For admin server
 waitress
+prometheus-client

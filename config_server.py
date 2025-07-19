@@ -1,9 +1,15 @@
-from flask import Flask, request, jsonify, send_from_directory, send_file, redirect
+from flask import Flask, request, jsonify, send_from_directory, send_file, redirect, Response
 import yaml
 import json # For handling JSON input
 import os
 import signal
 from ui_utils import link_html_file
+from prometheus_client import Counter, generate_latest, REGISTRY, Gauge
+
+# Create metrics
+pictures_taken_total = Counter('pictures_taken_total', 'Total number of pictures taken', ['camera_name'])
+last_successfully_picture_taken_timestamp = Gauge('last_successfully_picture_taken_timestamp', 'Timestamp of the last successfully taken picture', ['camera_name'])
+capture_failures_total = Counter('capture_failures_total', 'Total number of capture failures', ['camera_name'])
 
 # app = Flask(__name__) # Default static folder is 'static'
 # To serve UI from a specific directory, e.g. 'config_ui/static' and 'config_ui/templates'
@@ -14,6 +20,10 @@ app = Flask(__name__, static_folder='.')
 # CONFIG_FILE_PATH and FENETRE_PID_FILE will now be passed via app.config
 # by fenetre.py when it runs this Flask app.
 # CONFIG_SERVER_HOST and CONFIG_SERVER_PORT are also managed by fenetre.py.
+
+@app.route('/metrics')
+def metrics():
+    return Response(generate_latest(REGISTRY), mimetype='text/plain')
 
 @app.route('/config', methods=['GET'])
 def get_config():

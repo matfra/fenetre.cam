@@ -54,6 +54,7 @@ from waitress import serve as waitress_serve
 from astral.sun import sun
 from astral import LocationInfo
 
+from config_server import pictures_taken_total, last_successfully_picture_taken_timestamp, capture_failures_total
 from config import config_load
 
 from platform_utils import is_raspberry_pi
@@ -296,6 +297,8 @@ def snap(camera_name, camera_config: Dict):
             camera_config.get("mozjpeg_optimize", False),
             previous_exif,
         )
+        pictures_taken_total.labels(camera_name=camera_name).inc()
+        last_successfully_picture_taken_timestamp.labels(camera_name=camera_name).set_to_current_time()
         update_latest_link(previous_pic_fullpath)
         metadata = {
             # We want the relative path to the picture file, from the metadata file
@@ -586,6 +589,8 @@ def create_and_start_and_watch_thread(
                 logging.info(
                     f"Thread {name} (re)start attempt {failure_count}. Delaying {exp_backoff_delay}s."
                 )
+                if camera_name_for_management:
+                    capture_failures_total.labels(camera_name=camera_name_for_management).inc()
                 time.sleep(exp_backoff_delay)
 
             failure_count += 1
