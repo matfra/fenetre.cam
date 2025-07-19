@@ -13,6 +13,10 @@ capture_failures_total = Counter('capture_failures_total', 'Total number of capt
 timelapses_created_total = Counter('timelapses_created_total', 'Total number of timelapses created', ['camera_name'])
 camera_directory_size_bytes = Gauge('camera_directory_size_bytes', 'Size of the camera directory in bytes', ['camera_name'])
 work_dir_size_bytes = Gauge('work_dir_size_bytes', 'Size of the work directory in bytes')
+total_directories = Gauge('total_directories', 'Total number of directories', ['camera_name'])
+archived_directories = Gauge('archived_directories', 'Number of archived directories', ['camera_name'])
+timelapse_directories_total = Gauge('timelapse_directories_total', 'Number of directories with a timelapse file', ['camera_name'])
+daylight_directories_total = Gauge('daylight_directories_total', 'Number of directories with a daylight.png file', ['camera_name'])
 
 
 

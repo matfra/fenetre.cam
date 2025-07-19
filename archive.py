@@ -22,8 +22,33 @@ import os
 # - If missing timelapses and daylight are found, offer to add the in the queue
 # - Make the queue for daylight and timelapse a file on the FS (use async read/write if necessary?)
 from config import config_load
+from config_server import total_directories, archived_directories, timelapse_directories_total, daylight_directories_total
 
-global_config = {}
+
+def scan_and_publish_metrics(camera_name: str, camera_dir: str, global_config: dict):
+    """Scans a camera directory and publishes metrics."""
+    if not os.path.isdir(camera_dir):
+        return
+
+    subdirs = [d.path for d in os.scandir(camera_dir) if d.is_dir()]
+    total_directories.labels(camera_name=camera_name).set(len(subdirs))
+
+    archived_count = 0
+    timelapse_count = 0
+    daylight_count = 0
+    timelapse_ext = global_config.get("timelapse_file_extension", "mp4")
+    for subdir in subdirs:
+        if os.path.exists(os.path.join(subdir, "archived")):
+            archived_count += 1
+        if check_dir_has_timelapse(subdir, timelapse_ext):
+            timelapse_count += 1
+        if check_dir_has_daylight_band(subdir):
+            daylight_count += 1
+
+    archived_directories.labels(camera_name=camera_name).set(archived_count)
+    timelapse_directories_total.labels(camera_name=camera_name).set(timelapse_count)
+    daylight_directories_total.labels(camera_name=camera_name).set(daylight_count)
+
 
 def keep_only_a_subset_of_jpeg_files(
     directory: str, dry_run=True, image_ext="jpg", files_to_keep=48
@@ -110,7 +135,7 @@ def check_dir_has_daylight_band(daydir):
     return os.path.isfile(os.path.join(daydir, "daylight.png"))
 
 
-def get_today_date() -> str:
+def get_today_date(global_config: dict) -> str:
     tz = pytz.timezone(global_config["timezone"])
     dt = datetime.now(tz)
     return dt.strftime("%Y-%m-%d")
@@ -121,8 +146,8 @@ def is_dir_older_than_n_days(daydir, n_days=3):
     return (datetime.now() - dir_date).days > n_days
 
 
-def archive_daydir(daydir: str, dry_run: bool = True, create_daylight_bands: bool = False, create_timelapses: bool = False):
-    today_date = get_today_date()
+def archive_daydir(daydir: str, global_config: dict, dry_run: bool = True, create_daylight_bands: bool = False, create_timelapses: bool = False):
+    today_date = get_today_date(global_config)
     if os.path.basename(daydir) == today_date:
         logging.info(
             f"Not archiving {daydir} as it's today and may still be in progress"
@@ -188,7 +213,7 @@ def main(argv):
             logging.warning(f"Could not find directory {camera_dir} for camera: {cam}.")
             continue
         for daydir in list_unarchived_dirs(camera_dir):
-            archive_daydir(daydir, FLAGS.dry_run, FLAGS.create_daylight_bands, FLAGS.create_timelapses)
+            archive_daydir(daydir, global_config, FLAGS.dry_run, FLAGS.create_daylight_bands, FLAGS.create_timelapses)
 
 if __name__ == "__main__":
     FLAGS = flags.FLAGS

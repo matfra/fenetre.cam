@@ -40,7 +40,7 @@ from SSIM_PIL import compare_ssim
 
 from timelapse import create_timelapse
 from daylight import run_end_of_day
-from archive import archive_daydir
+from archive import archive_daydir, list_unarchived_dirs, scan_and_publish_metrics
 from gopro import capture_gopro_photo
 from gopro_utility import GoProUtilityThread, format_gopro_sd_card
 from postprocess import postprocess
@@ -54,7 +54,7 @@ from waitress import serve as waitress_serve
 from astral.sun import sun
 from astral import LocationInfo
 
-from config_server import pictures_taken_total, last_successfully_picture_taken_timestamp, capture_failures_total, timelapses_created_total, camera_directory_size_bytes, work_dir_size_bytes
+from config_server import pictures_taken_total, last_successfully_picture_taken_timestamp, capture_failures_total, timelapses_created_total, camera_directory_size_bytes, work_dir_size_bytes, total_directories, archived_directories, timelapse_directories_total, daylight_directories_total
 from config import config_load
 
 from platform_utils import is_raspberry_pi
@@ -1082,7 +1082,7 @@ def disk_management_loop():
                     current_size_bytes -= dir_to_delete_size
 
         # Manage global limit
-        global_limit_gb = global_config.get("work_dir_max_size_GB")
+        global_limit_gb = storage_management_config.get("work_dir_max_size_GB")
         if global_limit_gb is not None:
             work_dir = global_config.get("work_dir")
             current_work_dir_size = get_dir_size(work_dir)
@@ -1120,11 +1120,13 @@ def archive_loop():
     This is a loop with a blocking Thread to archive pictures one at a time.
     """
     while not exit_event.is_set():
-        if len(archive_q) > 0:
-            daydir = archive_q.popleft()
-            archive_daydir(daydir=daydir, dry_run=True) #TODO: Verify behaviour and switch to False
-        else:
-            time.sleep(600)
+        for camera_name, camera_config in cameras_config.items():
+            camera_dir = os.path.join(global_config["pic_dir"], camera_name)
+            scan_and_publish_metrics(camera_name, camera_dir, global_config)
+            daydirs = list_unarchived_dirs(camera_dir)
+            for daydir in daydirs:
+                archive_daydir(daydir=daydir, global_config=global_config, dry_run=True) #TODO: Verify behaviour and switch to False
+        time.sleep(600)
 
 
 if __name__ == "__main__":

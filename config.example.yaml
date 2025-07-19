@@ -3,13 +3,13 @@ global:
   ffmpeg_2pass: True #default to False
   work_dir: /Users/fenetre
   log_dir: /Users/fenetre/logs
-  work_dir_max_size_GB: 10
   timezone: "America/Los_Angeles"
   sunrise_sunset_interval_s: 10
   storage_management:
     enabled: true
     dry_run: true
     check_interval_s: 300
+    work_dir_max_size_GB: 10
 http_server:
   port: 8888
   host: 0.0.0.0
