@@ -54,7 +54,7 @@ from waitress import serve as waitress_serve
 from astral.sun import sun
 from astral import LocationInfo
 
-from config_server import pictures_taken_total, last_successfully_picture_taken_timestamp, capture_failures_total, timelapses_created_total
+from config_server import pictures_taken_total, last_successfully_picture_taken_timestamp, capture_failures_total, timelapses_created_total, camera_directory_size_bytes, work_dir_size_bytes
 from config import config_load
 
 from platform_utils import is_raspberry_pi
@@ -737,6 +737,12 @@ def main(argv):
     else:
         logging.info("Timelapse scheduler is disabled.")
 
+    disk_management_thread_global = Thread(
+        target=disk_management_loop, daemon=True, name="disk_management_loop"
+    )
+    disk_management_thread_global.start()
+    logging.info(f"Starting thread {disk_management_thread_global.name}")
+
     try:
         while not exit_event.is_set():
             # Main loop can perform periodic checks or just wait for exit_event
@@ -1020,6 +1026,93 @@ def daylight_loop():
             timelapse_q.append(daily_pic_dir)
             archive_q.append(daily_pic_dir)
         time.sleep(1)
+
+
+def get_dir_size(path='.'):
+    total_size = 0
+    for dirpath, dirnames, filenames in os.walk(path):
+        for f in filenames:
+            fp = os.path.join(dirpath, f)
+            # skip if it is symbolic link
+            if not os.path.islink(fp):
+                total_size += os.path.getsize(fp)
+    return total_size
+
+
+def disk_management_loop():
+    """
+    This is a loop that manages disk space.
+    """
+    storage_management_config = global_config.get("storage_management", {})
+    if not storage_management_config.get("enabled", False):
+        logging.info("Disk management is disabled.")
+        return
+
+    interval = storage_management_config.get("check_interval_s", 300)
+    dry_run = storage_management_config.get("dry_run", True)
+
+    while not exit_event.is_set():
+        # Manage per-camera limits
+        for camera_name, camera_config in cameras_config.items():
+            camera_limit_gb = camera_config.get("work_dir_max_size_GB")
+            if camera_limit_gb is None:
+                continue
+
+            camera_dir = os.path.join(global_config["pic_dir"], camera_name)
+            if not os.path.isdir(camera_dir):
+                continue
+
+            current_size_bytes = get_dir_size(camera_dir)
+            camera_directory_size_bytes.labels(camera_name=camera_name).set(current_size_bytes)
+            
+            limit_bytes = camera_limit_gb * (1024**3)
+
+            if current_size_bytes > limit_bytes:
+                logging.info(f"Camera {camera_name} is over its limit of {camera_limit_gb} GB. Current size: {current_size_bytes / (1024**3):.2f} GB. Deleting oldest directories.")
+                subdirs = sorted([d.path for d in os.scandir(camera_dir) if d.is_dir()])
+                for subdir in subdirs:
+                    if current_size_bytes <= limit_bytes:
+                        break
+                    dir_to_delete_size = get_dir_size(subdir)
+                    if dry_run:
+                        logging.info(f"[DRY RUN] Would delete {subdir} to free up {dir_to_delete_size / (1024**2):.2f} MB")
+                    else:
+                        logging.info(f"Deleting {subdir} to free up {dir_to_delete_size / (1024**2):.2f} MB")
+                        shutil.rmtree(subdir)
+                    current_size_bytes -= dir_to_delete_size
+
+        # Manage global limit
+        global_limit_gb = global_config.get("work_dir_max_size_GB")
+        if global_limit_gb is not None:
+            work_dir = global_config.get("work_dir")
+            current_work_dir_size = get_dir_size(work_dir)
+            work_dir_size_bytes.set(current_work_dir_size)
+            global_limit_bytes = global_limit_gb * (1024**3)
+
+            if current_work_dir_size > global_limit_bytes:
+                logging.info(f"Global work_dir is over its limit of {global_limit_gb} GB. Current size: {current_work_dir_size / (1024**3):.2f} GB. Deleting oldest directories across all cameras.")
+                
+                all_day_dirs = []
+                for camera_name in cameras_config:
+                    camera_dir = os.path.join(global_config["pic_dir"], camera_name)
+                    if os.path.isdir(camera_dir):
+                        all_day_dirs.extend([d.path for d in os.scandir(camera_dir) if d.is_dir()])
+                
+                all_day_dirs.sort()
+
+                for day_dir in all_day_dirs:
+                    if current_work_dir_size <= global_limit_bytes:
+                        break
+                    dir_to_delete_size = get_dir_size(day_dir)
+                    if dry_run:
+                        logging.info(f"[DRY RUN] Would delete {day_dir} to free up {dir_to_delete_size / (1024**2):.2f} MB")
+                    else:
+                        logging.info(f"Deleting {day_dir} to free up {dir_to_delete_size / (1024**2):.2f} MB")
+                        shutil.rmtree(day_dir)
+                    current_work_dir_size -= dir_to_delete_size
+
+        logging.info(f"Disk management sleeping for {interval} seconds.")
+        time.sleep(interval)
 
 
 def archive_loop():

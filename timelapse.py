@@ -89,6 +89,7 @@ def create_timelapse(
 
     timelapse_filename = os.path.basename(dir) + "." + file_ext
     timelapse_filepath = os.path.join(dir, timelapse_filename)
+    ffmpeg_log_filepath = os.path.join(dir, "ffmpeg.log")
     logging.debug(f"timelapse_filename: {timelapse_filename}")
     logging.debug(f"timelapse_filepath: {timelapse_filepath}")
 
@@ -116,21 +117,22 @@ def create_timelapse(
         ffmpeg_cmd.append("-y")
     ffmpeg_cmd.extend(ffmpeg_options.split(" "))
 
-    if two_pass:
-        first_pass_cmd = ffmpeg_cmd + ["-pass", "1", "-an", "-f", "null", "/dev/null"]
-        logging.info(f"Running ffmpeg first pass: {' '.join(first_pass_cmd)}")
-        if not dry_run:
-            subprocess.run(first_pass_cmd, cwd=tmp_dir, check=True)
-        
-        second_pass_cmd = ffmpeg_cmd + ["-pass", "2", os.path.abspath(timelapse_filepath)]
-        logging.info(f"Running ffmpeg second pass: {' '.join(second_pass_cmd)}")
-        if not dry_run:
-            subprocess.run(second_pass_cmd, cwd=tmp_dir, check=True)
-    else:
-        final_cmd = ffmpeg_cmd + [os.path.abspath(timelapse_filepath)]
-        logging.info(f"Running ffmpeg: {' '.join(final_cmd)}")
-        if not dry_run:
-            subprocess.run(final_cmd, cwd=tmp_dir, check=True)
+    with open(ffmpeg_log_filepath, "w") as ffmpeg_log:
+        if two_pass:
+            first_pass_cmd = ffmpeg_cmd + ["-pass", "1", "-an", "-f", "null", "/dev/null"]
+            logging.info(f"Running ffmpeg first pass: {' '.join(first_pass_cmd)}")
+            if not dry_run:
+                subprocess.run(first_pass_cmd, cwd=tmp_dir, check=True, stdout=ffmpeg_log, stderr=subprocess.STDOUT)
+            
+            second_pass_cmd = ffmpeg_cmd + ["-pass", "2", os.path.abspath(timelapse_filepath)]
+            logging.info(f"Running ffmpeg second pass: {' '.join(second_pass_cmd)}")
+            if not dry_run:
+                subprocess.run(second_pass_cmd, cwd=tmp_dir, check=True, stdout=ffmpeg_log, stderr=subprocess.STDOUT)
+        else:
+            final_cmd = ffmpeg_cmd + [os.path.abspath(timelapse_filepath)]
+            logging.info(f"Running ffmpeg: {' '.join(final_cmd)}")
+            if not dry_run:
+                subprocess.run(final_cmd, cwd=tmp_dir, check=True, stdout=ffmpeg_log, stderr=subprocess.STDOUT)
 
     if os.path.exists(timelapse_filepath):
         # Update cameras.json

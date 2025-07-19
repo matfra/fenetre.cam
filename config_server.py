@@ -11,6 +11,9 @@ pictures_taken_total = Counter('pictures_taken_total', 'Total number of pictures
 last_successfully_picture_taken_timestamp = Gauge('last_successfully_picture_taken_timestamp', 'Timestamp of the last successfully taken picture', ['camera_name'])
 capture_failures_total = Counter('capture_failures_total', 'Total number of capture failures', ['camera_name'])
 timelapses_created_total = Counter('timelapses_created_total', 'Total number of timelapses created', ['camera_name'])
+camera_directory_size_bytes = Gauge('camera_directory_size_bytes', 'Size of the camera directory in bytes', ['camera_name'])
+work_dir_size_bytes = Gauge('work_dir_size_bytes', 'Size of the work directory in bytes')
+
 
 
 # app = Flask(__name__) # Default static folder is 'static'
