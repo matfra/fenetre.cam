@@ -45,7 +45,7 @@ from daylight import run_end_of_day
 from archive import archive_daydir, list_unarchived_dirs, scan_and_publish_metrics
 from gopro import capture_gopro_photo
 from gopro_utility import GoProUtilityThread, format_gopro_sd_card
-from postprocess import postprocess
+from postprocess import postprocess, gather_metrics
 
 import logging as std_logging
 
@@ -233,20 +233,7 @@ def is_sunrise_or_sunset(camera_config: Dict, global_config: Dict) -> bool:
         return False
 
 
-def update_image_metrics(camera_name: str, pic: Image.Image, pic_bytes: bytes):
-    """Update prometheus metrics with image data."""
-    metric_picture_width_pixels.labels(camera_name=camera_name).set(pic.width)
-    metric_picture_height_pixels.labels(camera_name=camera_name).set(pic.height)
-    metric_picture_size_bytes.labels(camera_name=camera_name).set(len(pic_bytes))
 
-    exif_data = pic.getexif()
-    if exif_data:
-        exif = {TAGS.get(key, key): value for key, value in exif_data.items()}
-        metric_picture_iso.labels(camera_name=camera_name).set(exif.get("ISOSpeedRatings", 0))
-        metric_picture_focal_length_mm.labels(camera_name=camera_name).set(exif.get("FocalLength", 0))
-        metric_picture_aperture.labels(camera_name=camera_name).set(exif.get("FNumber", 0))
-        metric_picture_exposure_time_seconds.labels(camera_name=camera_name).set(exif.get("ExposureTime", 0))
-        metric_picture_white_balance.labels(camera_name=camera_name).set(exif.get("WhiteBalance", 0))
 
 
 def snap(camera_name, camera_config: Dict):
@@ -309,17 +296,17 @@ def snap(camera_name, camera_config: Dict):
     # Capture loop
     while not exit_event.is_set():
         # Immediately save the previous pic to disk.
-        jpeg_io = BytesIO()
-        previous_pic.convert("RGB").save(jpeg_io, format="JPEG", quality=90, exif=previous_exif)
-        jpeg_io.seek(0)
-        jpeg_bytes = jpeg_io.read()
-        update_image_metrics(camera_name, previous_pic, jpeg_bytes)
         write_pic_to_disk(
             previous_pic,
             previous_pic_fullpath,
             camera_config.get("mozjpeg_optimize", False),
             previous_exif,
         )
+        if camera_config.get("gather_metrics", True):
+            try:
+                gather_metrics(previous_pic_fullpath, camera_name)
+            except Exception as e:
+                logging.error(f"Error gathering metrics for {previous_pic_fullpath}: {e}")
         metric_pictures_taken_total.labels(camera_name=camera_name).inc()
         metric_last_successful_picture_timestamp.labels(camera_name=camera_name).set_to_current_time()
         update_latest_link(previous_pic_fullpath)

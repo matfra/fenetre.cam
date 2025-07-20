@@ -6,6 +6,18 @@ from absl import logging
 from datetime import datetime
 import pytz # To get timezone from global_config easily
 import yaml # For get_timezone_from_config
+import pyexiv2
+from admin_server import (
+    metric_picture_width_pixels,
+    metric_picture_height_pixels,
+    metric_picture_size_bytes,
+    metric_picture_iso,
+    metric_picture_focal_length_mm,
+    metric_picture_aperture,
+    metric_picture_exposure_time_seconds,
+    metric_picture_white_balance,
+)
+import os
 
 
 # It's not ideal to re-read the config here, but it's the simplest way to get timezone
@@ -347,3 +359,58 @@ def auto_white_balance(pic: Image.Image) -> Image.Image:
 
     # Convert the NumPy array back to a PIL image
     return Image.fromarray(img_array_awb.astype(np.uint8))
+
+def gather_metrics(image_path: str, camera_name: str):
+    """
+    Reads metadata from an image file using pyexiv2 and updates Prometheus metrics.
+    """
+    try:
+        with pyexiv2.Image(image_path) as img:
+            exif = img.read_exif()
+            
+            # Basic file stats
+            try:
+                stat = os.stat(image_path)
+                metric_picture_size_bytes.labels(camera_name=camera_name).set(stat.st_size)
+                
+                # Get image dimensions from EXIF or fallback to reading image
+                width = exif.get('Exif.Image.ImageWidth') or exif.get('Exif.Photo.PixelXDimension')
+                height = exif.get('Exif.Image.ImageLength') or exif.get('Exif.Photo.PixelYDimension')
+
+                if width and height:
+                    metric_picture_width_pixels.labels(camera_name=camera_name).set(int(width))
+                    metric_picture_height_pixels.labels(camera_name=camera_name).set(int(height))
+                else:
+                    # Fallback to PIL if dimensions not in EXIF
+                    with Image.open(image_path) as pil_img:
+                        metric_picture_width_pixels.labels(camera_name=camera_name).set(pil_img.width)
+                        metric_picture_height_pixels.labels(camera_name=camera_name).set(pil_img.height)
+
+            except Exception as e:
+                logging.error(f"Error getting file stats or dimensions for {image_path}: {e}")
+
+
+            # EXIF Metrics
+            def get_exif_value(key, default=0):
+                v = exif.get(key)
+                if v is None:
+                    return default
+                try:
+                    # Fractions are returned as 'num/den' strings
+                    if isinstance(v, str) and '/' in v:
+                        num, den = v.split('/')
+                        return float(num) / float(den)
+                    return float(v)
+                except (ValueError, TypeError):
+                    return default
+
+            metric_picture_iso.labels(camera_name=camera_name).set(get_exif_value('Exif.Photo.ISOSpeedRatings'))
+            metric_picture_focal_length_mm.labels(camera_name=camera_name).set(get_exif_value('Exif.Photo.FocalLength'))
+            metric_picture_aperture.labels(camera_name=camera_name).set(get_exif_value('Exif.Photo.FNumber'))
+            metric_picture_exposure_time_seconds.labels(camera_name=camera_name).set(get_exif_value('Exif.Photo.ExposureTime'))
+            metric_picture_white_balance.labels(camera_name=camera_name).set(get_exif_value('Exif.Photo.WhiteBalance'))
+
+            logging.debug(f"Successfully gathered metrics for {image_path}")
+
+    except Exception as e:
+        logging.error(f"Error reading metadata from {image_path} with pyexiv2: {e}")
