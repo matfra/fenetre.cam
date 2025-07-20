@@ -1,0 +1,5 @@
+- Do not apologize or try to be polite. Go straight to the point.
+- Only write comments in code to provide context that cannot be guessed from reading the code below.
+- Challenge my idea or suggestions before implementing them.
+- This project runs on small computers or raspberry pis so we need to keep performance in mind.
+- Always ask for permission before modifying a file that is listed in @.gitignore
