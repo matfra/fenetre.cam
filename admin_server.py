@@ -8,15 +8,15 @@ from prometheus_client import Counter, generate_latest, REGISTRY, Gauge
 
 # Create metrics
 metric_pictures_taken_total = Counter('pictures_taken_total', 'Total number of pictures taken', ['camera_name'])
-metric_last_successful_picture_timestamp = Gauge('last_successfully_picture_taken_timestamp', 'Timestamp of the last successfully taken picture', ['camera_name'])
+metric_last_successful_picture_timestamp = Gauge('capture_last_success_timestamp', 'Timestamp of the last successfully taken picture', ['camera_name'])
 metric_capture_failures_total = Counter('capture_failures_total', 'Total number of capture failures', ['camera_name'])
 metric_timelapses_created_total = Counter('timelapses_created_total', 'Total number of timelapses created', ['camera_name'])
 metric_camera_directory_size_bytes = Gauge('camera_directory_size_bytes', 'Size of the camera directory in bytes', ['camera_name'])
 metric_work_directory_size_bytes = Gauge('work_dir_size_bytes', 'Size of the work directory in bytes')
-metric_directories_total = Gauge('total_directories', 'Total number of directories', ['camera_name'])
-metric_directories_archived_total = Gauge('archived_directories', 'Number of archived directories', ['camera_name'])
-metric_directories_timelapse_total = Gauge('timelapse_directories_total', 'Number of directories with a timelapse file', ['camera_name'])
-metric_directories_daylight_total = Gauge('daylight_directories_total', 'Number of directories with a daylight.png file', ['camera_name'])
+metric_directories_total = Gauge('dir_total_count', 'Total number of directories', ['camera_name'])
+metric_directories_archived_total = Gauge('dir_archived_count', 'Number of archived directories', ['camera_name'])
+metric_directories_timelapse_total = Gauge('dir_timelapse_count', 'Number of directories with a timelapse file', ['camera_name'])
+metric_directories_daylight_total = Gauge('dir_daylight_count', 'Number of directories with a daylight.png file', ['camera_name'])
 metric_picture_width_pixels = Gauge('picture_width_pixels', 'Width of the captured picture in pixels', ['camera_name'])
 metric_picture_height_pixels = Gauge('picture_height_pixels', 'Height of the captured picture in pixels', ['camera_name'])
 metric_picture_size_bytes = Gauge('picture_size_bytes', 'Size of the captured picture in bytes', ['camera_name'])
@@ -25,8 +25,8 @@ metric_picture_focal_length_mm = Gauge('picture_focal_length_mm', 'Focal length 
 metric_picture_aperture = Gauge('picture_aperture', 'Aperture value of the captured picture', ['camera_name'])
 metric_picture_exposure_time_seconds = Gauge('picture_exposure_time_seconds', 'Exposure time of the captured picture in seconds', ['camera_name'])
 metric_picture_white_balance = Gauge('picture_white_balance', 'White balance value of the captured picture', ['camera_name'])
-metric_processing_time_seconds = Gauge('processing_time_seconds', 'Time it took to fetch and process a new picture', ['camera_name'])
-metric_sleep_time_seconds = Gauge('sleep_time_seconds', 'Time the camera sleeps between pictures', ['camera_name'])
+metric_processing_time_seconds = Gauge('capture_processing_time_seconds', 'Time it took to fetch and process a new picture', ['camera_name'])
+metric_sleep_time_seconds = Gauge('capture_loop_sleep_time_seconds', 'Time the camera sleeps between pictures', ['camera_name'])
 
 
 

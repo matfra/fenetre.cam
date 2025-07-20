@@ -183,9 +183,8 @@ def archive_daydir(daydir: str, global_config: dict, dry_run: bool = True, creat
 def main(argv):
     del argv  # Unused.
 
-    # TODO: Are global variable really necessary?
-    global server_config, cameras_config, global_config
-    server_config, cameras_config, global_config = config_load(FLAGS.config)
+    global cameras_config, global_config
+    _, cameras_config, global_config, _ = config_load(FLAGS.config)
     global_config["pic_dir"] = os.path.join(global_config["work_dir"], "photos")
 
     log_dir = global_config.get("log_dir")

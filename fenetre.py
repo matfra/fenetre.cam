@@ -707,10 +707,14 @@ def main(argv):
 
     load_and_apply_configuration(initial_load=True)  # Uses FLAGS.config by default
 
+    global timelapse_queue_file
+    timelapse_queue_file = os.path.join(global_config.get("work_dir"), "timelapse_queue.txt")
+    if not os.path.exists(timelapse_queue_file):
+        open(timelapse_queue_file, 'a').close() # Create the file if it does not exist
+
     # These queues are global and should persist across reloads if fenetre.py itself isn't restarted.
     # If reload implies restarting these loops, then re-initialization might be needed in reload_configuration_logic
-    global timelapse_q, daylight_q, archive_q
-    timelapse_q = deque()
+    global daylight_q, archive_q
     daylight_q = deque()
     archive_q = deque()
 
@@ -991,7 +995,9 @@ def timelapse_scheduler_loop():
     while not exit_event.is_set():
         for camera_name in cameras_config:
             pic_dir, _ = get_pic_dir_and_filename(camera_name)
-            timelapse_q.append(pic_dir)
+            with timelapse_queue_lock:
+                with open(timelapse_queue_file, "a") as f:
+                    f.write(f"{pic_dir}\n")
         logging.info(f"Timelapse scheduler sleeping for {interval} seconds.")
         time.sleep(interval)
 
@@ -1001,24 +1007,33 @@ def timelapse_loop():
     This prevent overloading the system by creating new daily timelapses for all the cameras at the same time.
     """
     while not exit_event.is_set():
-        if len(timelapse_q) > 0:
-            dir = timelapse_q.popleft()
+        dir_to_process = None
+        with timelapse_queue_lock:
+            with open(timelapse_queue_file, "r+") as f:
+                lines = f.readlines()
+                if lines:
+                    dir_to_process = lines.pop(0).strip()
+                    f.seek(0)
+                    f.truncate()
+                    f.writelines(lines)
+
+        if dir_to_process:
             result = False
             try:
                 result = create_timelapse(
-                    dir=dir,
+                    dir=dir_to_process,
                     overwrite=True,
                     two_pass=global_config.get("ffmpeg_2pass", False),
                 )
                 if result:
-                    camera_name = os.path.basename(os.path.dirname(os.path.normpath(dir)))
+                    camera_name = os.path.basename(os.path.dirname(os.path.normpath(dir_to_process)))
                     metric_timelapses_created_total.labels(camera_name=camera_name).inc()
 
             except FileExistsError:
-                logging.warning(f"Found an existing timelapse in dir {dir}, Skipping.")
+                logging.warning(f"Found an existing timelapse in dir {dir_to_process}, Skipping.")
             if result is False:
                 logging.error(
-                    f"There was an error creating the timelapse for dir: {dir}"
+                    f"There was an error creating the timelapse for dir: {dir_to_process}"
                 )
         time.sleep(1)
 
@@ -1034,7 +1049,9 @@ def daylight_loop():
                 f"Running daylight in {daily_pic_dir} with sky_area {sky_area}"
             )
             run_end_of_day(camera_name, daily_pic_dir, sky_area)
-            timelapse_q.append(daily_pic_dir)
+            with timelapse_queue_lock:
+                with open(timelapse_queue_file, "a") as f:
+                    f.write(f"{daily_pic_dir}\n")
             archive_q.append(daily_pic_dir)
         time.sleep(1)
 
@@ -1122,7 +1139,7 @@ def disk_management_loop():
                         shutil.rmtree(day_dir)
                     current_work_dir_size -= dir_to_delete_size
 
-        logging.info(f"Disk management sleeping for {interval} seconds.")
+        logging.debug(f"Disk management sleeping for {interval} seconds.")
         time.sleep(interval)
 
 
@@ -1136,7 +1153,7 @@ def archive_loop():
             scan_and_publish_metrics(camera_name, camera_dir, global_config)
             daydirs = list_unarchived_dirs(camera_dir)
             for daydir in daydirs:
-                archive_daydir(daydir=daydir, global_config=global_config, dry_run=True) #TODO: Verify behaviour and switch to False
+                archive_daydir(daydir=daydir, global_config=global_config, dry_run=False)
         time.sleep(600)
 
 
