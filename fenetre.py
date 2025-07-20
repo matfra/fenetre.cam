@@ -730,7 +730,7 @@ def main(argv):
     archive_thread_global.start()
     logging.info(f"Starting thread {archive_thread_global.name}")
 
-    if global_config.get("timelapse_scheduler_enabled", True):
+    if global_config.get("frequent_timelapse_scheduler_enabled", True):
         timelapse_scheduler_thread_global = Thread(
             target=timelapse_scheduler_loop, daemon=True, name="timelapse_scheduler_loop"
         )
