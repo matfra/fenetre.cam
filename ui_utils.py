@@ -29,13 +29,14 @@ def generate_index_html(work_dir: str, global_config: dict):
         f.write(index_content)
 
 
-def link_html_file(work_dir: str, global_config: dict):
+def copy_public_html_files(work_dir: str, global_config: dict):
     """Copies all HTML and library files to the working directory."""
     current_dir = os.getcwd()
+    public_html_dir = os.path.join(current_dir, "html", "public")
     # Copy all html files
-    for file in os.listdir(current_dir):
+    for file in os.listdir(public_html_dir):
         if file.endswith(".html"):
-            shutil.copy(os.path.join(current_dir, file), os.path.join(work_dir, file))
+            shutil.copy(os.path.join(public_html_dir, file), os.path.join(work_dir, file))
 
     # Create the lib directory if it does not exist.
     lib_dir = os.path.join(work_dir, "lib")

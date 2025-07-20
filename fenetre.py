@@ -59,7 +59,7 @@ from admin_server import metric_pictures_taken_total, metric_last_successful_pic
 from config import config_load
 
 from platform_utils import is_raspberry_pi
-from ui_utils import link_html_file
+from ui_utils import copy_public_html_files
 
 # Define flags at module level
 flags.DEFINE_string("config", None, "path to YAML config file")
@@ -811,6 +811,7 @@ def load_and_apply_configuration(initial_load=False, config_file_override=None):
     cameras_config = new_cameras_config
     if global_config.get("work_dir"):
         update_cameras_metadata(cameras_config, global_config["work_dir"])
+        copy_public_html_files(global_config["work_dir"], global_config)
     else:
         logging.error("work_dir not set in global config. Cannot update camera metadata.")
 

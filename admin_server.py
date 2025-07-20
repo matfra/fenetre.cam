@@ -3,7 +3,7 @@ import yaml
 import json # For handling JSON input
 import os
 import signal
-from ui_utils import link_html_file
+from ui_utils import copy_public_html_files
 from prometheus_client import Counter, generate_latest, REGISTRY, Gauge
 
 # Create metrics
@@ -31,7 +31,7 @@ metric_sleep_time_seconds = Gauge('capture_loop_sleep_time_seconds', 'Time the c
 
 
 
-app = Flask(__name__, static_folder='.')
+app = Flask(__name__, static_folder='html/admin')
 
 # CONFIG_FILE_PATH and FENETRE_PID_FILE are passed by fenetre.py.
 # ADMIN_SERVER_HOST and ADMIN_SERVER_PORT are also managed by fenetre.py.
@@ -90,7 +90,7 @@ def update_config():
 
 @app.route('/')
 def serve_ui_page():
-    return app.send_static_file('index.html')
+    return send_from_directory('html/admin', 'index.html')
 
 @app.route('/api/sync_ui', methods=['POST'])
 def sync_ui():
@@ -104,7 +104,7 @@ def sync_ui():
         if not work_dir:
             return jsonify({"error": "work_dir not set in global config."}), 500
         
-        link_html_file(work_dir, config.get('global', {}))
+        copy_public_html_files(work_dir, config.get('global', {}))
         return jsonify({"message": "UI files synchronized successfully."}), 200
     except Exception as e:
         return jsonify({"error": f"Error synchronizing UI files: {str(e)}"}), 500
