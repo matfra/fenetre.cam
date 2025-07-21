@@ -7,6 +7,7 @@ from typing import Optional
 from absl import app, flags, logging
 from PIL import Image
 
+from config import get_log_dir
 from platform_utils import is_raspberry_pi
 
 def get_image_dimensions(image_path: str):
@@ -89,7 +90,12 @@ def create_timelapse(
 
     timelapse_filename = os.path.basename(dir) + "." + file_ext
     timelapse_filepath = os.path.join(dir, timelapse_filename)
-    ffmpeg_log_filepath = os.path.join(dir, "ffmpeg.log")
+
+    log_dir = get_log_dir()
+    os.makedirs(log_dir, exist_ok=True)
+    ffmpeg_log_filename = f"ffmpeg_{os.path.basename(dir)}.log"
+    ffmpeg_log_filepath = os.path.join(log_dir, ffmpeg_log_filename)
+
     logging.debug(f"timelapse_filename: {timelapse_filename}")
     logging.debug(f"timelapse_filepath: {timelapse_filepath}")
 
