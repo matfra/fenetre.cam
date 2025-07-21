@@ -2,7 +2,7 @@
 Description=Fetch images and build timelapses
 
 [Service]
-ExecStart=/srv/fenetre/venv/bin/python /srv/fenetre/fenetre.py --config=/srv/fenetre/config.yaml
+ExecStart=/srv/fenetre.cam/venv/bin/python /srv/fenetre.cam/fenetre.py --config=/srv/fenetre.cam/config.yaml
 User=fenetre
 Restart=always
 Environment=TZ=America/Los_Angeles
