@@ -15,11 +15,11 @@ from timelapse import create_timelapse
 import os
 
 
-from config import config_load
+from config import config_load, GlobalConfig
 from admin_server import metric_directories_total, metric_directories_archived_total, metric_directories_timelapse_total, metric_directories_daylight_total
 
 
-def scan_and_publish_metrics(camera_name: str, camera_dir: str, global_config: dict):
+def scan_and_publish_metrics(camera_name: str, camera_dir: str, global_config: GlobalConfig):
     """Scans a camera directory and publishes metrics."""
     if not os.path.isdir(camera_dir):
         return
@@ -30,7 +30,7 @@ def scan_and_publish_metrics(camera_name: str, camera_dir: str, global_config: d
     archived_count = 0
     timelapse_count = 0
     daylight_count = 0
-    timelapse_ext = global_config.get("timelapse_file_extension", "mp4")
+    timelapse_ext = "mp4" if os.uname().machine.startswith("arm") else "webm"
     for subdir in subdirs:
         if os.path.exists(os.path.join(subdir, "archived")):
             archived_count += 1
@@ -127,8 +127,8 @@ def check_dir_has_daylight_band(daydir):
     return os.path.isfile(os.path.join(daydir, "daylight.png"))
 
 
-def get_today_date(global_config: dict) -> str:
-    tz = pytz.timezone(global_config["timezone"])
+def get_today_date(global_config: GlobalConfig) -> str:
+    tz = pytz.timezone(global_config.timezone)
     dt = datetime.now(tz)
     return dt.strftime("%Y-%m-%d")
 
@@ -138,7 +138,7 @@ def is_dir_older_than_n_days(daydir, n_days=3):
     return (datetime.now() - dir_date).days > n_days
 
 
-def archive_daydir(daydir: str, global_config: dict, dry_run: bool = True, create_daylight_bands: bool = False, create_timelapses: bool = False):
+def archive_daydir(daydir: str, global_config: GlobalConfig, dry_run: bool = True, create_daylight_bands: bool = False, create_timelapses: bool = False):
     today_date = get_today_date(global_config)
     if os.path.basename(daydir) == today_date:
         logging.info(
@@ -163,14 +163,14 @@ def archive_daydir(daydir: str, global_config: dict, dry_run: bool = True, creat
 
     # Check if the subdirectory contains a file name daylight.png and a file named $year-$month-$day.webm.
     if not check_dir_has_timelapse(
-        daydir, global_config.get("timelapse_file_extension", "mp4")
+        daydir, "mp4" if os.uname().machine.startswith("arm") else "webm"
     ):
         if create_timelapses:
             logging.info(f"Creating timelapse for {daydir}")
             create_timelapse(
                 dir=daydir,
                 overwrite=True,
-                two_pass=global_config.get("ffmpeg_2pass", False),
+                two_pass=global_config.ffmpeg_2pass,
                 dry_run=dry_run,
             )
         else:
@@ -185,26 +185,25 @@ def archive_daydir(daydir: str, global_config: dict, dry_run: bool = True, creat
 def main(argv):
     del argv  # Unused.
 
-    global cameras_config, global_config
-    _, cameras_config, global_config, _ = config_load(FLAGS.config)
-    global_config["pic_dir"] = os.path.join(global_config["work_dir"], "photos")
+    config = config_load(FLAGS.config)
+    pic_dir = os.path.join(config.global_config.work_dir, "photos")
 
-    log_dir = global_config.get("log_dir")
+    log_dir = config.global_config.log_dir
     if log_dir:
         log_path = os.path.join(log_dir, "archive.log")
         # Add a file handler to the absl logger
         logging.get_absl_handler().use_absl_log_file("archive", log_dir)
 
-    for cam in cameras_config:
-        camera_dir = os.path.join(global_config["pic_dir"], cam)
-        sky_area = cameras_config[cam].get("sky_area", None)
+    for cam_name, cam_config in config.cameras.items():
+        camera_dir = os.path.join(pic_dir, cam_name)
+        sky_area = cam_config.sky_area
         if sky_area is None:
-            logging.warning(f"No sky area defined for cam {cam}")
+            logging.warning(f"No sky area defined for cam {cam_name}")
         if not os.path.isdir(camera_dir):
-            logging.warning(f"Could not find directory {camera_dir} for camera: {cam}.")
+            logging.warning(f"Could not find directory {camera_dir} for camera: {cam_name}.")
             continue
         for daydir in list_unarchived_dirs(camera_dir):
-            archive_daydir(daydir, global_config, FLAGS.dry_run, FLAGS.create_daylight_bands, FLAGS.create_timelapses)
+            archive_daydir(daydir, config.global_config, FLAGS.dry_run, FLAGS.create_daylight_bands, FLAGS.create_timelapses)
 
 if __name__ == "__main__":
     FLAGS = flags.FLAGS
