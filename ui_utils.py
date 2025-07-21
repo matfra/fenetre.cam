@@ -1,5 +1,7 @@
 import os
 import shutil
+import logging
+import filecmp
 
 def generate_index_html(work_dir: str, global_config: dict):
     """Generates the index.html file to redirect to the configured landing page."""
@@ -31,12 +33,19 @@ def generate_index_html(work_dir: str, global_config: dict):
 
 def copy_public_html_files(work_dir: str, global_config: dict):
     """Copies all HTML and library files to the working directory."""
-    current_dir = os.getcwd()
-    public_html_dir = os.path.join(current_dir, "html", "public")
+    logger = logging.getLogger(__name__)
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    public_html_dir = os.path.join(current_dir, "static", "public")
     # Copy all html files
     for file in os.listdir(public_html_dir):
         if file.endswith(".html"):
-            shutil.copy(os.path.join(public_html_dir, file), os.path.join(work_dir, file))
+            source_path = os.path.join(public_html_dir, file)
+            dest_path = os.path.join(work_dir, file)
+            if not os.path.exists(dest_path) or not filecmp.cmp(source_path, dest_path):
+                shutil.copy(source_path, dest_path)
+                logger.info(f"Copied {file} to {work_dir}")
+            else:
+                logger.debug(f"{file} already exists and is identical, skipping copy.")
 
     # Create the lib directory if it does not exist.
     lib_dir = os.path.join(work_dir, "lib")
@@ -48,8 +57,12 @@ def copy_public_html_files(work_dir: str, global_config: dict):
         # Copy all the files in the lib directory from the current directory to the work_dir/lib directory.
         for file in os.listdir(source_lib_dir):
             if file.endswith(".js") or file.endswith(".css"):
-                shutil.copy(
-                    os.path.join(source_lib_dir, file),
-                    os.path.join(lib_dir, file),
-                )
+                source_path = os.path.join(source_lib_dir, file)
+                dest_path = os.path.join(lib_dir, file)
+                if not os.path.exists(dest_path) or not filecmp.cmp(source_path, dest_path):
+                    shutil.copy(source_path, dest_path)
+                    logger.info(f"Copied {file} to {lib_dir}")
+                else:
+                    logger.debug(f"{file} already exists and is identical, skipping copy.")
+
     generate_index_html(work_dir, global_config)
