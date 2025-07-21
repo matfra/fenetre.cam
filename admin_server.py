@@ -31,10 +31,8 @@ metric_sleep_time_seconds = Gauge('capture_loop_sleep_time_seconds', 'Time the c
 
 
 
-app = Flask(__name__, static_folder='html/admin')
+app = Flask(__name__)
 
-# CONFIG_FILE_PATH and FENETRE_PID_FILE are passed by fenetre.py.
-# ADMIN_SERVER_HOST and ADMIN_SERVER_PORT are also managed by fenetre.py.
 
 @app.route('/metrics')
 def metrics():
@@ -90,7 +88,7 @@ def update_config():
 
 @app.route('/')
 def serve_ui_page():
-    return send_from_directory('html/admin', 'index.html')
+    return send_from_directory('static/admin', 'index.html')
 
 @app.route('/api/sync_ui', methods=['POST'])
 def sync_ui():
