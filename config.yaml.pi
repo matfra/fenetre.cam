@@ -1,0 +1,70 @@
+cameras:
+  gopro-hero-11:
+    gopro_ble_identifier: '9756'
+    gopro_ip: 10.5.5.9
+    lat: 37
+    lon: -122.4
+    sunrise_sunset:
+      enabled: True
+    postprocessing:
+      - type: crop
+        area: "491,1219,5465,3150"
+      - type: resize
+        height: 1440
+      - type: timestamp
+        enabled: true
+        size: 24
+        color: white
+        background_color: "(100, 100, 100)"
+      - type: gather_metrics
+        enabled: true
+    sky_area: 0,100,2560,500
+    ssim_area: 0,0,2560,500
+    ssim_setpoint: 0.89
+  picam-hq-6mm:
+    local_command: libcamera-still -n --tuning-file /home/mathieu/fenetre.cam/imx477_long_exposure.json --exposure normal --framerate 0 --ev 1.5 -q 100 -o -
+    #    capture_method: picamera2
+    #    tuning_file: /home/mathieu/fenetre.cam/imx477_long_exposure.json
+    #    exposure_time: 1000000
+    #    analogue_gain: 1.0
+    #    denoise_mode: HighQuality
+    lat: 37.6
+    lon: -122.4
+    sunrise_sunset:
+      enabled: True
+    postprocessing:
+      - type: crop
+        area: 0,470,4056,2750
+      - type: resize
+        height: 1440
+      - type: timestamp
+        enabled: true
+        size: 24
+        color: white
+        background_color: "(100, 100, 100)"
+      - type: gather_metrics
+        enabled: true
+    sky_area: 0,0,2560,500
+    ssim_area: 0,0,2560,500
+    ssim_setpoint: 0.9
+    redirect_stderr: true
+global:
+  frequent_timelapse_scheduler_enabled: true
+  timelapse_scheduler_interval_s: 1200
+  log_dir: /srv/fenetre/logs
+  timezone: America/Los_Angeles
+  work_dir: /srv/fenetre/data
+  sunrise_sunset_interval_s: 10
+  storage_management:
+    enabled: true
+    dry_run: true
+    check_interval_s: 60
+    work_dir_max_size_GB: 20
+http_server:
+  enabled: false
+  host: 0.0.0.0
+  port: 8888
+admin_server:
+  enabled: true
+  host: 0.0.0.0
+  port: 8889
