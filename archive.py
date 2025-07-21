@@ -88,26 +88,28 @@ def keep_only_a_subset_of_jpeg_files(
 def list_unarchived_dirs(camera_dir, archived_marker_file="archived"):
     res = []
     # Iterate over all the subdirectories.
-    for subdirectory in os.listdir(camera_dir):
+    for entry in os.scandir(camera_dir):
+        if not entry.is_dir():
+            continue
+
+        subdirectory = entry.name
         # Check if the subdirectory is formatted with the name $year-$month-$day.
-        if (
-            len(subdirectory) == 10
-            and subdirectory[0:3].isdigit()
-            and subdirectory[5:6].isdigit()
-            and subdirectory[8:9].isdigit()
-        ):
-            daydir = os.path.join(camera_dir, subdirectory)
+        try:
+            datetime.strptime(subdirectory, "%Y-%m-%d")
+        except ValueError:
+            continue
+
+        daydir = entry.path
+        if os.path.isfile(os.path.join(daydir, archived_marker_file)):
             photos_count = len(glob.glob(os.path.join(daydir, "*.jpg")))
-            if os.path.isfile(os.path.join(daydir, archived_marker_file)):
-                if photos_count > 48:
-                    logging.warning(
-                        f"{daydir} is archived but has {photos_count} photos. "
-                        "This is unexpected, please check the directory."
-                    )
-                else:
-                    logging.debug(f"{daydir} is already archived.")
-                    continue
-            res.append(daydir)
+            if photos_count > 48:
+                logging.warning(
+                    f"{daydir} is archived but has {photos_count} photos. "
+                    "This is unexpected, please check the directory."
+                )
+            logging.debug(f"{daydir} is already archived.")
+            continue
+        res.append(daydir)
     return res
 
 

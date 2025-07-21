@@ -26,7 +26,37 @@ class TestArchive(unittest.TestCase):
     def tearDown(self):
         self.temp_dir.cleanup()
 
-    @patch('archive.global_config', {"timelapse_file_extension": "mp4"})
+    def test_list_unarchived_dirs_skips_archived(self):
+        # Create a dummy camera directory
+        camera_dir = os.path.join(self.temp_dir.name, "camera1")
+        os.makedirs(camera_dir)
+
+        # Create a directory that is already archived but has many files
+        archived_dir = os.path.join(camera_dir, "2025-07-18")
+        os.makedirs(archived_dir)
+        with open(os.path.join(archived_dir, "archived"), "w") as f:
+            f.write("")
+        for i in range(50):
+            with open(os.path.join(archived_dir, f"img_{i}.jpg"), "w") as f:
+                f.write("dummy")
+
+        # Create a directory that is not archived
+        unarchived_dir = os.path.join(camera_dir, "2025-07-19")
+        os.makedirs(unarchived_dir)
+        with open(os.path.join(unarchived_dir, "img_A.jpg"), "w") as f:
+            f.write("dummy")
+
+        # Create a directory with an invalid name
+        invalid_dir = os.path.join(camera_dir, "not-a-date")
+        os.makedirs(invalid_dir)
+
+        # Call the function
+        result = list_unarchived_dirs(camera_dir)
+
+        # Check that only the unarchived directory is returned
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0], unarchived_dir)
+
     @patch('archive.get_today_date')
     @patch('archive.is_dir_older_than_n_days')
     @patch('archive.check_dir_has_daylight_band')
@@ -40,13 +70,14 @@ class TestArchive(unittest.TestCase):
         mock_is_older.return_value = True
         mock_check_daylight.return_value = True
         mock_check_timelapse.return_value = True
+        mock_global_config = {"timelapse_file_extension": "mp4"}
 
         # Create a dummy directory
         day_dir = os.path.join(self.temp_dir.name, "2023-01-01")
         os.makedirs(day_dir)
 
         # Call the function
-        archive_daydir(day_dir)
+        archive_daydir(day_dir, mock_global_config)
 
         # Check that the correct functions were called
         mock_keep_files.assert_called_once_with(day_dir, dry_run=True)
