@@ -15,3 +15,8 @@ def config_load(config_file_path: str) -> list[dict]:
     except yaml.YAMLError as e:
         logging.error(f"Error parsing YAML configuration file {config_file_path}: {e}")
         return [{}, {}, {}]
+
+def get_log_dir() -> str:
+    if not _config:
+        raise Exception("Config not loaded")
+    return _config.global_config.log_dir
