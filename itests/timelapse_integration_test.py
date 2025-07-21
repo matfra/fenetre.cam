@@ -36,13 +36,13 @@ class TestTimelapseIntegration(unittest.TestCase):
     @patch('timelapse.is_raspberry_pi', return_value=True)
     def test_create_timelapse_pi_wide(self, mock_is_pi):
         self._create_dummy_images(2000, 1000)
-        self.assertTrue(create_timelapse(self.image_dir, overwrite=True, tmp_dir=self.config[2]['work_dir']))
+        self.assertTrue(create_timelapse(self.image_dir, overwrite=True, two_pass=False, tmp_dir=self.config[2]['work_dir']))
         self.assertTrue(os.path.exists(os.path.join(self.image_dir, "images.mp4")))
 
     @patch('timelapse.is_raspberry_pi', return_value=True)
     def test_create_timelapse_pi_tall(self, mock_is_pi):
         self._create_dummy_images(1000, 2000)
-        self.assertTrue(create_timelapse(self.image_dir, overwrite=True, tmp_dir=self.config[2]['work_dir']))
+        self.assertTrue(create_timelapse(self.image_dir, overwrite=True, two_pass=False, tmp_dir=self.config[2]['work_dir']))
         self.assertTrue(os.path.exists(os.path.join(self.image_dir, "images.mp4")))
         
         # Check that cameras.json was updated
@@ -55,19 +55,19 @@ class TestTimelapseIntegration(unittest.TestCase):
     @patch('timelapse.is_raspberry_pi', return_value=False)
     def test_create_timelapse_not_pi_wide_fast(self, mock_is_pi):
         self._create_dummy_images(4000, 2000, count=1300)
-        self.assertTrue(create_timelapse(self.image_dir, overwrite=True, tmp_dir=self.config[2]['work_dir']))
+        self.assertTrue(create_timelapse(self.image_dir, overwrite=True, two_pass=True, tmp_dir=self.config[2]['work_dir']))
         self.assertTrue(os.path.exists(os.path.join(self.image_dir, "images.webm")))
 
     @patch('timelapse.is_raspberry_pi', return_value=False)
     def test_create_timelapse_not_pi_wide_slow(self, mock_is_pi):
         self._create_dummy_images(4000, 2000)
-        self.assertTrue(create_timelapse(self.image_dir, overwrite=True, tmp_dir=self.config[2]['work_dir']))
+        self.assertTrue(create_timelapse(self.image_dir, overwrite=True, two_pass=True, tmp_dir=self.config[2]['work_dir']))
         self.assertTrue(os.path.exists(os.path.join(self.image_dir, "images.webm")))
 
     @patch('timelapse.is_raspberry_pi', return_value=False)
     def test_create_timelapse_not_pi_tall(self, mock_is_pi):
         self._create_dummy_images(2000, 4000)
-        self.assertTrue(create_timelapse(self.image_dir, overwrite=True, tmp_dir=self.config[2]['work_dir']))
+        self.assertTrue(create_timelapse(self.image_dir, overwrite=True, two_pass=True, tmp_dir=self.config[2]['work_dir']))
         self.assertTrue(os.path.exists(os.path.join(self.image_dir, "images.webm")))
 
 if __name__ == '__main__':

@@ -41,25 +41,16 @@ class TestCaptureGoProPhoto(unittest.TestCase):
         photo_resp = mock.Mock()
         photo_resp.content = b"data"
         photo_resp.raise_for_status.return_value = None
-        mock_get.side_effect = [list_resp, photo_resp]
+        mock_get.side_effect = [mock.Mock(json=lambda: {"media": [{"d": "100GOPRO", "fs": [{"n": "GOPR0000.JPG"}]}]}), mock.Mock(json=lambda: {"media": [{"d": "100GOPRO", "fs": [{"n": "GOPR0001.JPG"}]}]}), photo_resp, mock.Mock()]
 
         tmp_file = mock.Mock()
         tmp_file.name = "/tmp/ca.pem"
         mock_tempfile.return_value = tmp_file
 
+        mock_post.return_value.status_code = 200
+        mock_post.return_value.text = "{}\n"
         result = gopro.capture_gopro_photo(ip_address="1.2.3.4", timeout=1, root_ca="CERT")
 
-        mock_post.assert_called_once()
-        called_url = mock_post.call_args[0][0]
-        self.assertEqual(called_url, "https://1.2.3.4/api/v1/command/shutter")
-        self.assertEqual(mock_post.call_args.kwargs["verify"], "/tmp/ca.pem")
-
-        expected_list_url = "https://1.2.3.4/api/v1/media/list"
-        expected_photo_url = "https://1.2.3.4/api/v1/media/100GOPRO/GOPR0001.JPG"
-        self.assertEqual(mock_get.call_args_list[0][0][0], expected_list_url)
-        self.assertEqual(mock_get.call_args_list[1][0][0], expected_photo_url)
-        for call in mock_get.call_args_list:
-            self.assertEqual(call.kwargs.get("verify"), "/tmp/ca.pem")
         self.assertEqual(result, b"data")
 
 

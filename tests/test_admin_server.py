@@ -16,9 +16,6 @@ from admin_server import app as flask_app
 class ConfigServerTestCase(unittest.TestCase):
 
     def setUp(self):
-        self.app = flask_app.test_client()
-        self.app.testing = True
-
         # Create a temporary config file
         self.temp_config_file = tempfile.NamedTemporaryFile(mode="w+", delete=False, suffix=".yaml")
         self.test_config_data = {"global": {"setting": "value"}, "cameras": {"cam1": {"url": "http://localhost"}}}
@@ -30,16 +27,14 @@ class ConfigServerTestCase(unittest.TestCase):
         self.temp_pid_file.write(str(os.getpid())) # Write a dummy PID
         self.temp_pid_file.close()
 
-        # Patch the module-level variables in admin_server directly
-        self.config_path_patch = patch('admin_server.CONFIG_FILE_PATH', self.temp_config_file.name)
-        self.pid_path_patch = patch('admin_server.FENETRE_PID_FILE', self.temp_pid_file.name)
-
-        self.config_path_patch.start()
-        self.pid_path_patch.start()
+        flask_app.config.update({
+            "TESTING": True,
+            "CONFIG_FILE_PATH": self.temp_config_file.name,
+            "FENETRE_PID_FILE": self.temp_pid_file.name,
+        })
+        self.app = flask_app.test_client()
 
     def tearDown(self):
-        self.config_path_patch.stop()
-        self.pid_path_patch.stop()
         os.unlink(self.temp_config_file.name)
         os.unlink(self.temp_pid_file.name)
 
@@ -50,14 +45,11 @@ class ConfigServerTestCase(unittest.TestCase):
         self.assertEqual(response.json, self.test_config_data)
 
     def test_get_config_not_found(self):
-        os.unlink(self.temp_config_file.name)
+        flask_app.config["CONFIG_FILE_PATH"] = "nonexistent.yaml"
         response = self.app.get('/config')
         self.assertEqual(response.status_code, 404)
         self.assertIn("Configuration file not found", response.json['error'])
-        self.temp_config_file = tempfile.NamedTemporaryFile(mode="w+", delete=False, suffix=".yaml")
-        yaml.dump(self.test_config_data, self.temp_config_file)
-        self.temp_config_file.close()
-        flask_app.config['CONFIG_FILE_PATH'] = self.temp_config_file.name
+        flask_app.config["CONFIG_FILE_PATH"] = self.temp_config_file.name
 
 # ... (other parts of the class) ...
 
@@ -114,16 +106,12 @@ class ConfigServerTestCase(unittest.TestCase):
 
     @patch('os.kill')
     def test_reload_config_pid_file_not_found(self, mock_kill):
-        os.unlink(self.temp_pid_file.name) # Delete PID file
+        flask_app.config["FENETRE_PID_FILE"] = "nonexistent.pid"
         response = self.app.post('/config/reload')
         self.assertEqual(response.status_code, 404)
         self.assertIn("PID file not found", response.json['error'])
         mock_kill.assert_not_called()
-        # Recreate for other tests
-        self.temp_pid_file = tempfile.NamedTemporaryFile(mode="w+", delete=False, suffix=".pid")
-        self.temp_pid_file.write(str(os.getpid()))
-        self.temp_pid_file.close()
-        flask_app.config['FENETRE_PID_FILE'] = self.temp_pid_file.name
+        flask_app.config["FENETRE_PID_FILE"] = self.temp_pid_file.name
 
 
     @patch('os.kill', side_effect=ProcessLookupError)

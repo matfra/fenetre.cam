@@ -1,4 +1,5 @@
 from flask import Flask, request, jsonify, send_from_directory, send_file, redirect, Response
+from werkzeug.exceptions import BadRequest
 import yaml
 import json # For handling JSON input
 import os
@@ -40,9 +41,9 @@ def metrics():
 
 @app.route('/config', methods=['GET'])
 def get_config():
-    config_file_path = app.config.get('FENETRE_CONFIG_FILE')
+    config_file_path = app.config.get('CONFIG_FILE_PATH')
     if not config_file_path:
-        return jsonify({"error": "FENETRE_CONFIG_FILE not set in app config."}), 500
+        return jsonify({"error": "CONFIG_FILE_PATH not set in app config."}), 500
     try:
         if not os.path.exists(config_file_path):
             return jsonify({"error": f"Configuration file not found: {config_file_path}"}), 404
@@ -54,9 +55,9 @@ def get_config():
 
 @app.route('/config', methods=['PUT'])
 def update_config():
-    config_file_path = app.config.get('FENETRE_CONFIG_FILE')
+    config_file_path = app.config.get('CONFIG_FILE_PATH')
     if not config_file_path:
-        return jsonify({"error": "FENETRE_CONFIG_FILE not set in app config."}), 500
+        return jsonify({"error": "CONFIG_FILE_PATH not set in app config."}), 500
     try:
         if not request.is_json:
             return jsonify({"error": "Request body must be JSON."}), 415
@@ -92,9 +93,9 @@ def serve_ui_page():
 
 @app.route('/api/sync_ui', methods=['POST'])
 def sync_ui():
-    config_file_path = app.config.get('FENETRE_CONFIG_FILE')
+    config_file_path = app.config.get('CONFIG_FILE_PATH')
     if not config_file_path:
-        return jsonify({"error": "FENETRE_CONFIG_FILE not set in app config."}), 500
+        return jsonify({"error": "CONFIG_FILE_PATH not set in app config."}), 500
     try:
         with open(config_file_path, 'r') as f:
             config = yaml.safe_load(f)
@@ -111,9 +112,9 @@ def sync_ui():
 
 @app.route('/api/camera/<string:camera_name>/capture_for_ui', methods=['POST'])
 def capture_for_ui(camera_name):
-    config_file_path = app.config.get('FENETRE_CONFIG_FILE')
+    config_file_path = app.config.get('CONFIG_FILE_PATH')
     if not config_file_path:
-        return jsonify({"error": "FENETRE_CONFIG_FILE not set in app config."}), 500
+        return jsonify({"error": "CONFIG_FILE_PATH not set in app config."}), 500
 
     try:
         with open(config_file_path, 'r') as f:
@@ -247,9 +248,9 @@ def reload_config():
     """
     Signals the main fenetre.py process to reload its configuration.
     """
-    fenetre_pid_file_path = app.config.get('FENETRE_PID_FILE_PATH')
+    fenetre_pid_file_path = app.config.get('FENETRE_PID_FILE')
     if not fenetre_pid_file_path:
-        return jsonify({"error": "FENETRE_PID_FILE_PATH not set in app config."}), 500
+        return jsonify({"error": "FENETRE_PID_FILE not set in app config."}), 500
 
     try:
         if os.path.exists(fenetre_pid_file_path):

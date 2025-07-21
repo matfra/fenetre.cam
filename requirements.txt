@@ -47,3 +47,4 @@ PyYAML
 waitress
 prometheus-client
 pyexiv2
+pydantic

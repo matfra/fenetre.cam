@@ -25,7 +25,7 @@ class TestTimelapse(unittest.TestCase):
                 f.write("test")
 
         # Call the function
-        create_timelapse(self.temp_dir.name, overwrite=True)
+        create_timelapse(self.temp_dir.name, overwrite=True, two_pass=False)
 
         # Check that ffmpeg was called with the correct arguments
         self.assertTrue(mock_subprocess_run.called)
@@ -44,7 +44,7 @@ class TestTimelapse(unittest.TestCase):
                 f.write("test")
 
         # Call the function
-        create_timelapse(self.temp_dir.name, overwrite=True)
+        create_timelapse(self.temp_dir.name, overwrite=True, two_pass=False)
 
         # Check that ffmpeg was called with the correct arguments
         self.assertTrue(mock_subprocess_run.called)

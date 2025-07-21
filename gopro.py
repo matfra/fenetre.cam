@@ -24,7 +24,6 @@ def _log_request_response(url: str, response: requests.Response):
 
 
 def _make_gopro_request(
-
     url_path: str,
     expected_response_code: int = 200,
     expected_response_text: str = "{}\n",
@@ -32,10 +31,14 @@ def _make_gopro_request(
     timeout: int = 5,
     root_ca_filepath: str = "",
     scheme: str = "http",
+    post: bool = False,
 ):
     """Helper function to make HTTP requests to GoPro with common parameters."""
     url = f"{scheme}://{ip_address}{url_path}"
-    r = requests.get(url, timeout=timeout, verify=root_ca_filepath)
+    if post:
+        r = requests.post(url, timeout=timeout, verify=root_ca_filepath)
+    else:
+        r = requests.get(url, timeout=timeout, verify=root_ca_filepath)
     _log_request_response(url, r)
     if r.status_code != expected_response_code:
         raise RuntimeError(
@@ -60,22 +63,19 @@ def _get_latest_file(
     resp.raise_for_status()
     data = resp.json()
 
-    media_entries = data.get("media") or data.get("results", {}).get("media")
+    media_entries = data.get("media")
     if not media_entries:
         logging.debug("No media medias found on GoPro.")
         return None, None
 
-    latest_dir_info = media_entries[-1]
-    latest_dir = latest_dir_info.get("directory") or latest_dir_info.get("d")
+    latest_dir_info = media_entries[0]
+    latest_dir = latest_dir_info.get("d")
 
-    if "filename" in latest_dir_info:
-        latest_file = latest_dir_info["filename"]
-    else:
-        files = latest_dir_info.get("files") or latest_dir_info.get("fs")
-        if not files:
-            raise RuntimeError("No files returned by GoPro")
-        latest_file_info = files[-1]
-        latest_file = latest_file_info.get("filename") or latest_file_info.get("n")
+    files = latest_dir_info.get("fs")
+    if not files:
+        raise RuntimeError("No files returned by GoPro")
+    latest_file_info = files[-1]
+    latest_file = latest_file_info.get("n")
     return latest_dir, latest_file
 
 
@@ -128,16 +128,31 @@ def capture_gopro_photo(
     # Takeover control of the GoPro camera https://gopro.github.io/OpenGoPro/http#tag/Control/operation/GPCAMERA_SYSTEM_RESET
     _make_gopro_request(
         "/gopro/camera/control/set_ui_controller?p=2",
+        ip_address=ip_address,
+        timeout=timeout,
+        root_ca_filepath=root_ca_filepath,
+        scheme=scheme,
+        post=True,
     )
 
     # Set the control mode to pro
     _make_gopro_request(
         "/gopro/camera/setting?option=1&setting=175",
+        ip_address=ip_address,
+        timeout=timeout,
+        root_ca_filepath=root_ca_filepath,
+        scheme=scheme,
+        post=True,
     )
 
     # Set the LCD brightness to minimum to avoid wearing out the LCD
     _make_gopro_request(
         "/gopro/camera/setting?option=10&setting=88",
+        ip_address=ip_address,
+        timeout=timeout,
+        root_ca_filepath=root_ca_filepath,
+        scheme=scheme,
+        post=True,
     )
 
     # Set photo output to superphoto
@@ -148,33 +163,53 @@ def capture_gopro_photo(
     # Turn off all LEDs:
     _make_gopro_request(
         "/gopro/camera/setting?option=4&setting=91",
+        ip_address=ip_address,
+        timeout=timeout,
+        root_ca_filepath=root_ca_filepath,
+        scheme=scheme,
+        post=True,
     )
 
     # Disable GPS in metadata
     _make_gopro_request(
         "/gopro/camera/setting?option=1&setting=83",
+        ip_address=ip_address,
+        timeout=timeout,
+        root_ca_filepath=root_ca_filepath,
+        scheme=scheme,
+        post=True,
     )
 
     # Set up auto power down to 30 minutes (option 7)
     _make_gopro_request(
         "/gopro/camera/setting?option=7&setting=59",
+        ip_address=ip_address,
+        timeout=timeout,
+        root_ca_filepath=root_ca_filepath,
+        scheme=scheme,
+        post=True,
     )
 
 
     # Set the GoPro HERO 11 preset for night photography
-#    if preset:
-#        _make_gopro_request(
-#            f"/gopro/camera/presets/load?p1={preset}",
-#        )
+    if preset:
+        _make_gopro_request(
+            f"/gopro/camera/presets/load?p1={preset}",
+            ip_address=ip_address,
+            timeout=timeout,
+            root_ca_filepath=root_ca_filepath,
+            scheme=scheme,
+        )
 
     # Trigger the shutter to capture a new photo
-    trigger_url = f"{scheme}://{ip_address}/gopro/camera/shutter/start"
-    r = requests.get(
-        trigger_url,
+    _make_gopro_request(
+        "/gopro/camera/shutter/start",
+        ip_address=ip_address,
         timeout=timeout,
-        verify=root_ca_filepath,
+        root_ca_filepath=root_ca_filepath,
+        scheme=scheme,
+        post=True,
     )
-    _log_request_response(trigger_url, r)
 
     # Poll for the last captured file until it changes
     while True:
