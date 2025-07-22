@@ -7,7 +7,6 @@ from typing import Optional
 from absl import app, flags, logging
 from PIL import Image
 
-from config import get_log_dir
 from platform_utils import is_raspberry_pi
 
 def get_image_dimensions(image_path: str):
@@ -23,6 +22,7 @@ def create_timelapse(
     dir: str,
     overwrite: bool,
     two_pass: Optional[bool],
+    log_dir: str,
     tmp_dir: Optional[str] = "/dev/shm/fenetre",
     dry_run: bool = False,
 ) -> bool:
@@ -91,7 +91,7 @@ def create_timelapse(
     timelapse_filename = os.path.basename(dir) + "." + file_ext
     timelapse_filepath = os.path.join(dir, timelapse_filename)
 
-    log_dir = get_log_dir()
+    
     os.makedirs(log_dir, exist_ok=True)
     ffmpeg_log_filename = f"ffmpeg_{os.path.basename(dir)}.log"
     ffmpeg_log_filepath = os.path.join(log_dir, ffmpeg_log_filename)
@@ -161,7 +161,7 @@ def create_timelapse(
 def main(argv):
     del argv  # Unused.
     create_timelapse(
-        FLAGS.dir, FLAGS.overwrite, FLAGS.two_pass
+        FLAGS.dir, FLAGS.overwrite, FLAGS.two_pass, FLAGS.log_dir
     )
 
 
@@ -169,6 +169,7 @@ if __name__ == "__main__":
     FLAGS = flags.FLAGS
 
     flags.DEFINE_string("dir", None, "directory to build a timelapse from")
+    flags.DEFINE_string("log_dir", "/tmp", "directory to store logs")
     flags.DEFINE_bool("overwrite", False, "Overwrite existing timelapse")
     flags.DEFINE_bool(
         "two_pass", False, "Tell ffmpeg to do 2 pass encoding. Recommended for VP9"

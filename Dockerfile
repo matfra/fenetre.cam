@@ -1,31 +1,30 @@
 # Dockerfile
 
 # Use an official Python 3.12 image as a base
-FROM python:3.12-slim
+FROM ubuntu:latest
 
 # Set the working directory inside the container
-WORKDIR /app
+WORKDIR /opt/fenetre
 
 # Install required system packages (ffmpeg)
 RUN apt-get update && \
-    apt-get install -y ffmpeg && \
+    apt-get install -y python3-venv ffmpeg && \
     rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies if necessary
 # Uncomment the following line if you need to install dependencies
-COPY requirements.txt /app/
-RUN pip install --no-cache-dir -r requirements.txt
+RUN python3 -m venv /opt/fenetre/venv
+RUN mkdir /opt/fenetre/app
+COPY requirements.txt /opt/fenetre/app/requirements.txt
+RUN /opt/fenetre/venv/bin/pip install --no-cache-dir -r /opt/fenetre/app/requirements.txt
 
 # Copy the local files into the container
-COPY fenetre.py timelapse.py daylight.py archive.py index.html /app/
-COPY config_server.py /app/
+COPY . /opt/fenetre/app
+VOLUME /opt/fenetre/config.yaml
+VOLUME /opt/fenetre/data
+VOLUME /opt/fenetre/logs
 
-# Add the lib directoy to /app
-COPY lib /app/lib
-
-# Add the static directory for the config server UI to /app/static
-COPY static /app/static/
 
 # Set entrypoint to allow dynamic config.yaml file specification
-ENTRYPOINT ["python", "fenetre.py", "--config"]
+# ENTRYPOINT ["/opt/fenetre/venv/bin/python", "/opt/fenetre/app/fenetre.py", "--config"]
 

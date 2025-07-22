@@ -32,12 +32,8 @@ from PIL import Image
 from PIL.ExifTags import TAGS
 
 
-import SSIM_PIL._gpu_strategy as gpu_strategy
-from pyopencl import Kernel as cl_Kernel
-
-gpu_strategy._kernel = cl_Kernel(gpu_strategy._program, "convert")
-
-from SSIM_PIL import compare_ssim
+import numpy as np
+from skimage.metrics import structural_similarity
 
 
 from timelapse import create_timelapse
@@ -387,23 +383,28 @@ def get_ssim_for_area(
             f"Images {image1.size} and {image2.size} are not the same size, cannot compare SSIM."
         )
         return 1.0
-    # Compute SSIM on the full image.
-    if area is None:
-        return compare_ssim(image1, image2)
 
-    # Prevents the linter from complaining about the type of crop_points.
-    crop_points_list = [float(i) for i in area.split(",")]
-    crop_points = (
-        crop_points_list[0],
-        crop_points_list[1],
-        crop_points_list[2],
-        crop_points_list[3],
-    )
-    logging.debug(f"{crop_points}")
-    return compare_ssim(
-        image1.resize((50, 50), box=crop_points),
-        image2.resize((50, 50), box=crop_points),
-    )
+    target_image1 = image1
+    target_image2 = image2
+
+    # Compute SSIM on the full image.
+    if area:
+        # Prevents the linter from complaining about the type of crop_points.
+        crop_points_list = [float(i) for i in area.split(",")]
+        crop_points = (
+            crop_points_list[0],
+            crop_points_list[1],
+            crop_points_list[2],
+            crop_points_list[3],
+        )
+        logging.debug(f"{crop_points}")
+        target_image1 = image1.resize((50, 50), box=crop_points)
+        target_image2 = image2.resize((50, 50), box=crop_points)
+
+    image1_np = np.array(target_image1.convert("L"))
+    image2_np = np.array(target_image2.convert("L"))
+
+    return structural_similarity(image1_np, image2_np, data_range=255)
 
 
 def server_run():
@@ -730,7 +731,7 @@ def main(argv):
     archive_thread_global.start()
     logging.info(f"Starting thread {archive_thread_global.name}")
 
-    if global_config.get("frequent_timelapse_scheduler_enabled", True):
+    if global_config.get("frequent_timelapse_scheduler_enabled", False):
         timelapse_scheduler_thread_global = Thread(
             target=timelapse_scheduler_loop, daemon=True, name="timelapse_scheduler_loop"
         )
@@ -764,7 +765,7 @@ def load_and_apply_configuration(initial_load=False, config_file_override=None):
     If initial_load is True, it loads all configs and starts all services.
     If initial_load is False (on SIGHUP), it only reloads camera configs.
     """
-    global cameras_config
+    global server_config, cameras_config
 
     logging.info("Loading and applying configuration...")
 
@@ -777,7 +778,7 @@ def load_and_apply_configuration(initial_load=False, config_file_override=None):
     new_server_config, new_cameras_config, new_global_config, new_admin_server_config = config_load(config_path_to_load)
 
     if initial_load:
-        global server_config, global_config, admin_server_config, flask_app_instance
+        global global_config, admin_server_config, flask_app_instance
         server_config = new_server_config
         global_config = new_global_config
         admin_server_config = new_admin_server_config
@@ -806,6 +807,8 @@ def load_and_apply_configuration(initial_load=False, config_file_override=None):
                 name="admin_server_flask",
             )
             admin_server_thread_global.start()
+    else:
+        server_config = new_server_config
 
     # Update cameras_config and manage camera threads
     cameras_config = new_cameras_config
@@ -1012,6 +1015,7 @@ def timelapse_loop():
                     dir=dir_to_process,
                     overwrite=True,
                     two_pass=global_config.get("ffmpeg_2pass", False),
+                    log_dir=global_config.get("log_dir"),
                 )
                 if result:
                     camera_name = os.path.basename(os.path.dirname(os.path.normpath(dir_to_process)))
