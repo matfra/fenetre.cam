@@ -24,9 +24,8 @@ pytest
 ffmpeg-python # Maybe not required anymore
 
 # SSIM
-SSIM-PIL
 # numpi #use systems
-# pyopencl #use system
+numpy
 python-daemon
 
 #Pictures

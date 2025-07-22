@@ -1,17 +1,51 @@
-cameras: {}
 global:
-  ffmpeg_2pass: true
-  timelapse_scheduler_enabled: true
-  timelapse_scheduler_interval_s: 1200
-  log_dir: /tmp/fenetre/logs
-  timezone: America/Los_Angeles
-  work_dir: /tmp/fenetre/data
-  work_dir_max_size_GB: 10
+  ffmpeg_options: "-framerate 30 -c:v libvpx-vp9 -b:v 3M" #default to "-framerate 30"
+  ffmpeg_2pass: True #default to False
+  work_dir: /srv/fenetre/data
+  log_dir: /srv/fenetre/logs
+  timezone: "America/Los_Angeles"
+  sunrise_sunset_interval_s: 10
+  storage_management:
+    enabled: true
+    dry_run: true
+    check_interval_s: 300
+    work_dir_max_size_GB: 10
 http_server:
-  enabled: false
-  host: 0.0.0.0
   port: 8888
-config_server:
-  enabled: true
   host: 0.0.0.0
-  port: 8889
+  enabled: True
+admin_server:
+  enabled: true       # Enable the web UI for configuration
+  host: "0.0.0.0"     # Host for the config server
+  port: 8889          # Port for the config server
+ui:
+  landing_page: "list" # list, map, camera, fullscreen
+  fullscreen_camera: "a-cool-http-cam-with-clouds"
+cameras:
+  a-cool-http-cam-with-clouds:
+    url: "https://isitfoggy.com/photos/latest.jpg"
+    sky_area: 0,80,1920,400
+    work_dir_max_size_GB: 5
+    # In order to fast forward the boring days and capture the beautiful sky motion,
+    # we can calculate a dynamic interval based on the difference between the last 2 pictures.
+    # try to grab the biggest area containing things not susceptible to the wind like shaking tree.
+    ssim_area: 0,80,700,300
+    ssim_setpoint: 0.93
+    timeout_s: 20 # Default value is not specified
+    latitude: 37.7749
+    longitude: -122.4194
+    sunrise_sunset:
+      enabled: True
+    postprocessing:
+      - type: "crop"
+        area: "0,0,1920,1080"
+      - type: "resize"
+        width: 1280
+        height: 720
+      - type: "awb"
+      - type: "timestamp"
+        enabled: true
+        position: "bottom_right" # Options: "top_left", "top_right", "bottom_left", or "x,y" coordinates
+        size: 24
+        color: "white" # common color names or RGB tuple e.g., "(255, 255, 255)"
+        format: "%Y-%m-%d %H:%M:%S %Z"
