@@ -29,6 +29,10 @@ metric_picture_white_balance = Gauge('picture_white_balance', 'White balance val
 metric_processing_time_seconds = Gauge('capture_processing_time_seconds', 'Time it took to fetch and process a new picture', ['camera_name'])
 metric_sleep_time_seconds = Gauge('capture_loop_sleep_time_seconds', 'Time the camera sleeps between pictures', ['camera_name'])
 
+# GoPro specific metrics
+gopro_state_gauge = Gauge('gopro_state', 'GoPro State', ['camera_name', 'state_name'])
+gopro_setting_gauge = Gauge('gopro_setting', 'GoPro Setting', ['camera_name', 'setting_name'])
+
 
 
 

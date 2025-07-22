@@ -58,7 +58,7 @@ from platform_utils import is_raspberry_pi
 from ui_utils import copy_public_html_files
 
 # Define flags at module level
-flags.DEFINE_string("config", None, "path to YAML config file")
+flags.DEFINE_string("config", "config.yaml", "path to YAML config file")
 flags.mark_flag_as_required("config")
 
 FLAGS = flags.FLAGS
