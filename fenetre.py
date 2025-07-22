@@ -39,7 +39,6 @@ from skimage.metrics import structural_similarity
 from timelapse import create_timelapse
 from daylight import run_end_of_day
 from archive import archive_daydir, list_unarchived_dirs, scan_and_publish_metrics
-from gopro import capture_gopro_photo
 from gopro_utility import GoProUtilityThread, format_gopro_sd_card
 from postprocess import postprocess, gather_metrics
 
@@ -59,7 +58,6 @@ from ui_utils import copy_public_html_files
 
 # Define flags at module level
 flags.DEFINE_string("config", "config.yaml", "path to YAML config file")
-flags.mark_flag_as_required("config")
 
 FLAGS = flags.FLAGS
 
@@ -249,13 +247,10 @@ def snap(camera_name, camera_config: Dict):
                 local_command, timeout, camera_name, camera_config
             )
         if gopro_ip is not None:
-            jpeg_bytes = capture_gopro_photo(
-                ip_address=gopro_ip,
-                timeout=timeout,
-                root_ca=gopro_root_ca,
-                preset=camera_config.get("gopro_preset"),
-                log_dir=global_config.get("log_dir"),
-            )
+            gopro_instance = active_camera_threads.get(camera_name, {}).get('gopro_instance')
+            if not gopro_instance:
+                raise RuntimeError(f"GoPro instance not found for camera {camera_name}")
+            jpeg_bytes = gopro_instance.capture_photo()
             try:
                 i = Image.open(BytesIO(jpeg_bytes))
             except Image.UnidentifiedImageError:
@@ -872,9 +867,13 @@ def manage_camera_threads():
 
             # Start GoPro utility thread if needed
             if cam_conf.get("gopro_ip"):
-                gopro_utility_thread = GoProUtilityThread(cam_conf, exit_event)
+                from gopro import GoPro
+                gopro_instance = GoPro(ip_address=cam_conf.get("gopro_ip"), root_ca=cam_conf.get("gopro_root_ca"), log_dir=global_config.get("log_dir"))
+                gopro_utility_thread = GoProUtilityThread(gopro_instance, cam_conf, exit_event)
                 gopro_utility_thread.start()
+                if cam_name not in active_camera_threads: active_camera_threads[cam_name] = {}
                 active_camera_threads[cam_name]['gopro_utility'] = gopro_utility_thread
+                active_camera_threads[cam_name]['gopro_instance'] = gopro_instance
         else:
             # For existing, running cameras, we could update settings like sleep_interval here if they change.
             fixed_snap_interval = cam_conf.get("snap_interval_s", None)
