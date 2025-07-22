@@ -1012,7 +1012,6 @@ def timelapse_loop():
                     dir=dir_to_process,
                     overwrite=True,
                     two_pass=global_config.get("ffmpeg_2pass", False),
-                    log_dir=global_config.get("log_dir")
                 )
                 if result:
                     camera_name = os.path.basename(os.path.dirname(os.path.normpath(dir_to_process)))
