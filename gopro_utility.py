@@ -313,7 +313,7 @@ class GoProUtilityThread(threading.Thread):
                 
                 # Convert to human-readable format and log it
                 human_readable_state = get_human_readable_state(self.gopro.state)
-                logging.info(f"Human-readable GoPro state for {self.gopro_ip}:\n{human_readable_state}")
+                logging.debug(f"Human-readable GoPro state for {self.gopro_ip}:\n{human_readable_state}")
 
                 # Export to Prometheus
                 for key, value in human_readable_state.items():

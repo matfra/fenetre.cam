@@ -1,48 +1,41 @@
-# Mandatory dependencies
+## Mandatory dependencies
 pytz
 pyyaml
-astral
-
 absl-py
-# pillow # Use system
-logzero  # see github.com/metachris/logzero
+logzero
+numpy
+# python-daemon
 
-# For GoPro and fetching pics from URL. 
+## Optional
+astral # Slow down timelapses aorund sunrise/sunset
+Flask # Not necessary if no web servers are enabled
+
+# For URL or GoPro cameras
 requests
 
-# Only if using raspberry pi camera
+# Native Raspberry Pi camera (Currently unused)
 #picamera2
 #rpi-libcamera #Requires libcap-dev and libcamera-dev
 
-#dev only
-mock
-black
-pytest
-
-
-
-ffmpeg-python # Maybe not required anymore
-
-# SSIM
-# numpi #use systems
-numpy
-python-daemon
-
-#Pictures
-mozjpeg-lossless-optimization
-
-opencv-python
-siphash24
-scikit-image
-
 # For GoPro only
-open-gopro
+# open-gopro
 bleak
 
-Flask
-PyYAML
+#Picture optimization (not necessary if postprocessing)
+mozjpeg-lossless-optimization
 
 # For admin server
 waitress
 prometheus-client
 pyexiv2
+
+# Postprocessing
+# opencv-python
+# siphash24
+# SSIM
+scikit-image
+
+## Dev only
+mock
+black
+pytest
