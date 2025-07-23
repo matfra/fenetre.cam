@@ -4,7 +4,7 @@ from typing import Optional
 import os
 import datetime
 from absl import logging
-from gopro_utility import GoProEnums
+from gopro_state_map import GoProEnums
 
 log_dir_global = None
 

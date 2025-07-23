@@ -869,7 +869,7 @@ def manage_camera_threads():
             if cam_conf.get("gopro_ip"):
                 from gopro import GoPro
                 gopro_instance = GoPro(ip_address=cam_conf.get("gopro_ip"), root_ca=cam_conf.get("gopro_root_ca"), log_dir=global_config.get("log_dir"))
-                gopro_utility_thread = GoProUtilityThread(gopro_instance, cam_conf, exit_event)
+                gopro_utility_thread = GoProUtilityThread(gopro_instance, cam_name, cam_conf, exit_event)
                 gopro_utility_thread.start()
                 if cam_name not in active_camera_threads: active_camera_threads[cam_name] = {}
                 active_camera_threads[cam_name]['gopro_utility'] = gopro_utility_thread
