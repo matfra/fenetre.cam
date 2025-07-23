@@ -74,7 +74,13 @@ cameras:
       -----BEGIN CERTIFICATE-----
       YOUR-GOPRO-ROOT-CA
       -----END CERTIFICATE-----
-    gopro_preset: "65539" # Photo night
+    gopro_day_settings:
+      profile_id: 65536 #Normal photo (Higher ISO authorized)
+        # https://gopro.github.io/OpenGoPro/ble/features/settings.html#photo-output-125
+      settings:
+        125: 3 # Photo Output: SuperPhoto
+    gopro_night_settings:
+      profile_id: 65539 #Night photo (ISO locked to 100, long exposure and shadow boost)
     gopro_utility_poll_interval_s: 10
     gopro_bluetooth_retry_delay_s: 180
     sky_area: 0,0,1920,500
