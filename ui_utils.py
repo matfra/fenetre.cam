@@ -38,7 +38,7 @@ def copy_public_html_files(work_dir: str, global_config: dict):
     public_html_dir = os.path.join(current_dir, "static", "public")
     # Copy all html files
     for file in os.listdir(public_html_dir):
-        if file.endswith(".html"):
+        #if file.endswith(".html"):
             source_path = os.path.join(public_html_dir, file)
             dest_path = os.path.join(work_dir, file)
             if not os.path.exists(dest_path) or not filecmp.cmp(source_path, dest_path):
