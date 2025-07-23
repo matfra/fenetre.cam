@@ -228,8 +228,8 @@ def get_human_readable_state(state: Dict) -> Dict:
         for key, value in state['status'].items():
             key = int(key)
             status_name = GoProEnums.STATUS_NAMES.get(key, f"Unknown Status ({key})")
-            if key in gopro_status_values:
-                value_name = gopro_status_values[key].get(value, f"Unknown Value ({value})")
+            if key in GoProEnums.STATUS_VALUES:
+                value_name = GoProEnums.STATUS_VALUES[key].get(value, f"Unknown Value ({value})")
             else:
                 value_name = value
             human_readable_state[status_name] = value_name
@@ -238,9 +238,9 @@ def get_human_readable_state(state: Dict) -> Dict:
     if 'settings' in state:
         for key, value in state['settings'].items():
             key = int(key)
-            setting_name = gopro_setting_names.get(key, f"Unknown Setting ({key})")
-            if key in gopro_setting_values:
-                value_name = gopro_setting_values[key].get(value, f"Unknown Value ({value})")
+            setting_name = GoProEnums.SETTING_NAMES.get(key, f"Unknown Setting ({key})")
+            if key in GoProEnums.SETTING_VALUES:
+                value_name = GoProEnums.SETTING_VALUES[key].get(value, f"Unknown Value ({value})")
             else:
                 value_name = value
             human_readable_state[setting_name] = value_name

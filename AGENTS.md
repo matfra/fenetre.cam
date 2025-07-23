@@ -3,3 +3,5 @@
 - Challenge my idea or suggestions before implementing them.
 - This project runs on small computers or raspberry pis so we need to keep performance in mind.
 - Always ask for permission before modifying a file that is listed in @.gitignore
+- Use the local python virtualenv, typically in @venv directory
+- Do not fix things non-blocking problems unrelated to the current task. Add a TODO instead.
