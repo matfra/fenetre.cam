@@ -13,7 +13,6 @@ from absl import app
 from absl import flags
 from absl import logging
 
-import cv2 # Keep for generate_month_html, or remove if not used elsewhere by this function
 import numpy as np
 import calendar # Added for getting days in month
 from zoneinfo import ZoneInfo  # Python 3.9+
