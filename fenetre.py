@@ -454,7 +454,7 @@ def run_admin_server_func(
     global admin_server_instance_global
     try:
         logger = std_logging.getLogger('waitress')
-        logging.info(f"Starting admin server with Waitress on http://{host}:{port}")
+        logging.info("Starting admin server")
         waitress_serve(
                 flask_app, listen=listeners, threads=4, _quiet=False
         )
