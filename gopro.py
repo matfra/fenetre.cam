@@ -5,6 +5,9 @@ import os
 import datetime
 from absl import logging
 from gopro_state_map import GoProEnums
+import pytz
+from astral.sun import sun
+from astral import LocationInfo
 
 log_dir_global = None
 
@@ -61,13 +64,18 @@ class GoProSettings:
         )
 
 class GoPro:
-    def __init__(self, ip_address="10.5.5.9", timeout=5, root_ca=None, log_dir=None):
+    def __init__(self, ip_address="10.5.5.9", timeout=5, root_ca=None, log_dir=None, latitude=None, longitude=None, timezone=None, preset_day=None, preset_night=None):
         self.ip_address = ip_address
         self.timeout = timeout
         self.root_ca = root_ca
         self.scheme = "https" if root_ca else "http"
         self.root_ca_filepath = ""
         self.temp_file = None
+        self.latitude = latitude
+        self.longitude = longitude
+        self.timezone = timezone
+        self.preset_day = preset_day
+        self.preset_night = preset_night
 
         if log_dir:
             _set_log_dir(log_dir)
@@ -152,6 +160,45 @@ class GoPro:
             latest_file = latest_file_info.get("filename") or latest_file_info.get("n")
         return latest_dir, latest_file
 
+    def _is_night(self) -> bool:
+        """Determines if it is currently night time."""
+        if not all([self.latitude, self.longitude, self.timezone]):
+            logging.info("Location not configured for GoPro, assuming daytime.")
+            return False
+
+        try:
+            tz = pytz.timezone(self.timezone)
+            now = datetime.datetime.now(tz)
+            location = LocationInfo(latitude=self.latitude, longitude=self.longitude)
+            s = sun(location.observer, date=now.date(), tzinfo=tz)
+            
+            # It's night if current time is after dusk or before dawn
+            is_night_time = now > s['dusk'] or now < s['dawn']
+            logging.info(f"It is {'night' if is_night_time else 'day'}.")
+            return is_night_time
+        except Exception as e:
+            logging.error(f"Error calculating sunrise/sunset for GoPro: {e}")
+            return False # Default to day
+
+    def validate_presets(self):
+        """
+        Validates that the configured day and night presets are available on the camera.
+        """
+        available_presets = self.get_presets()
+        if not available_presets:
+            logging.error("Could not retrieve available presets from the camera.")
+            return
+
+        logging.info(f"Available presets: {[p.get('name') for p in available_presets]}")
+
+        available_preset_ids = [p.get('id') for p in available_presets]
+
+        if self.preset_day and self.preset_day.get('id') not in available_preset_ids:
+            logging.error(f"Configured day preset ID '{self.preset_day.get('id')}' is not available on the camera.")
+        
+        if self.preset_night and self.preset_night.get('id') not in available_preset_ids:
+            logging.error(f"Configured night preset ID '{self.preset_night.get('id')}' is not available on the camera.")
+
     def capture_photo(self, output_file: Optional[str] = None) -> bytes:
         latest_dir_before, latest_file_before = self._get_latest_file()
 
@@ -161,6 +208,25 @@ class GoPro:
         self.settings.led = "All Off"
         self.settings.gps = "Off"
         self.settings.auto_power_down = "30 Min"
+
+        preset_config = None
+        if self._is_night():
+            if self.preset_night:
+                preset_config = self.preset_night
+        else:
+            if self.preset_day:
+                preset_config = self.preset_day
+
+        if preset_config:
+            if 'id' in preset_config:
+                self._make_gopro_request(f"/gopro/camera/presets/load?id={preset_config['id']}")
+            if 'settings' in preset_config and isinstance(preset_config['settings'], dict):
+                for setting, value in preset_config['settings'].items():
+                    try:
+                        setattr(self.settings, setting, value)
+                        logging.info(f"Applied setting '{setting}' with value '{value}'")
+                    except (AttributeError, ValueError) as e:
+                        logging.error(f"Failed to apply setting '{setting}' with value '{value}': {e}")
 
         trigger_url = f"{self.scheme}://{self.ip_address}/gopro/camera/shutter/start"
         r = requests.get(trigger_url, timeout=self.timeout, verify=self.root_ca_filepath)
