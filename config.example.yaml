@@ -14,10 +14,10 @@ http_server:
   port: 8888
   host: 0.0.0.0
   enabled: True
-config_server:
-  enabled: true       # Enable the web UI for configuration
-  host: "0.0.0.0"     # Host for the config server
-  port: 8889          # Port for the config server
+admin_server:
+  enabled: true
+  # Waitress args https://docs.pylonsproject.org/projects/waitress/en/stable/arguments.html#arguments
+  listen: "0.0.0.0:8889 [::]:8889"
 ui:
   landing_page: "list" # list, map, camera, fullscreen
   fullscreen_camera: "a-cool-http-cam-with-clouds"

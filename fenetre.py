@@ -442,7 +442,7 @@ def stop_http_server():
 
 # --- Config Server Management ---
 def run_admin_server_func(
-    host: str, port: int, flask_app, fenetre_config_file: str, fenetre_pid_file: str
+        listeners: str, flask_app, fenetre_config_file: str, fenetre_pid_file: str
 ):
     """Runs the Flask admin server."""
     flask_app.config["FENETRE_CONFIG_FILE"] = fenetre_config_file
@@ -456,7 +456,7 @@ def run_admin_server_func(
         logger = std_logging.getLogger('waitress')
         logging.info(f"Starting admin server with Waitress on http://{host}:{port}")
         waitress_serve(
-            flask_app, host=host, port=port, threads=4, _quiet=True
+                flask_app, listen=listeners, threads=4, _quiet=False
         )
     except SystemExit:
         logging.info("admin server shutting down (SystemExit caught).")
@@ -464,7 +464,7 @@ def run_admin_server_func(
         if not exit_event.is_set():
             logging.error(f"admin server crashed: {e}", exc_info=True)
     finally:
-        logging.info(f"admin server on http://{host}:{port} stopped.")
+        logging.info(f"admin server stopped.")
         admin_server_instance_global = None
 
 
@@ -797,7 +797,7 @@ def load_and_apply_configuration(initial_load=False, config_file_override=None):
             pid_file_path = FENETRE_PID_FILE
             admin_server_thread_global = Thread(
                 target=run_admin_server_func,
-                args=(admin_server_config.get("host"), admin_server_config.get("port"), flask_app_instance, main_config_file_path, pid_file_path),
+                args=(admin_server_config.get("listen", "0.0.0.0:8889"), flask_app_instance, main_config_file_path, pid_file_path),
                 daemon=True,
                 name="admin_server_flask",
             )
