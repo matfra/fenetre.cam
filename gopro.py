@@ -96,6 +96,22 @@ class GoPro:
             logging.error(f"Failed to get GoPro state from {self.ip_address}: {e}")
             self.state = {}
 
+    def get_presets(self):
+        """Get the available presets from the camera."""
+        url = f"{self.scheme}://{self.ip_address}/gopro/camera/presets/get"
+        try:
+            response = requests.get(url, timeout=self.timeout, verify=self.root_ca_filepath)
+            _log_request_response(url, response)
+            response.raise_for_status()
+            preset_group_array = response.json().get('presetGroupArray', [])
+        except requests.RequestException as e:
+            logging.error(f"Failed to get GoPro presets from {self.ip_address}: {e}")
+        if len(preset_group_array) > 0:
+            for preset_group in preset_group_array:
+                if preset_group.get("id") == "PRESET_GROUP_ID_PHOTO":
+                    return preset_group.get('presetArray', [])
+        return []
+
     def _make_gopro_request(self, url_path: str, expected_response_code: int = 200, expected_response_text: str = "{}\n"):
         """Helper function to make HTTP requests to GoPro with common parameters."""
         url = f"{self.scheme}://{self.ip_address}{url_path}"

@@ -16,16 +16,25 @@ class TestGoPro(unittest.TestCase):
         """Set up test fixtures."""
         self.gopro = gopro.GoPro()
 
-    @mock.patch('gopro.GoPro._make_gopro_request')
-    def test_set_setting_success(self, mock_make_gopro_request):
+    @mock.patch('gopro.requests.get')
+    def test_set_setting_success(self, mock_get):
+        mock_response = mock.Mock()
+        mock_response.status_code = 200
+        mock_response.text = "{}\n"
+        mock_get.return_value = mock_response
+
         self.gopro.settings.video_performance_mode = "Maximum Video Performance"
-        mock_make_gopro_request.assert_called_with(
-            "/gopro/camera/setting?option=0&setting=173"
+        mock_get.assert_called_with(
+            "http://10.5.5.9/gopro/camera/setting?option=0&setting=173",
+            timeout=5,
+            verify=""
         )
 
         self.gopro.settings.max_lens = "On"
-        mock_make_gopro_request.assert_called_with(
-            "/gopro/camera/setting?option=1&setting=162"
+        mock_get.assert_called_with(
+            "http://10.5.5.9/gopro/camera/setting?option=1&setting=162",
+            timeout=5,
+            verify=""
         )
 
     def test_set_invalid_setting(self):
@@ -37,13 +46,13 @@ class TestGoPro(unittest.TestCase):
             self.gopro.settings.video_performance_mode = "invalid_value"
 
     @mock.patch('gopro.GoPro._get_latest_file')
-    @mock.patch('gopro.GoPro._make_gopro_request')
     @mock.patch('gopro.requests.get')
-    def test_capture_photo(self, mock_requests_get, mock_make_gopro_request, mock_get_latest_file):
-        mock_photo_response = mock.Mock()
-        mock_photo_response.status_code = 200
-        mock_photo_response.content = b"test_jpeg_content"
-        mock_requests_get.return_value = mock_photo_response
+    def test_capture_photo(self, mock_get, mock_get_latest_file):
+        mock_response = mock.Mock()
+        mock_response.status_code = 200
+        mock_response.text = "{}\n"
+        mock_response.content = b"test_jpeg_content"
+        mock_get.return_value = mock_response
 
         mock_get_latest_file.side_effect = [
             ("100GOPRO", "GOPR0001.JPG"),
@@ -55,27 +64,64 @@ class TestGoPro(unittest.TestCase):
         self.assertEqual(content, b"test_jpeg_content")
 
         expected_calls = [
-            mock.call("/gopro/camera/control/set_ui_controller?p=2"),
-            mock.call('/gopro/camera/setting?option=1&setting=175'),
-            mock.call('/gopro/camera/setting?option=10&setting=88'),
-            mock.call('/gopro/camera/setting?option=4&setting=91'),
-            mock.call('/gopro/camera/setting?option=0&setting=83'),
-            mock.call('/gopro/camera/setting?option=7&setting=59'),
+            mock.call('http://10.5.5.9/gopro/camera/control/set_ui_controller?p=2', timeout=5, verify=''),
+            mock.call('http://10.5.5.9/gopro/camera/setting?option=1&setting=175', timeout=5, verify=''),
+            mock.call('http://10.5.5.9/gopro/camera/setting?option=10&setting=88', timeout=5, verify=''),
+            mock.call('http://10.5.5.9/gopro/camera/setting?option=4&setting=91', timeout=5, verify=''),
+            mock.call('http://10.5.5.9/gopro/camera/setting?option=0&setting=83', timeout=5, verify=''),
+            mock.call('http://10.5.5.9/gopro/camera/setting?option=7&setting=59', timeout=5, verify=''),
+            mock.call('http://10.5.5.9/gopro/camera/shutter/start', timeout=5, verify=''),
+            mock.call('http://10.5.5.9/videos/DCIM/100GOPRO/GOPR0002.JPG', timeout=5, verify=''),
+            mock.call().raise_for_status(),
+            mock.call('http://10.5.5.9/gopro/media/delete/file?path=100GOPRO/GOPR0002.JPG', timeout=5, verify=''),
         ]
-        mock_make_gopro_request.assert_has_calls(expected_calls, any_order=False)
+        mock_get.assert_has_calls(expected_calls, any_order=False)
 
-        mock_requests_get.assert_any_call(
-            "http://10.5.5.9/videos/DCIM/100GOPRO/GOPR0002.JPG",
+    @mock.patch('gopro.requests.get')
+    def test_update_state(self, mock_get):
+        import json
+        gopro_state_path = os.path.join(os.path.dirname(__file__), "goprostate.json")
+        with open(gopro_state_path) as f:
+            mock_state = json.load(f)
+
+        mock_response = mock.Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = mock_state
+        mock_get.return_value = mock_response
+
+        self.gopro.update_state()
+
+        mock_get.assert_called_once_with(
+            "http://10.5.5.9/gopro/camera/state",
             timeout=5,
             verify=""
         )
-        mock_requests_get.assert_any_call(
-            "http://10.5.5.9/gopro/camera/shutter/start",
+        self.assertEqual(self.gopro.state, mock_state)
+
+    @mock.patch('gopro.requests.get')
+    def test_get_presets(self, mock_get):
+        import json
+        gopro_presets_path = os.path.join(os.path.dirname(__file__), "gopro_presets_get.json")
+        with open(gopro_presets_path) as f:
+            mock_presets = json.load(f)
+
+        gopro_expected_photo_presets_path = os.path.join(os.path.dirname(__file__), "goprohero11_photo_presets.json")
+        with open(gopro_expected_photo_presets_path) as f:
+            expected_photo_presets = json.load(f)
+
+        mock_response = mock.Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = mock_presets
+        mock_get.return_value = mock_response
+
+        available_photo_presets = self.gopro.get_presets()
+
+        mock_get.assert_called_once_with(
+            "http://10.5.5.9/gopro/camera/presets/get",
             timeout=5,
             verify=""
         )
-        
-        mock_make_gopro_request.assert_called_with("/gopro/media/delete/file?path=100GOPRO/GOPR0002.JPG")
+        self.assertEqual(available_photo_presets, expected_photo_presets)
 
 
 if __name__ == '__main__':

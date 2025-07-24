@@ -1,0 +1,325 @@
+{
+ "presetGroupArray": [
+  {
+   "id": "PRESET_GROUP_ID_PHOTO",
+   "presetArray": [
+    {
+     "id": 65536,
+     "mode": "FLAT_MODE_PHOTO_SINGLE",
+     "titleId": "PRESET_TITLE_PHOTO",
+     "userDefined": false,
+     "icon": "PRESET_ICON_PHOTO",
+     "settingArray": [
+      {
+       "id": 122,
+       "value": 101,
+       "isCaption": true
+      }
+     ],
+     "isModified": true
+    },
+    {
+     "id": 65538,
+     "mode": "FLAT_MODE_PHOTO_BURST",
+     "titleId": "PRESET_TITLE_BURST",
+     "userDefined": false,
+     "icon": "PRESET_ICON_BURST",
+     "settingArray": [
+      {
+       "id": 147,
+       "value": 9,
+       "isCaption": true
+      },
+      {
+       "id": 123,
+       "value": 101,
+       "isCaption": true
+      }
+     ],
+     "isModified": false
+    },
+    {
+     "id": 65539,
+     "mode": "FLAT_MODE_PHOTO_NIGHT",
+     "titleId": "PRESET_TITLE_NIGHT",
+     "userDefined": false,
+     "icon": "PRESET_ICON_PHOTO_NIGHT",
+     "settingArray": [
+      {
+       "id": 19,
+       "value": 0,
+       "isCaption": true
+      },
+      {
+       "id": 122,
+       "value": 101,
+       "isCaption": true
+      }
+     ],
+     "isModified": true
+    }
+   ],
+   "canAddPreset": true,
+   "icon": "PRESET_GROUP_PHOTO_ICON_ID"
+  },
+  {
+   "id": "PRESET_GROUP_ID_TIMELAPSE",
+   "presetArray": [
+    {
+     "id": 131072,
+     "mode": "FLAT_MODE_TIME_WARP_VIDEO",
+     "titleId": "PRESET_TITLE_TIME_WARP",
+     "userDefined": false,
+     "icon": "PRESET_ICON_TIMEWARP",
+     "settingArray": [
+      {
+       "id": 2,
+       "value": 1,
+       "isCaption": true
+      },
+      {
+       "id": 111,
+       "value": 10,
+       "isCaption": true
+      },
+      {
+       "id": 121,
+       "value": 0,
+       "isCaption": true
+      }
+     ],
+     "isModified": false
+    },
+    {
+     "id": 131075,
+     "mode": "FLAT_MODE_VIDEO_STAR_TRAIL",
+     "titleId": "PRESET_TITLE_STAR_TRAIL",
+     "userDefined": false,
+     "icon": "PRESET_ICON_STAR_TRAIL",
+     "settingArray": [
+      {
+       "id": 2,
+       "value": 1,
+       "isCaption": true
+      },
+      {
+       "id": 32,
+       "value": 3601,
+       "isCaption": true
+      },
+      {
+       "id": 121,
+       "value": 0,
+       "isCaption": true
+      }
+     ],
+     "isModified": false
+    },
+    {
+     "id": 131076,
+     "mode": "FLAT_MODE_VIDEO_LIGHT_PAINTING",
+     "titleId": "PRESET_TITLE_LIGHT_PAINTING",
+     "userDefined": false,
+     "icon": "PRESET_ICON_LIGHT_PAINTING",
+     "settingArray": [
+      {
+       "id": 2,
+       "value": 1,
+       "isCaption": true
+      },
+      {
+       "id": 32,
+       "value": 3601,
+       "isCaption": true
+      },
+      {
+       "id": 121,
+       "value": 0,
+       "isCaption": true
+      }
+     ],
+     "isModified": false
+    },
+    {
+     "id": 131077,
+     "mode": "FLAT_MODE_VIDEO_LIGHT_TRAIL",
+     "titleId": "PRESET_TITLE_LIGHT_TRAIL",
+     "userDefined": false,
+     "icon": "PRESET_ICON_LIGHT_TRAIL",
+     "settingArray": [
+      {
+       "id": 2,
+       "value": 1,
+       "isCaption": true
+      },
+      {
+       "id": 32,
+       "value": 3601,
+       "isCaption": true
+      },
+      {
+       "id": 121,
+       "value": 0,
+       "isCaption": true
+      }
+     ],
+     "isModified": false
+    },
+    {
+     "id": 131073,
+     "mode": "FLAT_MODE_TIME_LAPSE_PHOTO",
+     "titleId": "PRESET_TITLE_TIME_LAPSE",
+     "userDefined": false,
+     "icon": "PRESET_ICON_TIMELAPSE_PHOTO",
+     "settingArray": [
+      {
+       "id": 30,
+       "value": 107,
+       "isCaption": true
+      },
+      {
+       "id": 123,
+       "value": 101,
+       "isCaption": true
+      }
+     ],
+     "isModified": true
+    },
+    {
+     "id": 131074,
+     "mode": "FLAT_MODE_NIGHT_LAPSE_VIDEO",
+     "titleId": "PRESET_TITLE_NIGHT_LAPSE",
+     "userDefined": false,
+     "icon": "PRESET_ICON_NIGHTLAPSE",
+     "settingArray": [
+      {
+       "id": 2,
+       "value": 1,
+       "isCaption": true
+      },
+      {
+       "id": 32,
+       "value": 3601,
+       "isCaption": true
+      },
+      {
+       "id": 121,
+       "value": 0,
+       "isCaption": true
+      }
+     ],
+     "isModified": false
+    }
+   ],
+   "canAddPreset": true,
+   "icon": "PRESET_GROUP_TIMELAPSE_ICON_ID"
+  },
+  {
+   "id": "PRESET_GROUP_ID_VIDEO",
+   "presetArray": [
+    {
+     "id": 524288,
+     "mode": "FLAT_MODE_VIDEO",
+     "titleId": "PRESET_TITLE_STANDARD",
+     "userDefined": false,
+     "icon": "PRESET_ICON_VIDEO",
+     "settingArray": [
+      {
+       "id": 2,
+       "value": 1,
+       "isCaption": true
+      },
+      {
+       "id": 3,
+       "value": 8,
+       "isCaption": true
+      },
+      {
+       "id": 121,
+       "value": 0,
+       "isCaption": true
+      }
+     ],
+     "isModified": false
+    },
+    {
+     "id": 524289,
+     "mode": "FLAT_MODE_VIDEO",
+     "titleId": "PRESET_TITLE_ACTIVITY",
+     "userDefined": false,
+     "icon": "PRESET_ICON_ACTIVITY",
+     "settingArray": [
+      {
+       "id": 2,
+       "value": 4,
+       "isCaption": true
+      },
+      {
+       "id": 3,
+       "value": 5,
+       "isCaption": true
+      },
+      {
+       "id": 121,
+       "value": 3,
+       "isCaption": true
+      }
+     ],
+     "isModified": false
+    },
+    {
+     "id": 524290,
+     "mode": "FLAT_MODE_VIDEO",
+     "titleId": "PRESET_TITLE_CINEMATIC",
+     "userDefined": false,
+     "icon": "PRESET_ICON_CINEMATIC",
+     "settingArray": [
+      {
+       "id": 2,
+       "value": 1,
+       "isCaption": true
+      },
+      {
+       "id": 3,
+       "value": 8,
+       "isCaption": true
+      },
+      {
+       "id": 121,
+       "value": 10,
+       "isCaption": true
+      }
+     ],
+     "isModified": false
+    },
+    {
+     "id": 524291,
+     "mode": "FLAT_MODE_VIDEO",
+     "titleId": "PRESET_TITLE_SLOMO",
+     "userDefined": false,
+     "icon": "PRESET_ICON_ULTRA_SLO_MO",
+     "settingArray": [
+      {
+       "id": 2,
+       "value": 9,
+       "isCaption": true
+      },
+      {
+       "id": 3,
+       "value": 0,
+       "isCaption": true
+      },
+      {
+       "id": 121,
+       "value": 0,
+       "isCaption": true
+      }
+     ],
+     "isModified": false
+    }
+   ],
+   "canAddPreset": false,
+   "icon": "PRESET_GROUP_ENDURANCE_VIDEO_ICON_ID"
+  }
+ ]
+}
