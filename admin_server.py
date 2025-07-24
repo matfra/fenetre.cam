@@ -4,6 +4,9 @@ import yaml
 import json # For handling JSON input
 import os
 import signal
+import requests
+from io import BytesIO
+from PIL import Image
 from ui_utils import copy_public_html_files
 from prometheus_client import Counter, generate_latest, REGISTRY, Gauge
 
