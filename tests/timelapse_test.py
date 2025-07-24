@@ -4,9 +4,11 @@ import tempfile
 from unittest.mock import patch, MagicMock
 
 import sys
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from timelapse import create_timelapse
+
 
 class TestTimelapse(unittest.TestCase):
     def setUp(self):
@@ -15,17 +17,24 @@ class TestTimelapse(unittest.TestCase):
     def tearDown(self):
         self.temp_dir.cleanup()
 
-    @patch('timelapse.subprocess.run')
-    @patch('timelapse.get_image_dimensions', return_value=(1920, 1080))
-    @patch('timelapse.is_raspberry_pi', return_value=False)
-    def test_create_timelapse_ffmpeg_args_not_pi(self, mock_is_pi, mock_get_dims, mock_subprocess_run):
+    @patch("timelapse.subprocess.run")
+    @patch("timelapse.get_image_dimensions", return_value=(1920, 1080))
+    @patch("timelapse.is_raspberry_pi", return_value=False)
+    def test_create_timelapse_ffmpeg_args_not_pi(
+        self, mock_is_pi, mock_get_dims, mock_subprocess_run
+    ):
         # Create a dummy directory with some jpg files
         for i in range(10):
             with open(os.path.join(self.temp_dir.name, f"test_{i}.jpg"), "w") as f:
                 f.write("test")
 
         # Call the function
-        create_timelapse(self.temp_dir.name, overwrite=True, two_pass=False, log_dir=self.temp_dir.name)
+        create_timelapse(
+            self.temp_dir.name,
+            overwrite=True,
+            two_pass=False,
+            log_dir=self.temp_dir.name,
+        )
 
         # Check that ffmpeg was called with the correct arguments
         self.assertTrue(mock_subprocess_run.called)
@@ -34,17 +43,24 @@ class TestTimelapse(unittest.TestCase):
         self.assertIn("libvpx-vp9", args[0])
         self.assertIn(".webm", args[0][-1])
 
-    @patch('timelapse.subprocess.run')
-    @patch('timelapse.get_image_dimensions', return_value=(1920, 1080))
-    @patch('timelapse.is_raspberry_pi', return_value=True)
-    def test_create_timelapse_ffmpeg_args_pi(self, mock_is_pi, mock_get_dims, mock_subprocess_run):
+    @patch("timelapse.subprocess.run")
+    @patch("timelapse.get_image_dimensions", return_value=(1920, 1080))
+    @patch("timelapse.is_raspberry_pi", return_value=True)
+    def test_create_timelapse_ffmpeg_args_pi(
+        self, mock_is_pi, mock_get_dims, mock_subprocess_run
+    ):
         # Create a dummy directory with some jpg files
         for i in range(10):
             with open(os.path.join(self.temp_dir.name, f"test_{i}.jpg"), "w") as f:
                 f.write("test")
 
         # Call the function
-        create_timelapse(self.temp_dir.name, overwrite=True, two_pass=False, log_dir=self.temp_dir.name)
+        create_timelapse(
+            self.temp_dir.name,
+            overwrite=True,
+            two_pass=False,
+            log_dir=self.temp_dir.name,
+        )
 
         # Check that ffmpeg was called with the correct arguments
         self.assertTrue(mock_subprocess_run.called)
@@ -53,6 +69,6 @@ class TestTimelapse(unittest.TestCase):
         self.assertIn("h264_v4l2m2m", args[0])
         self.assertIn(".mp4", args[0][-1])
 
-if __name__ == '__main__':
-    unittest.main()
 
+if __name__ == "__main__":
+    unittest.main()

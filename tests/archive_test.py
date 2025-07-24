@@ -7,7 +7,8 @@ import pytz
 from unittest.mock import patch, MagicMock
 
 import sys
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from archive import (
     keep_only_a_subset_of_jpeg_files,
@@ -18,6 +19,7 @@ from archive import (
     is_dir_older_than_n_days,
     archive_daydir,
 )
+
 
 class TestArchive(unittest.TestCase):
     def setUp(self):
@@ -57,14 +59,23 @@ class TestArchive(unittest.TestCase):
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0], unarchived_dir)
 
-    @patch('archive.get_today_date')
-    @patch('archive.is_dir_older_than_n_days')
-    @patch('archive.check_dir_has_daylight_band')
-    @patch('archive.check_dir_has_timelapse')
-    @patch('archive.create_timelapse')
-    @patch('archive.run_end_of_day')
-    @patch('archive.keep_only_a_subset_of_jpeg_files')
-    def test_archive_daydir(self, mock_keep_files, mock_run_end_of_day, mock_create_timelapse, mock_check_timelapse, mock_check_daylight, mock_is_older, mock_get_today):
+    @patch("archive.get_today_date")
+    @patch("archive.is_dir_older_than_n_days")
+    @patch("archive.check_dir_has_daylight_band")
+    @patch("archive.check_dir_has_timelapse")
+    @patch("archive.create_timelapse")
+    @patch("archive.run_end_of_day")
+    @patch("archive.keep_only_a_subset_of_jpeg_files")
+    def test_archive_daydir(
+        self,
+        mock_keep_files,
+        mock_run_end_of_day,
+        mock_create_timelapse,
+        mock_check_timelapse,
+        mock_check_daylight,
+        mock_is_older,
+        mock_get_today,
+    ):
         # Set up mocks
         mock_get_today.return_value = "2023-01-03"
         mock_is_older.return_value = True
@@ -85,5 +96,5 @@ class TestArchive(unittest.TestCase):
         mock_create_timelapse.assert_not_called()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

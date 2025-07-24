@@ -16,7 +16,12 @@ import os
 
 
 from config import config_load
-from admin_server import metric_directories_total, metric_directories_archived_total, metric_directories_timelapse_total, metric_directories_daylight_total
+from admin_server import (
+    metric_directories_total,
+    metric_directories_archived_total,
+    metric_directories_timelapse_total,
+    metric_directories_daylight_total,
+)
 
 
 def scan_and_publish_metrics(camera_name: str, camera_dir: str, global_config: dict):
@@ -39,9 +44,15 @@ def scan_and_publish_metrics(camera_name: str, camera_dir: str, global_config: d
         if check_dir_has_daylight_band(subdir):
             daylight_count += 1
 
-    metric_directories_archived_total.labels(camera_name=camera_name).set(archived_count)
-    metric_directories_timelapse_total.labels(camera_name=camera_name).set(timelapse_count)
-    metric_directories_daylight_total.labels(camera_name=camera_name).set(daylight_count)
+    metric_directories_archived_total.labels(camera_name=camera_name).set(
+        archived_count
+    )
+    metric_directories_timelapse_total.labels(camera_name=camera_name).set(
+        timelapse_count
+    )
+    metric_directories_daylight_total.labels(camera_name=camera_name).set(
+        daylight_count
+    )
 
 
 def keep_only_a_subset_of_jpeg_files(
@@ -102,7 +113,7 @@ def list_unarchived_dirs(camera_dir, archived_marker_file="archived"):
         daydir = entry.path
         if os.path.isfile(os.path.join(daydir, archived_marker_file)):
             photos_count = len(glob.glob(os.path.join(daydir, "*.jpg")))
-            if photos_count > 95: # 48 * 2 - 1
+            if photos_count > 95:  # 48 * 2 - 1
                 logging.warning(
                     f"{daydir} is archived but has {photos_count} photos. "
                     "This is unexpected, please check the directory."
@@ -138,7 +149,13 @@ def is_dir_older_than_n_days(daydir, n_days=3):
     return (datetime.now() - dir_date).days > n_days
 
 
-def archive_daydir(daydir: str, global_config: dict, dry_run: bool = True, create_daylight_bands: bool = False, create_timelapses: bool = False):
+def archive_daydir(
+    daydir: str,
+    global_config: dict,
+    dry_run: bool = True,
+    create_daylight_bands: bool = False,
+    create_timelapses: bool = False,
+):
     today_date = get_today_date(global_config)
     if os.path.basename(daydir) == today_date:
         logging.info(
@@ -151,14 +168,15 @@ def archive_daydir(daydir: str, global_config: dict, dry_run: bool = True, creat
         logging.info(f"Skipping {daydir} as it is not old enough")
         return False
 
-
     if not check_dir_has_daylight_band(daydir):
         if create_daylight_bands:
             logging.info(f"Creating daylight band for {daydir}")
             if not dry_run:
                 run_end_of_day(cam, daydir, sky_area)
 
-        logging.warning(f"{daydir} does not contain a daylight file. We are not archiving this.")
+        logging.warning(
+            f"{daydir} does not contain a daylight file. We are not archiving this."
+        )
         return False
 
     # Check if the subdirectory contains a file name daylight.png and a file named $year-$month-$day.webm.
@@ -204,7 +222,14 @@ def main(argv):
             logging.warning(f"Could not find directory {camera_dir} for camera: {cam}.")
             continue
         for daydir in list_unarchived_dirs(camera_dir):
-            archive_daydir(daydir, global_config, FLAGS.dry_run, FLAGS.create_daylight_bands, FLAGS.create_timelapses)
+            archive_daydir(
+                daydir,
+                global_config,
+                FLAGS.dry_run,
+                FLAGS.create_daylight_bands,
+                FLAGS.create_timelapses,
+            )
+
 
 if __name__ == "__main__":
     FLAGS = flags.FLAGS

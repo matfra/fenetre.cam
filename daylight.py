@@ -14,7 +14,7 @@ from absl import flags
 from absl import logging
 
 import numpy as np
-import calendar # Added for getting days in month
+import calendar  # Added for getting days in month
 from zoneinfo import ZoneInfo  # Python 3.9+
 
 
@@ -68,10 +68,9 @@ def run_end_of_day(camera_name, day_dir_path, sky_area):
         sky_area = DEFAULT_SKY_AREA
     create_daily_band(day_dir_path, parse_sky_area(sky_area))
     year, month, _ = os.path.split(day_dir_path)[-1].split("-")
-    camera_dir=os.path.join(day_dir_path, os.path.pardir)
+    camera_dir = os.path.join(day_dir_path, os.path.pardir)
     create_monthly_image(f"{year}-{month}", camera_dir)
     generate_html(camera_dir=camera_dir)
-
 
 
 def get_avg_color(image, crop_box):
@@ -178,9 +177,11 @@ def create_monthly_image(year_month_str: str, camera_data_path: str):
         f"    Creating/Updating monthly image for {year_month_str} in {camera_data_path}"
     )
     try:
-        year, month = map(int, year_month_str.split('-'))
+        year, month = map(int, year_month_str.split("-"))
     except ValueError:
-        print(f"      Invalid year_month_str format: {year_month_str}. Expected YYYY-MM.")
+        print(
+            f"      Invalid year_month_str format: {year_month_str}. Expected YYYY-MM."
+        )
         return None
 
     num_days_in_month = calendar.monthrange(year, month)[1]
@@ -188,7 +189,7 @@ def create_monthly_image(year_month_str: str, camera_data_path: str):
     actual_days_with_data = 0
 
     for day_num in range(1, num_days_in_month + 1):
-        day_str = f"{day_num:02d}" # Format day as DD (e.g., 01, 02, ..., 31)
+        day_str = f"{day_num:02d}"  # Format day as DD (e.g., 01, 02, ..., 31)
         day_dir_name = f"{year_month_str}-{day_str}"
         band_path = os.path.join(camera_data_path, day_dir_name, "daylight.png")
 
@@ -197,24 +198,32 @@ def create_monthly_image(year_month_str: str, camera_data_path: str):
                 img = Image.open(band_path)
                 if img.width == 1 and img.height == DAILY_BAND_HEIGHT:
                     images_to_stitch.append(img)
-                    actual_days_with_data +=1
+                    actual_days_with_data += 1
                 else:
                     print(
                         f"      Skipping band {band_path} due to incorrect dimensions: {img.size}. Using default color."
                     )
-                    default_band = Image.new("RGB", (1, DAILY_BAND_HEIGHT), DEFAULT_SKY_COLOR)
+                    default_band = Image.new(
+                        "RGB", (1, DAILY_BAND_HEIGHT), DEFAULT_SKY_COLOR
+                    )
                     images_to_stitch.append(default_band)
             except Exception as e:
-                print(f"      Error opening daily band {band_path}: {e}. Using default color.")
-                default_band = Image.new("RGB", (1, DAILY_BAND_HEIGHT), DEFAULT_SKY_COLOR)
+                print(
+                    f"      Error opening daily band {band_path}: {e}. Using default color."
+                )
+                default_band = Image.new(
+                    "RGB", (1, DAILY_BAND_HEIGHT), DEFAULT_SKY_COLOR
+                )
                 images_to_stitch.append(default_band)
         else:
             # print(f"      No daily band found for {day_dir_name}. Using default color.") # Optional: less verbose
             default_band = Image.new("RGB", (1, DAILY_BAND_HEIGHT), DEFAULT_SKY_COLOR)
             images_to_stitch.append(default_band)
 
-    if not images_to_stitch: # Should not happen if we iterate through all days
-        print(f"      No daily bands (including defaults) to stitch for {year_month_str}.")
+    if not images_to_stitch:  # Should not happen if we iterate through all days
+        print(
+            f"      No daily bands (including defaults) to stitch for {year_month_str}."
+        )
         return None
 
     # The total width will now always be the number of days in the month
@@ -284,7 +293,7 @@ def generate_bands_for_time_range(
     current_day = start_day  # .replace(tzinfo=ZoneInfo("America/Los_Angeles"))
     end_day = end_day  # .replace(tzinfo=ZoneInfo("America/Los_Angeles"))
     # Localize the current_day using the timezone in the config file
-    created_daybands_for_yearmonths = set() # Use set for unique yearmonths
+    created_daybands_for_yearmonths = set()  # Use set for unique yearmonths
     while current_day <= end_day:
         current_yearmonth = current_day.strftime("%Y-%m")
         pic_dir = os.path.join(camera_dir, current_day.strftime("%Y-%m-%d"))
@@ -293,7 +302,9 @@ def generate_bands_for_time_range(
                 f"{current_day.strftime('%Y-%m-%d')}: Skipping non-existent directory: {pic_dir}."
             )
             current_day += timedelta(days=1)
-            created_daybands_for_yearmonths.add(current_yearmonth) # Add so month image is still attempted
+            created_daybands_for_yearmonths.add(
+                current_yearmonth
+            )  # Add so month image is still attempted
             continue
         if (
             not os.path.exists(os.path.join(pic_dir, "daylight.png"))
@@ -303,11 +314,13 @@ def generate_bands_for_time_range(
             create_daily_band(pic_dir, parse_sky_area(sky_area_str))
         else:
             logging.info(f"Not overwriting " + os.path.join(pic_dir, "daylight.png"))
-        
+
         created_daybands_for_yearmonths.add(current_yearmonth)
         current_day += timedelta(days=1)
 
-    for yearmonth in sorted(list(created_daybands_for_yearmonths)): # Sort for consistent processing order
+    for yearmonth in sorted(
+        list(created_daybands_for_yearmonths)
+    ):  # Sort for consistent processing order
         logging.info(f"Creating monthly band for {yearmonth}.")
         create_monthly_image(yearmonth, camera_dir)
 
@@ -356,8 +369,8 @@ def generate_html(camera_dir: str):
             )
             continue
         # yearmonth = yearmonth_re_matches.group(0) # This would be "YYYY-MM.png"
-        yearmonth_str = yearmonth_re_matches.group(1) # This is "YYYY-MM"
-        logging.info(f"{yearmonth_str}: Creating monthband HTML.") # Corrected logging
+        yearmonth_str = yearmonth_re_matches.group(1)  # This is "YYYY-MM"
+        logging.info(f"{yearmonth_str}: Creating monthband HTML.")  # Corrected logging
         generate_month_html(
             monthband_path=yearmonth_file, camera_name=os.path.basename(camera_dir)
         )
@@ -376,14 +389,16 @@ def generate_html_browser(camera_dir: str):
 
     # Build the list of all daylight monthly files
     daylight_monthly_bands = glob.glob(os.path.join(camera_dir, "daylight", "*.png"))
-    print(f"Found {len(daylight_monthly_bands)} monthly bands in {camera_dir} for HTML browser")
+    print(
+        f"Found {len(daylight_monthly_bands)} monthly bands in {camera_dir} for HTML browser"
+    )
 
     # Generate the HTML
     HTML_FILE = os.path.join(camera_dir, "daylight.html")
     with open(HTML_FILE, "w") as f:
         f.write(
             dump_html_header(
-                title=f"{camera_name} daylight browser", # f-string for title
+                title=f"{camera_name} daylight browser",  # f-string for title
                 additional_headers="""
                 <style>
                 </style>""",
@@ -398,7 +413,7 @@ def generate_html_browser(camera_dir: str):
         # Corrected loop for AM/PM display
         for hour in range(24):
             display_hour = hour % 12
-            if display_hour == 0: # Midnight and Noon
+            if display_hour == 0:  # Midnight and Noon
                 display_hour = 12
             am_pm = "AM" if hour < 12 else "PM"
             f.write(
@@ -406,7 +421,6 @@ def generate_html_browser(camera_dir: str):
                 <div class="timebox{(hour % 2) + 1}">{display_hour} {am_pm}</div>
                 """
             )
-
 
         f.write(
             """
@@ -423,7 +437,9 @@ def generate_html_browser(camera_dir: str):
                 with Image.open(month_band) as img_for_width:
                     width = img_for_width.width
             except Exception as e:
-                print(f"Could not read width for {month_band} using Pillow: {e}. Skipping in HTML.")
+                print(
+                    f"Could not read width for {month_band} using Pillow: {e}. Skipping in HTML."
+                )
                 continue
 
             year_month = month_band_nopath.split(".")[0]
@@ -480,9 +496,10 @@ def generate_month_html(monthband_path: str, camera_name: str):
         with Image.open(monthband_path) as img_for_width:
             width = img_for_width.width
     except Exception as e:
-        logging.error(f"Could not read width for {monthband_path} using Pillow: {e}. Cannot generate month HTML.")
+        logging.error(
+            f"Could not read width for {monthband_path} using Pillow: {e}. Cannot generate month HTML."
+        )
         return
-
 
     # Write the HTML header
     with open(html_outfile, "w") as f:
@@ -506,29 +523,29 @@ def generate_month_html(monthband_path: str, camera_name: str):
         <body>
             <img src="{os.path.basename(monthband_path)}" usemap="#daylight" width="{width}" height="{DAILY_BAND_HEIGHT}">
             <map name="daylight">
-        """ # Referenced image locally
+        """  # Referenced image locally
         )
 
         # Iterate over the days in the month and generate an area tag for each day
         # The width of the image now directly corresponds to the number of days in the month
         # due to the changes in create_monthly_image
         num_days_in_image = width
-        current_year, current_month = map(int, year_month.split('-'))
+        current_year, current_month = map(int, year_month.split("-"))
 
-        for day_index in range(num_days_in_image): # day_index is 0 to (width-1)
-            day_of_month = day_index + 1 # Day is 1 to num_days_in_image
+        for day_index in range(num_days_in_image):  # day_index is 0 to (width-1)
+            day_of_month = day_index + 1  # Day is 1 to num_days_in_image
 
             # Ensure day is formatted with leading zero if needed for isodate
             day_str_for_isodate = f"{day_of_month:02d}"
             isodate = f"{year_month}-{day_str_for_isodate}"
-            dirlink = f"/photos/{camera_name}/{isodate}/" # Assumes this path structure
+            dirlink = f"/photos/{camera_name}/{isodate}/"  # Assumes this path structure
 
             # Define the coordinates for the clickable area for this day's band
             # x1 = current x-offset, y1 = 0
             # x2 = current x-offset + width of the band (which is 1 pixel)
             # y2 = height of the band
             x1 = day_index
-            x2 = day_index + 1 # Each band is 1 pixel wide
+            x2 = day_index + 1  # Each band is 1 pixel wide
 
             f.write(
                 f"""
@@ -559,7 +576,7 @@ def list_valid_days_directories(d: str) -> List[str]:
         A list of valid day directories in the format YYYY-MM-DD.
     """
     valid_days = []
-    if not os.path.isdir(d): # Check if base directory exists
+    if not os.path.isdir(d):  # Check if base directory exists
         logging.warning(f"Base directory for listing days does not exist: {d}")
         return valid_days
     for subdir in os.listdir(d):
@@ -628,9 +645,7 @@ def main(argv):
         )  # Renamed to avoid conflict with flag
 
         # Prioritize flag sky_area if provided, otherwise use config
-        sky_area_to_use = (
-            FLAGS.sky_area if FLAGS.sky_area else sky_area_str_from_config
-        )
+        sky_area_to_use = FLAGS.sky_area if FLAGS.sky_area else sky_area_str_from_config
 
         if not sky_area_to_use:
             print(
@@ -674,7 +689,9 @@ def main(argv):
                 logging.warning(
                     f"No start date specified and no data found for camera {camera_name}. Skipping band generation."
                 )
-                if FLAGS.html_only:  # Fall through to generate HTML if that's all that's asked
+                if (
+                    FLAGS.html_only
+                ):  # Fall through to generate HTML if that's all that's asked
                     generate_html(camera_dir=camera_dir)
                 continue
 
@@ -708,7 +725,9 @@ def main(argv):
             # For now, keeping it as per original logic but it might be redundant if range includes single day.
             if FLAGS.from_date and FLAGS.to_date and FLAGS.from_date == FLAGS.to_date:
                 day_dir_path = os.path.join(camera_dir, start_day.strftime("%Y-%m-%d"))
-                if os.path.exists(day_dir_path):  # Check if the specific day directory exists
+                if os.path.exists(
+                    day_dir_path
+                ):  # Check if the specific day directory exists
                     logging.info(
                         f"Running end of day for single specified day: {start_day.strftime('%Y-%m-%d')}"
                     )

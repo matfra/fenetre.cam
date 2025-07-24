@@ -1,7 +1,8 @@
-""" Utility functions for GoPro 11+
+"""Utility functions for GoPro 11+
 
 Most of the code here is copied from tutorial modules at https://github.com/gopro/OpenGoPro.git
 """
+
 import sys
 import os
 import threading
@@ -35,23 +36,27 @@ def get_human_readable_state(state: Dict) -> Dict:
     """
     human_readable_state = {}
     # Process statuses
-    if 'status' in state:
-        for key, value in state['status'].items():
+    if "status" in state:
+        for key, value in state["status"].items():
             key = int(key)
             status_name = GoProEnums.STATUS_NAMES.get(key, f"Unknown Status ({key})")
             if key in GoProEnums.STATUS_VALUES:
-                value_name = GoProEnums.STATUS_VALUES[key].get(value, f"Unknown Value ({value})")
+                value_name = GoProEnums.STATUS_VALUES[key].get(
+                    value, f"Unknown Value ({value})"
+                )
             else:
                 value_name = value
             human_readable_state[status_name] = value_name
 
     # Process settings
-    if 'settings' in state:
-        for key, value in state['settings'].items():
+    if "settings" in state:
+        for key, value in state["settings"].items():
             key = int(key)
             setting_name = GoProEnums.SETTING_NAMES.get(key, f"Unknown Setting ({key})")
             if key in GoProEnums.SETTING_VALUES:
-                value_name = GoProEnums.SETTING_VALUES[key].get(value, f"Unknown Value ({value})")
+                value_name = GoProEnums.SETTING_VALUES[key].get(
+                    value, f"Unknown Value ({value})"
+                )
             else:
                 value_name = value
             human_readable_state[setting_name] = value_name
@@ -76,7 +81,9 @@ class GoProUuid(str, enum.Enum):
     NETWORK_MANAGEMENT_RSP_UUID = GOPRO_BASE_UUID.format("0092")
 
     @classmethod
-    def dict_by_uuid(cls, value_creator: Callable[["GoProUuid"], T]) -> dict["GoProUuid", T]:
+    def dict_by_uuid(
+        cls, value_creator: Callable[["GoProUuid"], T]
+    ) -> dict["GoProUuid", T]:
         """Build a dict where the keys are each UUID defined here and the values are built from the input value_creator.
 
         Args:
@@ -100,7 +107,9 @@ def exception_handler(loop: asyncio.AbstractEventLoop, context: dict[str, Any]) 
     logging.critical("This is unexpected and unrecoverable.")
 
 
-async def connect_ble(notification_handler: noti_handler_T, identifier: str | None = None) -> BleakClient:
+async def connect_ble(
+    notification_handler: noti_handler_T, identifier: str | None = None
+) -> BleakClient:
     """Connect to a GoPro, then pair, and enable notifications
 
     If identifier is None, the first discovered GoPro will be connected to.
@@ -140,7 +149,9 @@ async def connect_ble(notification_handler: noti_handler_T, identifier: str | No
             matched_devices: list[BleakDevice] = []
             while len(matched_devices) == 0:
                 # Now get list of connectable advertisements
-                for device in await BleakScanner.discover(timeout=5, detection_callback=_scan_callback):
+                for device in await BleakScanner.discover(
+                    timeout=5, detection_callback=_scan_callback
+                ):
                     if device.name and device.name != "Unknown":
                         devices[device.name] = device
                 # Log every device we discovered
@@ -148,7 +159,9 @@ async def connect_ble(notification_handler: noti_handler_T, identifier: str | No
                     logging.info(f"\tDiscovered: {d}")
                 # Now look for our matching device(s)
                 token = re.compile(identifier or r"GoPro [A-Z0-9]{4}")
-                matched_devices = [device for name, device in devices.items() if token.match(name)]
+                matched_devices = [
+                    device for name, device in devices.items() if token.match(name)
+                ]
                 logging.info(f"Found {len(matched_devices)} matching devices.")
 
             # Connect to first matching Bluetooth device
@@ -201,7 +214,9 @@ async def enable_wifi(identifier: str | None = None) -> tuple[str, str, BleakCli
     event = asyncio.Event()
     client: BleakClient
 
-    async def notification_handler(characteristic: BleakGATTCharacteristic, data: bytearray) -> None:
+    async def notification_handler(
+        characteristic: BleakGATTCharacteristic, data: bytearray
+    ) -> None:
         uuid = GoProUuid(client.services.characteristics[characteristic.handle].uuid)
         logging.info(f'Received response at {uuid}: {data.hex(":")}')
 
@@ -249,6 +264,7 @@ def format_gopro_sd_card(ip_address: str):
     url = f"http://{ip_address}/gp/gpControl/command/storage/delete/all"
     requests.get(url)
 
+
 def _get_gopro_state(ip_address: str, root_ca: Optional[str] = None) -> Dict:
     """
     Get the current state of the GoPro camera.
@@ -267,7 +283,13 @@ def _get_gopro_state(ip_address: str, root_ca: Optional[str] = None) -> Dict:
 
 
 class GoProUtilityThread(threading.Thread):
-    def __init__(self, gopro: 'GoPro', camera_name: str, camera_config: Dict, exit_event: threading.Event):
+    def __init__(
+        self,
+        gopro: "GoPro",
+        camera_name: str,
+        camera_config: Dict,
+        exit_event: threading.Event,
+    ):
         super().__init__(
             name=f"{camera_config.get('name', 'gopro')}_utility_thread", daemon=True
         )
@@ -278,7 +300,9 @@ class GoProUtilityThread(threading.Thread):
         self.gopro_ip = camera_config.get("gopro_ip")
         self.gopro_ble_identifier = camera_config.get("gopro_ble_identifier")
         self.poll_interval_s = camera_config.get("gopro_utility_poll_interval_s", 10)
-        self.bluetooth_retry_delay_s = camera_config.get("gopro_bluetooth_retry_delay_s", 180) # Default to 3 minutes
+        self.bluetooth_retry_delay_s = camera_config.get(
+            "gopro_bluetooth_retry_delay_s", 180
+        )  # Default to 3 minutes
         self._ble_client = None  # To store the BleakClient instance
 
     def run(self):
@@ -288,21 +312,34 @@ class GoProUtilityThread(threading.Thread):
             try:
                 # 1. Verify IP connectivity
                 if not self._check_ip_connectivity():
-                    logging.info(f"No IP connectivity to {self.gopro_ip}. Attempting to enable Wi-Fi AP via Bluetooth...")
+                    logging.info(
+                        f"No IP connectivity to {self.gopro_ip}. Attempting to enable Wi-Fi AP via Bluetooth..."
+                    )
                     asyncio.run(self._enable_wifi_ap())
 
                     # After attempting to enable Wi-Fi AP, poll for connectivity
                     # for the duration of bluetooth_retry_delay_s
                     start_time = time.time()
-                    while not self.exit_event.is_set() and (time.time() - start_time) < self.bluetooth_retry_delay_s:
+                    while (
+                        not self.exit_event.is_set()
+                        and (time.time() - start_time) < self.bluetooth_retry_delay_s
+                    ):
                         if self._check_ip_connectivity():
-                            logging.info(f"IP connectivity to {self.gopro_ip} is now OK.")
-                            break # Exit the polling loop if connected
-                        logging.debug(f"Still no IP connectivity to {self.gopro_ip}. Retrying check in {self.poll_interval_s}s...")
+                            logging.info(
+                                f"IP connectivity to {self.gopro_ip} is now OK."
+                            )
+                            break  # Exit the polling loop if connected
+                        logging.debug(
+                            f"Still no IP connectivity to {self.gopro_ip}. Retrying check in {self.poll_interval_s}s..."
+                        )
                         self.exit_event.wait(self.poll_interval_s)
 
-                    if not self._check_ip_connectivity(): # Final check after the polling loop
-                        logging.warning(f"Failed to establish IP connectivity to {self.gopro_ip} after enabling Wi-Fi AP and polling.")
+                    if (
+                        not self._check_ip_connectivity()
+                    ):  # Final check after the polling loop
+                        logging.warning(
+                            f"Failed to establish IP connectivity to {self.gopro_ip} after enabling Wi-Fi AP and polling."
+                        )
                     else:
                         logging.info(f"IP connectivity to {self.gopro_ip} is now OK.")
                 else:
@@ -311,19 +348,24 @@ class GoProUtilityThread(threading.Thread):
                 # 3. Gather the state of the camera and store it
                 self.gopro.update_state()
                 logging.debug(f"GoPro state for {self.gopro_ip}:\n{self.gopro.state}")
-                
+
                 # Convert to human-readable format and log it
                 human_readable_state = get_human_readable_state(self.gopro.state)
-                logging.debug(f"Human-readable GoPro state for {self.gopro_ip}:\n{human_readable_state}")
+                logging.debug(
+                    f"Human-readable GoPro state for {self.gopro_ip}:\n{human_readable_state}"
+                )
 
                 # Export to Prometheus
                 for key, value in human_readable_state.items():
                     if isinstance(value, (int, float)):
                         if key in GoProEnums.STATUS_NAMES.values():
-                            gopro_state_gauge.labels(camera_name=self.camera_name, state_name=key).set(value)
+                            gopro_state_gauge.labels(
+                                camera_name=self.camera_name, state_name=key
+                            ).set(value)
                         elif key in GoProEnums.SETTING_NAMES.values():
-                            gopro_setting_gauge.labels(camera_name=self.camera_name, setting_name=key).set(value)
-
+                            gopro_setting_gauge.labels(
+                                camera_name=self.camera_name, setting_name=key
+                            ).set(value)
 
             except Exception as e:
                 logging.error(f"Error in GoPro utility thread for {self.gopro_ip}: {e}")

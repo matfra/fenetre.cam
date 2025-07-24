@@ -4,8 +4,8 @@ from skimage import exposure
 from typing import Optional, Tuple, Union
 from absl import logging
 from datetime import datetime
-import pytz # To get timezone from global_config easily
-import yaml # For get_timezone_from_config
+import pytz  # To get timezone from global_config easily
+import yaml  # For get_timezone_from_config
 import pyexiv2
 from admin_server import (
     metric_picture_width_pixels,
@@ -29,11 +29,16 @@ def get_timezone_from_config():
             config = yaml.safe_load(f)
             return config.get("global", {}).get("timezone", "UTC")
     except FileNotFoundError:
-        logging.warning("config.yaml not found, defaulting timezone to UTC for timestamps.")
+        logging.warning(
+            "config.yaml not found, defaulting timezone to UTC for timestamps."
+        )
         return "UTC"
     except Exception as e:
-        logging.error(f"Error reading timezone from config.yaml: {e}. Defaulting to UTC.")
+        logging.error(
+            f"Error reading timezone from config.yaml: {e}. Defaulting to UTC."
+        )
         return "UTC"
+
 
 DEFAULT_TIMEZONE = get_timezone_from_config()
 
@@ -45,18 +50,22 @@ def _parse_color(color_input: Union[str, Tuple[int, int, int]]) -> Tuple[int, in
     if isinstance(color_input, str):
         if color_input.startswith("(") and color_input.endswith(")"):
             try:
-                parts = list(map(int, color_input.strip("()").split(',')))
+                parts = list(map(int, color_input.strip("()").split(",")))
                 if len(parts) == 3:
-                    return tuple(parts) # type: ignore
+                    return tuple(parts)  # type: ignore
                 else:
-                    logging.warning(f"Invalid RGB tuple string (not 3 parts): {color_input}. Defaulting to white.")
+                    logging.warning(
+                        f"Invalid RGB tuple string (not 3 parts): {color_input}. Defaulting to white."
+                    )
                     return (255, 255, 255)
             except ValueError:
-                logging.warning(f"Invalid RGB tuple string (non-integer parts): {color_input}. Defaulting to white.")
+                logging.warning(
+                    f"Invalid RGB tuple string (non-integer parts): {color_input}. Defaulting to white."
+                )
                 return (255, 255, 255)
         # For common color names, PIL/Pillow can often handle them directly.
         # If specific name-to-RGB mapping is needed, expand here.
-        return color_input # type: ignore
+        return color_input  # type: ignore
     logging.warning(f"Invalid color type: {color_input}. Defaulting to white.")
     return (255, 255, 255)
 
@@ -69,10 +78,10 @@ def _add_text_overlay(
     color: Union[str, Tuple[int, int, int]] = "white",
     font_path: Optional[str] = None,
     background_color: Optional[Union[str, Tuple[int, int, int]]] = None,
-    background_padding: int = 2
+    background_padding: int = 2,
 ) -> Image.Image:
     """Internal helper to add any text overlay to an image."""
-    if not text_to_draw: # Do nothing if text is empty
+    if not text_to_draw:  # Do nothing if text is empty
         return pic
 
     draw = ImageDraw.Draw(pic, "RGBA" if background_color else pic.mode)
@@ -87,7 +96,9 @@ def _add_text_overlay(
                 try:
                     font = ImageFont.truetype("Arial.ttf", size)
                 except IOError:
-                    logging.warning("DejaVuSans.ttf or Arial.ttf not found. Using default PIL font. Text might be small.")
+                    logging.warning(
+                        "DejaVuSans.ttf or Arial.ttf not found. Using default PIL font. Text might be small."
+                    )
                     font = ImageFont.load_default()
     except Exception as e:
         logging.error(f"Error loading font: {e}. Using default PIL font.")
@@ -102,27 +113,31 @@ def _add_text_overlay(
     except TypeError:
         try:
             text_width = draw.textlength(text_to_draw, font=font)
-            cap_bbox = draw.textbbox((0,0), "M", font=font) # Estimate height
+            cap_bbox = draw.textbbox((0, 0), "M", font=font)  # Estimate height
             text_height = cap_bbox[3] - cap_bbox[1]
-            if text_width == 0: text_height = 0
+            if text_width == 0:
+                text_height = 0
         except AttributeError:
-            logging.warning("Cannot determine text size accurately with the default font. Text may be misplaced.")
+            logging.warning(
+                "Cannot determine text size accurately with the default font. Text may be misplaced."
+            )
             text_width = len(text_to_draw) * 6
             text_height = 10
             # Initialize text_bbox with estimated values if it couldn't be created before
             text_bbox = (0, 0, text_width, text_height)
-
 
     img_width, img_height = pic.size
     padding = 10
 
     if isinstance(position, str) and "," in position:
         try:
-            x_str, y_str = position.split(',')
+            x_str, y_str = position.split(",")
             x = int(x_str.strip())
             y = int(y_str.strip())
         except ValueError:
-            logging.warning(f"Invalid coordinate string for position: {position}. Defaulting to bottom_right.")
+            logging.warning(
+                f"Invalid coordinate string for position: {position}. Defaulting to bottom_right."
+            )
             x = img_width - text_width - padding
             y = img_height - text_height - padding - (text_bbox[1] if text_bbox else 0)
     elif position == "top_left":
@@ -144,7 +159,9 @@ def _add_text_overlay(
         x = (img_width - text_width) // 2
         y = img_height - text_height - padding - (text_bbox[1] if text_bbox else 0)
     else:
-        logging.warning(f"Unrecognized position: {position}. Defaulting to bottom_right.")
+        logging.warning(
+            f"Unrecognized position: {position}. Defaulting to bottom_right."
+        )
         x = img_width - text_width - padding
         y = img_height - text_height - padding - (text_bbox[1] if text_bbox else 0)
 
@@ -158,8 +175,18 @@ def _add_text_overlay(
         parsed_bg_color = _parse_color(background_color)
         bg_x0 = final_x + (text_bbox[0] if text_bbox else 0) - background_padding
         bg_y0 = final_y + (text_bbox[1] if text_bbox else 0) - background_padding
-        bg_x1 = final_x + (text_bbox[0] if text_bbox else 0) + text_width + background_padding
-        bg_y1 = final_y + (text_bbox[1] if text_bbox else 0) + text_height + background_padding
+        bg_x1 = (
+            final_x
+            + (text_bbox[0] if text_bbox else 0)
+            + text_width
+            + background_padding
+        )
+        bg_y1 = (
+            final_y
+            + (text_bbox[1] if text_bbox else 0)
+            + text_height
+            + background_padding
+        )
 
         bg_x0 = max(0, bg_x0)
         bg_y0 = max(0, bg_y0)
@@ -171,30 +198,43 @@ def _add_text_overlay(
                 bg_color_tuple_with_alpha = parsed_bg_color + (255,)
             elif isinstance(parsed_bg_color, tuple) and len(parsed_bg_color) == 4:
                 bg_color_tuple_with_alpha = parsed_bg_color
-            else: # String color name
-                from PIL import ImageColor # Moved import here
+            else:  # String color name
+                from PIL import ImageColor  # Moved import here
+
                 try:
-                    bg_color_tuple_with_alpha = ImageColor.getcolor(parsed_bg_color, "RGBA")
+                    bg_color_tuple_with_alpha = ImageColor.getcolor(
+                        parsed_bg_color, "RGBA"
+                    )
                 except ValueError:
-                    logging.warning(f"Invalid background color name: {background_color}. Defaulting to semi-transparent black.")
-                    bg_color_tuple_with_alpha = (0,0,0,128)
+                    logging.warning(
+                        f"Invalid background color name: {background_color}. Defaulting to semi-transparent black."
+                    )
+                    bg_color_tuple_with_alpha = (0, 0, 0, 128)
 
             if pic.mode != "RGBA" and bg_color_tuple_with_alpha[3] < 255:
-                overlay = Image.new("RGBA", pic.size, (0,0,0,0))
+                overlay = Image.new("RGBA", pic.size, (0, 0, 0, 0))
                 draw_overlay = ImageDraw.Draw(overlay)
-                draw_overlay.rectangle([bg_x0, bg_y0, bg_x1, bg_y1], fill=bg_color_tuple_with_alpha)
+                draw_overlay.rectangle(
+                    [bg_x0, bg_y0, bg_x1, bg_y1], fill=bg_color_tuple_with_alpha
+                )
                 # Ensure pic is converted to RGBA before pasting if it's not already, to preserve alpha
                 if pic.mode != "RGBA":
                     pic = pic.convert("RGBA")
-                    draw = ImageDraw.Draw(pic) # Re-create draw object for the new pic mode
+                    draw = ImageDraw.Draw(
+                        pic
+                    )  # Re-create draw object for the new pic mode
                 pic.alpha_composite(overlay)
-            else: # Main image is RGBA or background is opaque
-                 # If pic was not RGBA initially but background is opaque, ensure draw object is for current pic mode
-                if draw.mode != pic.mode: # e.g. pic was RGB, bg_color is opaque, draw was made for RGB
-                     # This case should be handled by the initial draw = ImageDraw.Draw(pic, "RGBA" if background_color else pic.mode)
-                     # but as a safeguard:
-                     pass # Assuming draw object is appropriate or pic is already RGBA
-                draw.rectangle([bg_x0, bg_y0, bg_x1, bg_y1], fill=bg_color_tuple_with_alpha)
+            else:  # Main image is RGBA or background is opaque
+                # If pic was not RGBA initially but background is opaque, ensure draw object is for current pic mode
+                if (
+                    draw.mode != pic.mode
+                ):  # e.g. pic was RGB, bg_color is opaque, draw was made for RGB
+                    # This case should be handled by the initial draw = ImageDraw.Draw(pic, "RGBA" if background_color else pic.mode)
+                    # but as a safeguard:
+                    pass  # Assuming draw object is appropriate or pic is already RGBA
+                draw.rectangle(
+                    [bg_x0, bg_y0, bg_x1, bg_y1], fill=bg_color_tuple_with_alpha
+                )
 
     draw.text((final_x, final_y), text_to_draw, font=font, fill=parsed_text_color)
     return pic
@@ -209,7 +249,7 @@ def add_timestamp(
     font_path: Optional[str] = None,
     background_color: Optional[Union[str, Tuple[int, int, int]]] = None,
     background_padding: int = 2,
-    custom_text: Optional[str] = None
+    custom_text: Optional[str] = None,
 ) -> Image.Image:
     """Adds a timestamp and optional custom text to the image by utilizing _add_text_overlay."""
     try:
@@ -237,11 +277,13 @@ def add_timestamp(
         color=color,
         font_path=font_path,
         background_color=background_color,
-        background_padding=background_padding
+        background_padding=background_padding,
     )
 
 
-def postprocess(pic: Image.Image, postprocessing_steps: list) -> Tuple[Image.Image, dict]:
+def postprocess(
+    pic: Image.Image, postprocessing_steps: list
+) -> Tuple[Image.Image, dict]:
     """
     Applies a series of post-processing steps to an image.
     """
@@ -276,10 +318,12 @@ def postprocess(pic: Image.Image, postprocessing_steps: list) -> Tuple[Image.Ima
                     position=step.get("position", "bottom_right"),
                     size=step.get("size", 24),
                     color=step.get("color", "white"),
-                    font_path=step.get("font_path"), # Allow custom font path from config
+                    font_path=step.get(
+                        "font_path"
+                    ),  # Allow custom font path from config
                     background_color=step.get("background_color", None),
                     background_padding=step.get("background_padding", 2),
-                    custom_text=step.get("custom_text", None)
+                    custom_text=step.get("custom_text", None),
                 )
         elif step["type"] == "text":
             if step.get("enabled", False) and step.get("text_content"):
@@ -301,10 +345,12 @@ def postprocess(pic: Image.Image, postprocessing_steps: list) -> Tuple[Image.Ima
                     color=step.get("color", "white"),
                     font_path=step.get("font_path", None),
                     background_color=step.get("background_color", None),
-                    background_padding=step.get("background_padding", 2)
+                    background_padding=step.get("background_padding", 2),
                 )
             elif not step.get("text_content") and step.get("enabled", False):
-                logging.warning("Generic text step is enabled but no 'text_content' was provided.")
+                logging.warning(
+                    "Generic text step is enabled but no 'text_content' was provided."
+                )
 
     return pic, exif_data
 
@@ -360,6 +406,7 @@ def auto_white_balance(pic: Image.Image) -> Image.Image:
     # Convert the NumPy array back to a PIL image
     return Image.fromarray(img_array_awb.astype(np.uint8))
 
+
 def gather_metrics(image_path: str, camera_name: str):
     """
     Reads metadata from an image file using pyexiv2 and updates Prometheus metrics.
@@ -367,28 +414,43 @@ def gather_metrics(image_path: str, camera_name: str):
     try:
         with pyexiv2.Image(image_path) as img:
             exif = img.read_exif()
-            
+
             # Basic file stats
             try:
                 stat = os.stat(image_path)
-                metric_picture_size_bytes.labels(camera_name=camera_name).set(stat.st_size)
-                
+                metric_picture_size_bytes.labels(camera_name=camera_name).set(
+                    stat.st_size
+                )
+
                 # Get image dimensions from EXIF or fallback to reading image
-                width = exif.get('Exif.Image.ImageWidth') or exif.get('Exif.Photo.PixelXDimension')
-                height = exif.get('Exif.Image.ImageLength') or exif.get('Exif.Photo.PixelYDimension')
+                width = exif.get("Exif.Image.ImageWidth") or exif.get(
+                    "Exif.Photo.PixelXDimension"
+                )
+                height = exif.get("Exif.Image.ImageLength") or exif.get(
+                    "Exif.Photo.PixelYDimension"
+                )
 
                 if width and height:
-                    metric_picture_width_pixels.labels(camera_name=camera_name).set(int(width))
-                    metric_picture_height_pixels.labels(camera_name=camera_name).set(int(height))
+                    metric_picture_width_pixels.labels(camera_name=camera_name).set(
+                        int(width)
+                    )
+                    metric_picture_height_pixels.labels(camera_name=camera_name).set(
+                        int(height)
+                    )
                 else:
                     # Fallback to PIL if dimensions not in EXIF
                     with Image.open(image_path) as pil_img:
-                        metric_picture_width_pixels.labels(camera_name=camera_name).set(pil_img.width)
-                        metric_picture_height_pixels.labels(camera_name=camera_name).set(pil_img.height)
+                        metric_picture_width_pixels.labels(camera_name=camera_name).set(
+                            pil_img.width
+                        )
+                        metric_picture_height_pixels.labels(
+                            camera_name=camera_name
+                        ).set(pil_img.height)
 
             except Exception as e:
-                logging.error(f"Error getting file stats or dimensions for {image_path}: {e}")
-
+                logging.error(
+                    f"Error getting file stats or dimensions for {image_path}: {e}"
+                )
 
             # EXIF Metrics
             def get_exif_value(key, default=0):
@@ -397,18 +459,28 @@ def gather_metrics(image_path: str, camera_name: str):
                     return default
                 try:
                     # Fractions are returned as 'num/den' strings
-                    if isinstance(v, str) and '/' in v:
-                        num, den = v.split('/')
+                    if isinstance(v, str) and "/" in v:
+                        num, den = v.split("/")
                         return float(num) / float(den)
                     return float(v)
                 except (ValueError, TypeError):
                     return default
 
-            metric_picture_iso.labels(camera_name=camera_name).set(get_exif_value('Exif.Photo.ISOSpeedRatings'))
-            metric_picture_focal_length_mm.labels(camera_name=camera_name).set(get_exif_value('Exif.Photo.FocalLength'))
-            metric_picture_aperture.labels(camera_name=camera_name).set(get_exif_value('Exif.Photo.FNumber'))
-            metric_picture_exposure_time_seconds.labels(camera_name=camera_name).set(get_exif_value('Exif.Photo.ExposureTime'))
-            metric_picture_white_balance.labels(camera_name=camera_name).set(get_exif_value('Exif.Photo.WhiteBalance'))
+            metric_picture_iso.labels(camera_name=camera_name).set(
+                get_exif_value("Exif.Photo.ISOSpeedRatings")
+            )
+            metric_picture_focal_length_mm.labels(camera_name=camera_name).set(
+                get_exif_value("Exif.Photo.FocalLength")
+            )
+            metric_picture_aperture.labels(camera_name=camera_name).set(
+                get_exif_value("Exif.Photo.FNumber")
+            )
+            metric_picture_exposure_time_seconds.labels(camera_name=camera_name).set(
+                get_exif_value("Exif.Photo.ExposureTime")
+            )
+            metric_picture_white_balance.labels(camera_name=camera_name).set(
+                get_exif_value("Exif.Photo.WhiteBalance")
+            )
 
             logging.debug(f"Successfully gathered metrics for {image_path}")
 

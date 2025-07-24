@@ -11,9 +11,11 @@ from astral import LocationInfo
 
 log_dir_global = None
 
+
 def _set_log_dir(log_dir: str):
     global log_dir_global
     log_dir_global = log_dir
+
 
 def _log_request_response(url: str, response: requests.Response):
     if log_dir_global:
@@ -32,11 +34,13 @@ class GoProSettings:
         self._gopro = gopro_instance
 
     def __setattr__(self, name, value):
-        if name.startswith('_'):
+        if name.startswith("_"):
             super().__setattr__(name, value)
             return
 
-        setting_name_map = {v.lower().replace(" ", "_"): k for k, v in GoProEnums.SETTING_NAMES.items()}
+        setting_name_map = {
+            v.lower().replace(" ", "_"): k for k, v in GoProEnums.SETTING_NAMES.items()
+        }
         setting_id = setting_name_map.get(name)
 
         if setting_id is None:
@@ -55,7 +59,9 @@ class GoProSettings:
                 if isinstance(value, int) and value in value_map:
                     value_id = value
                 else:
-                    raise ValueError(f"'{value}' is not a valid option for '{name}'. Valid options are: {list(value_map.values())}")
+                    raise ValueError(
+                        f"'{value}' is not a valid option for '{name}'. Valid options are: {list(value_map.values())}"
+                    )
         else:
             value_id = value
 
@@ -63,8 +69,20 @@ class GoProSettings:
             f"/gopro/camera/setting?option={value_id}&setting={setting_id}"
         )
 
+
 class GoPro:
-    def __init__(self, ip_address="10.5.5.9", timeout=5, root_ca=None, log_dir=None, latitude=None, longitude=None, timezone=None, preset_day=None, preset_night=None):
+    def __init__(
+        self,
+        ip_address="10.5.5.9",
+        timeout=5,
+        root_ca=None,
+        log_dir=None,
+        latitude=None,
+        longitude=None,
+        timezone=None,
+        preset_day=None,
+        preset_night=None,
+    ):
         self.ip_address = ip_address
         self.timeout = timeout
         self.root_ca = root_ca
@@ -82,11 +100,12 @@ class GoPro:
 
         if self.root_ca:
             import tempfile
+
             self.temp_file = tempfile.NamedTemporaryFile(delete=False)
             self.temp_file.write(self.root_ca.encode())
             self.temp_file.close()
             self.root_ca_filepath = self.temp_file.name
-        
+
         self.settings = GoProSettings(self)
         self.state = {}
 
@@ -97,7 +116,9 @@ class GoPro:
     def update_state(self):
         url = f"{self.scheme}://{self.ip_address}/gopro/camera/state"
         try:
-            response = requests.get(url, timeout=self.timeout, verify=self.root_ca_filepath)
+            response = requests.get(
+                url, timeout=self.timeout, verify=self.root_ca_filepath
+            )
             response.raise_for_status()
             self.state = response.json()
         except requests.RequestException as e:
@@ -108,19 +129,26 @@ class GoPro:
         """Get the available presets from the camera."""
         url = f"{self.scheme}://{self.ip_address}/gopro/camera/presets/get"
         try:
-            response = requests.get(url, timeout=self.timeout, verify=self.root_ca_filepath)
+            response = requests.get(
+                url, timeout=self.timeout, verify=self.root_ca_filepath
+            )
             _log_request_response(url, response)
             response.raise_for_status()
-            preset_group_array = response.json().get('presetGroupArray', [])
+            preset_group_array = response.json().get("presetGroupArray", [])
         except requests.RequestException as e:
             logging.error(f"Failed to get GoPro presets from {self.ip_address}: {e}")
         if len(preset_group_array) > 0:
             for preset_group in preset_group_array:
                 if preset_group.get("id") == "PRESET_GROUP_ID_PHOTO":
-                    return preset_group.get('presetArray', [])
+                    return preset_group.get("presetArray", [])
         return []
 
-    def _make_gopro_request(self, url_path: str, expected_response_code: int = 200, expected_response_text: str = "{}\n"):
+    def _make_gopro_request(
+        self,
+        url_path: str,
+        expected_response_code: int = 200,
+        expected_response_text: str = "{}\n",
+    ):
         """Helper function to make HTTP requests to GoPro with common parameters."""
         url = f"{self.scheme}://{self.ip_address}{url_path}"
         r = requests.get(url, timeout=self.timeout, verify=self.root_ca_filepath)
@@ -137,7 +165,9 @@ class GoPro:
 
     def _get_latest_file(self):
         media_list_url = f"{self.scheme}://{self.ip_address}/gopro/media/list"
-        resp = requests.get(media_list_url, timeout=self.timeout, verify=self.root_ca_filepath)
+        resp = requests.get(
+            media_list_url, timeout=self.timeout, verify=self.root_ca_filepath
+        )
         _log_request_response(media_list_url, resp)
         resp.raise_for_status()
         data = resp.json()
@@ -171,14 +201,14 @@ class GoPro:
             now = datetime.datetime.now(tz)
             location = LocationInfo(latitude=self.latitude, longitude=self.longitude)
             s = sun(location.observer, date=now.date(), tzinfo=tz)
-            
+
             # It's night if current time is after dusk or before dawn
-            is_night_time = now > s['dusk'] or now < s['dawn']
+            is_night_time = now > s["dusk"] or now < s["dawn"]
             logging.info(f"It is {'night' if is_night_time else 'day'}.")
             return is_night_time
         except Exception as e:
             logging.error(f"Error calculating sunrise/sunset for GoPro: {e}")
-            return False # Default to day
+            return False  # Default to day
 
     def validate_presets(self):
         """
@@ -191,13 +221,20 @@ class GoPro:
 
         logging.info(f"Available presets: {[p.get('name') for p in available_presets]}")
 
-        available_preset_ids = [p.get('id') for p in available_presets]
+        available_preset_ids = [p.get("id") for p in available_presets]
 
-        if self.preset_day and self.preset_day.get('id') not in available_preset_ids:
-            logging.error(f"Configured day preset ID '{self.preset_day.get('id')}' is not available on the camera.")
-        
-        if self.preset_night and self.preset_night.get('id') not in available_preset_ids:
-            logging.error(f"Configured night preset ID '{self.preset_night.get('id')}' is not available on the camera.")
+        if self.preset_day and self.preset_day.get("id") not in available_preset_ids:
+            logging.error(
+                f"Configured day preset ID '{self.preset_day.get('id')}' is not available on the camera."
+            )
+
+        if (
+            self.preset_night
+            and self.preset_night.get("id") not in available_preset_ids
+        ):
+            logging.error(
+                f"Configured night preset ID '{self.preset_night.get('id')}' is not available on the camera."
+            )
 
     def capture_photo(self, output_file: Optional[str] = None) -> bytes:
         latest_dir_before, latest_file_before = self._get_latest_file()
@@ -218,24 +255,37 @@ class GoPro:
                 preset_config = self.preset_day
 
         if preset_config:
-            if 'id' in preset_config:
-                self._make_gopro_request(f"/gopro/camera/presets/load?id={preset_config['id']}")
-            if 'settings' in preset_config and isinstance(preset_config['settings'], dict):
-                for setting, value in preset_config['settings'].items():
+            if "id" in preset_config:
+                self._make_gopro_request(
+                    f"/gopro/camera/presets/load?id={preset_config['id']}"
+                )
+            if "settings" in preset_config and isinstance(
+                preset_config["settings"], dict
+            ):
+                for setting, value in preset_config["settings"].items():
                     try:
                         setattr(self.settings, setting, value)
-                        logging.info(f"Applied setting '{setting}' with value '{value}'")
+                        logging.info(
+                            f"Applied setting '{setting}' with value '{value}'"
+                        )
                     except (AttributeError, ValueError) as e:
-                        logging.error(f"Failed to apply setting '{setting}' with value '{value}': {e}")
+                        logging.error(
+                            f"Failed to apply setting '{setting}' with value '{value}': {e}"
+                        )
 
         trigger_url = f"{self.scheme}://{self.ip_address}/gopro/camera/shutter/start"
-        r = requests.get(trigger_url, timeout=self.timeout, verify=self.root_ca_filepath)
+        r = requests.get(
+            trigger_url, timeout=self.timeout, verify=self.root_ca_filepath
+        )
         _log_request_response(trigger_url, r)
 
         while True:
             try:
                 latest_dir_after, latest_file_after = self._get_latest_file()
-                if (latest_dir_after != latest_dir_before or latest_file_after != latest_file_before):
+                if (
+                    latest_dir_after != latest_dir_before
+                    or latest_file_after != latest_file_before
+                ):
                     break
             except requests.exceptions.HTTPError as e:
                 if e.response.status_code == 503:
@@ -245,14 +295,18 @@ class GoPro:
             time.sleep(0.5)
 
         photo_url = f"{self.scheme}://{self.ip_address}/videos/DCIM/{latest_dir_after}/{latest_file_after}"
-        photo_resp = requests.get(photo_url, timeout=self.timeout, verify=self.root_ca_filepath)
+        photo_resp = requests.get(
+            photo_url, timeout=self.timeout, verify=self.root_ca_filepath
+        )
         photo_resp.raise_for_status()
 
         if output_file:
             with open(output_file, "wb") as f:
                 f.write(photo_resp.content)
 
-        delete_path = f"/gopro/media/delete/file?path={latest_dir_after}/{latest_file_after}"
+        delete_path = (
+            f"/gopro/media/delete/file?path={latest_dir_after}/{latest_file_after}"
+        )
         self._make_gopro_request(delete_path)
 
         return photo_resp.content

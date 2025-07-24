@@ -50,7 +50,28 @@ from waitress import serve as waitress_serve
 from astral.sun import sun
 from astral import LocationInfo
 
-from admin_server import metric_pictures_taken_total, metric_last_successful_picture_timestamp, metric_capture_failures_total, metric_timelapses_created_total, metric_camera_directory_size_bytes, metric_work_directory_size_bytes, metric_directories_total, metric_directories_archived_total, metric_directories_timelapse_total, metric_directories_daylight_total, metric_picture_width_pixels, metric_picture_height_pixels, metric_picture_size_bytes, metric_picture_iso, metric_picture_focal_length_mm, metric_picture_aperture, metric_picture_exposure_time_seconds, metric_picture_white_balance, metric_processing_time_seconds, metric_sleep_time_seconds
+from admin_server import (
+    metric_pictures_taken_total,
+    metric_last_successful_picture_timestamp,
+    metric_capture_failures_total,
+    metric_timelapses_created_total,
+    metric_camera_directory_size_bytes,
+    metric_work_directory_size_bytes,
+    metric_directories_total,
+    metric_directories_archived_total,
+    metric_directories_timelapse_total,
+    metric_directories_daylight_total,
+    metric_picture_width_pixels,
+    metric_picture_height_pixels,
+    metric_picture_size_bytes,
+    metric_picture_iso,
+    metric_picture_focal_length_mm,
+    metric_picture_aperture,
+    metric_picture_exposure_time_seconds,
+    metric_picture_white_balance,
+    metric_processing_time_seconds,
+    metric_sleep_time_seconds,
+)
 from config import config_load
 
 from platform_utils import is_raspberry_pi
@@ -66,15 +87,11 @@ DEFAULT_SKY_AREA = "100,0,400,50"
 FENETRE_PID_FILE = os.environ.get("FENETRE_PID_FILE", "fenetre.pid")
 
 # Global dictionary to keep track of active camera threads and related utility threads
-active_camera_threads = (
-    {}
-)
+active_camera_threads = {}
 http_server_thread_global = None
 http_server_instance = None
 admin_server_thread_global = None
-admin_server_instance_global = (
-    None
-)
+admin_server_instance_global = None
 exit_event = threading.Event()
 timelapse_queue_file = None
 timelapse_queue_lock = threading.Lock()
@@ -168,9 +185,9 @@ def get_pic_from_picamera2(camera_config: Dict) -> Image.Image:
     from libcamera import controls
 
     picam2 = Picamera2()
-    
+
     config = picam2.create_still_configuration()
-    
+
     # Apply tuning file if specified
     if camera_config.get("tuning_file"):
         tuning = Picamera2.load_tuning_file(camera_config["tuning_file"])
@@ -184,16 +201,17 @@ def get_pic_from_picamera2(camera_config: Dict) -> Image.Image:
     if camera_config.get("analogue_gain"):
         picam2.set_controls({"AnalogueGain": camera_config["analogue_gain"]})
     if camera_config.get("denoise_mode"):
-        picam2.set_controls({"NoiseReductionMode": controls.draft.NoiseReductionModeEnum.HighQuality})
-
+        picam2.set_controls(
+            {"NoiseReductionMode": controls.draft.NoiseReductionModeEnum.HighQuality}
+        )
 
     picam2.start()
     time.sleep(1)
-    
+
     # Capture to a memory buffer
     buffer = picam2.capture_file("-")
     picam2.stop()
-    
+
     return Image.open(BytesIO(buffer))
 
 
@@ -214,20 +232,19 @@ def is_sunrise_or_sunset(camera_config: Dict, global_config: Dict) -> bool:
         now = datetime.now(tz)
         location = LocationInfo(latitude=latitude, longitude=longitude)
         s = sun(location.observer, date=now.date(), tzinfo=location.timezone)
-        
+
         sunrise_start = s["sunrise"] - timedelta(minutes=30)
         sunrise_end = s["sunrise"] + timedelta(minutes=30)
         sunset_start = s["sunset"] - timedelta(minutes=30)
         sunset_end = s["sunset"] + timedelta(minutes=30)
 
-        return (sunrise_start <= now <= sunrise_end) or (sunset_start <= now <= sunset_end)
+        return (sunrise_start <= now <= sunrise_end) or (
+            sunset_start <= now <= sunset_end
+        )
 
     except Exception as e:
         logging.error(f"Error calculating sunrise/sunset: {e}")
         return False
-
-
-
 
 
 def snap(camera_name, camera_config: Dict):
@@ -247,7 +264,9 @@ def snap(camera_name, camera_config: Dict):
                 local_command, timeout, camera_name, camera_config
             )
         if gopro_ip is not None:
-            gopro_instance = active_camera_threads.get(camera_name, {}).get('gopro_instance')
+            gopro_instance = active_camera_threads.get(camera_name, {}).get(
+                "gopro_instance"
+            )
             if not gopro_instance:
                 raise RuntimeError(f"GoPro instance not found for camera {camera_name}")
             jpeg_bytes = gopro_instance.capture_photo()
@@ -297,9 +316,13 @@ def snap(camera_name, camera_config: Dict):
             try:
                 gather_metrics(previous_pic_fullpath, camera_name)
             except Exception as e:
-                logging.error(f"Error gathering metrics for {previous_pic_fullpath}: {e}")
+                logging.error(
+                    f"Error gathering metrics for {previous_pic_fullpath}: {e}"
+                )
         metric_pictures_taken_total.labels(camera_name=camera_name).inc()
-        metric_last_successful_picture_timestamp.labels(camera_name=camera_name).set_to_current_time()
+        metric_last_successful_picture_timestamp.labels(
+            camera_name=camera_name
+        ).set_to_current_time()
         update_latest_link(previous_pic_fullpath)
         metadata = {
             "last_picture_url": os.path.relpath(
@@ -319,9 +342,13 @@ def snap(camera_name, camera_config: Dict):
         current_sleep_interval = sleep_intervals[camera_name]
         if is_sunrise_or_sunset(camera_config, global_config):
             current_sleep_interval = global_config.get("sunrise_sunset_interval_s", 10)
-            logging.info(f"{camera_name}: Sunrise/sunset detected, using fast interval: {current_sleep_interval}s")
+            logging.info(
+                f"{camera_name}: Sunrise/sunset detected, using fast interval: {current_sleep_interval}s"
+            )
 
-        metric_sleep_time_seconds.labels(camera_name=camera_name).set(current_sleep_interval)
+        metric_sleep_time_seconds.labels(camera_name=camera_name).set(
+            current_sleep_interval
+        )
         logging.info(f"{camera_name}: Sleeping {current_sleep_interval}s")
         time.sleep(current_sleep_interval)
 
@@ -361,9 +388,11 @@ def snap(camera_name, camera_config: Dict):
                 logging.debug(
                     f"{camera_name}: ssim {ssim}, setpoint: {ssim_setpoint}, new sleep interval: {sleep_intervals[camera_name]}s"
                 )
-        
+
         end_time = time.time()
-        metric_processing_time_seconds.labels(camera_name=camera_name).set(end_time - start_time)
+        metric_processing_time_seconds.labels(camera_name=camera_name).set(
+            end_time - start_time
+        )
         previous_pic = new_pic
         previous_exif = new_exif
         previous_pic_dir = new_pic_dir
@@ -442,22 +471,18 @@ def stop_http_server():
 
 # --- Config Server Management ---
 def run_admin_server_func(
-        listeners: str, flask_app, fenetre_config_file: str, fenetre_pid_file: str
+    listeners: str, flask_app, fenetre_config_file: str, fenetre_pid_file: str
 ):
     """Runs the Flask admin server."""
     flask_app.config["FENETRE_CONFIG_FILE"] = fenetre_config_file
     flask_app.config["FENETRE_PID_FILE_PATH"] = fenetre_pid_file
-    flask_app.config["EXIT_EVENT"] = (
-        exit_event
-    )
+    flask_app.config["EXIT_EVENT"] = exit_event
 
     global admin_server_instance_global
     try:
-        logger = std_logging.getLogger('waitress')
+        logger = std_logging.getLogger("waitress")
         logging.info("Starting admin server")
-        waitress_serve(
-                flask_app, listen=listeners, threads=4, _quiet=False
-        )
+        waitress_serve(flask_app, listen=listeners, threads=4, _quiet=False)
     except SystemExit:
         logging.info("admin server shutting down (SystemExit caught).")
     except Exception as e:
@@ -466,7 +491,6 @@ def run_admin_server_func(
     finally:
         logging.info(f"admin server stopped.")
         admin_server_instance_global = None
-
 
 
 def stop_admin_server():
@@ -584,7 +608,9 @@ def create_and_start_and_watch_thread(
                     f"Thread {name} (re)start attempt {failure_count}. Delaying {exp_backoff_delay}s."
                 )
                 if camera_name_for_management:
-                    metric_capture_failures_total.labels(camera_name=camera_name_for_management).inc()
+                    metric_capture_failures_total.labels(
+                        camera_name=camera_name_for_management
+                    ).inc()
                 time.sleep(exp_backoff_delay)
 
             failure_count += 1
@@ -597,9 +623,6 @@ def create_and_start_and_watch_thread(
                 thread_instance = None  # Ensure we try to restart it
 
         time.sleep(5)  # Check every 5 seconds
-
-
-
 
 
 def update_cameras_metadata(cameras_configs: Dict, work_dir: str):
@@ -617,12 +640,16 @@ def update_cameras_metadata(cameras_configs: Dict, work_dir: str):
 
             # Handle both old (list) and new (dict) formats
             if isinstance(cameras_public_metadata, list):
-                logging.warning(f"Old format detected for {json_filepath}. It will be updated to the new format.")
+                logging.warning(
+                    f"Old format detected for {json_filepath}. It will be updated to the new format."
+                )
                 old_camera_list = cameras_public_metadata
             elif isinstance(cameras_public_metadata, dict):
                 old_camera_list = cameras_public_metadata.get("cameras", [])
             else:
-                logging.warning(f"Unrecognized format for {json_filepath}. It will be overwritten.")
+                logging.warning(
+                    f"Unrecognized format for {json_filepath}. It will be overwritten."
+                )
                 old_camera_list = []
 
             for camera_metadata in old_camera_list:
@@ -634,15 +661,18 @@ def update_cameras_metadata(cameras_configs: Dict, work_dir: str):
                     updated_cameras_metadata["cameras"].append(camera_metadata)
 
         except (json.JSONDecodeError, TypeError) as e:
-            logging.warning(f"Could not parse {json_filepath} or it has an invalid format. It will be overwritten. Error: {e}")
-
+            logging.warning(
+                f"Could not parse {json_filepath} or it has an invalid format. It will be overwritten. Error: {e}"
+            )
 
     for cam in cameras_config:
         metadata = {}
         metadata["title"] = cam
         metadata["url"] = f"map.html?camera={cam}"
         metadata["fullscreen_url"] = f"fullscreen.html?camera={cam}"
-        metadata["livefeed_url"] = cameras_config[cam].get("url") or cameras_config[cam].get("local_command")
+        metadata["livefeed_url"] = cameras_config[cam].get("url") or cameras_config[
+            cam
+        ].get("local_command")
         metadata["description"] = cameras_config[cam].get("description", "")
         metadata["snap_interval_s"] = (
             cameras_config[cam].get("snap_interval_s") or "dynamic"
@@ -691,9 +721,11 @@ def main(argv):
     load_and_apply_configuration(initial_load=True)  # Uses FLAGS.config by default
 
     global timelapse_queue_file
-    timelapse_queue_file = os.path.join(global_config.get("work_dir"), "timelapse_queue.txt")
+    timelapse_queue_file = os.path.join(
+        global_config.get("work_dir"), "timelapse_queue.txt"
+    )
     if not os.path.exists(timelapse_queue_file):
-        open(timelapse_queue_file, 'a').close() # Create the file if it does not exist
+        open(timelapse_queue_file, "a").close()  # Create the file if it does not exist
 
     # These queues are global and should persist across reloads if fenetre.py itself isn't restarted.
     # If reload implies restarting these loops, then re-initialization might be needed in reload_configuration_logic
@@ -728,7 +760,9 @@ def main(argv):
 
     if global_config.get("frequent_timelapse_scheduler_enabled", False):
         timelapse_scheduler_thread_global = Thread(
-            target=timelapse_scheduler_loop, daemon=True, name="timelapse_scheduler_loop"
+            target=timelapse_scheduler_loop,
+            daemon=True,
+            name="timelapse_scheduler_loop",
         )
         timelapse_scheduler_thread_global.start()
         logging.info(f"Starting thread {timelapse_scheduler_thread_global.name}")
@@ -766,29 +800,43 @@ def load_and_apply_configuration(initial_load=False, config_file_override=None):
 
     config_path_to_load = config_file_override if config_file_override else FLAGS.config
     if not config_path_to_load:
-        logging.error("No configuration file path specified. Cannot load configuration.")
+        logging.error(
+            "No configuration file path specified. Cannot load configuration."
+        )
         return
 
     # Load new configuration
-    new_server_config, new_cameras_config, new_global_config, new_admin_server_config = config_load(config_path_to_load)
+    (
+        new_server_config,
+        new_cameras_config,
+        new_global_config,
+        new_admin_server_config,
+    ) = config_load(config_path_to_load)
 
     if initial_load:
         global global_config, admin_server_config, flask_app_instance
         server_config = new_server_config
         global_config = new_global_config
         admin_server_config = new_admin_server_config
-        global_config["pic_dir"] = os.path.join(global_config.get("work_dir", "."), "photos")
+        global_config["pic_dir"] = os.path.join(
+            global_config.get("work_dir", "."), "photos"
+        )
 
         try:
             from admin_server import app as imported_flask_app
+
             flask_app_instance = imported_flask_app
         except ImportError as e:
-            logging.error(f"Failed to import Flask app from admin_server: {e}. Config server UI will not be available.")
+            logging.error(
+                f"Failed to import Flask app from admin_server: {e}. Config server UI will not be available."
+            )
             flask_app_instance = None
 
         # Start HTTP Server if enabled
         if server_config.get("enabled", False):
-            http_server_thread_global = Thread(target=server_run, daemon=True, name="http_server")
+            http_server_thread_global = Thread(
+                target=server_run, daemon=True, name="http_server"
+            )
             http_server_thread_global.start()
 
         # Start Config Server if enabled
@@ -797,14 +845,21 @@ def load_and_apply_configuration(initial_load=False, config_file_override=None):
             pid_file_path = FENETRE_PID_FILE
             admin_server_thread_global = Thread(
                 target=run_admin_server_func,
-                args=(admin_server_config.get("listen", "0.0.0.0:8889"), flask_app_instance, main_config_file_path, pid_file_path),
+                args=(
+                    admin_server_config.get("listen", "0.0.0.0:8889"),
+                    flask_app_instance,
+                    main_config_file_path,
+                    pid_file_path,
+                ),
                 daemon=True,
                 name="admin_server_flask",
             )
             admin_server_thread_global.start()
-    else: # This is a reload
+    else:  # This is a reload
         # If server was enabled and is now disabled, stop it
-        if server_config.get("enabled", False) and not new_server_config.get("enabled", False):
+        if server_config.get("enabled", False) and not new_server_config.get(
+            "enabled", False
+        ):
             stop_http_server()
         server_config = new_server_config
 
@@ -814,11 +869,14 @@ def load_and_apply_configuration(initial_load=False, config_file_override=None):
         update_cameras_metadata(cameras_config, global_config["work_dir"])
         copy_public_html_files(global_config["work_dir"], global_config)
     else:
-        logging.error("work_dir not set in global config. Cannot update camera metadata.")
+        logging.error(
+            "work_dir not set in global config. Cannot update camera metadata."
+        )
 
     manage_camera_threads()
 
     manage_camera_threads()
+
 
 def manage_camera_threads():
     """Starts and stops camera threads based on the current cameras_config."""
@@ -827,15 +885,25 @@ def manage_camera_threads():
 
     # Stop threads for removed or disabled cameras
     for cam_name, thread_info in list(active_camera_threads.items()):
-        if cam_name not in current_camera_names or cameras_config[cam_name].get("disabled", False):
-            logging.info(f"Camera {cam_name} removed or disabled. Stopping its threads.")
-            if 'watchdog_manager_thread' in thread_info and thread_info['watchdog_manager_thread'].is_alive():
+        if cam_name not in current_camera_names or cameras_config[cam_name].get(
+            "disabled", False
+        ):
+            logging.info(
+                f"Camera {cam_name} removed or disabled. Stopping its threads."
+            )
+            if (
+                "watchdog_manager_thread" in thread_info
+                and thread_info["watchdog_manager_thread"].is_alive()
+            ):
                 # The watchdog manager will see the camera is gone and exit.
                 # We join to ensure it cleans up.
-                thread_info['watchdog_manager_thread'].join(timeout=5)
-            if 'gopro_utility' in thread_info and thread_info['gopro_utility'].is_alive():
-                thread_info['gopro_utility'].stop()
-                thread_info['gopro_utility'].join(timeout=5)
+                thread_info["watchdog_manager_thread"].join(timeout=5)
+            if (
+                "gopro_utility" in thread_info
+                and thread_info["gopro_utility"].is_alive()
+            ):
+                thread_info["gopro_utility"].stop()
+                thread_info["gopro_utility"].join(timeout=5)
             threads_to_remove.append(cam_name)
 
     for cam_name in threads_to_remove:
@@ -849,12 +917,21 @@ def manage_camera_threads():
         if cam_conf.get("disabled", False):
             continue
 
-        if cam_name not in active_camera_threads or not active_camera_threads[cam_name].get('watchdog_manager_thread', {}).is_alive():
+        if (
+            cam_name not in active_camera_threads
+            or not active_camera_threads[cam_name]
+            .get("watchdog_manager_thread", {})
+            .is_alive()
+        ):
             logging.info(f"Starting/Restarting threads for camera {cam_name}")
-            
+
             # Initialize sleep interval
             fixed_snap_interval = cam_conf.get("snap_interval_s", None)
-            sleep_intervals[cam_name] = float(fixed_snap_interval) if isinstance(fixed_snap_interval, (int, float)) else 60.0
+            sleep_intervals[cam_name] = (
+                float(fixed_snap_interval)
+                if isinstance(fixed_snap_interval, (int, float))
+                else 60.0
+            )
 
             # Start watchdog manager for the snap thread
             watchdog_name = f"{cam_name}_watchdog_manager"
@@ -865,12 +942,16 @@ def manage_camera_threads():
                 args=[snap, f"{cam_name}_snap", [cam_name, cam_conf], 86400, cam_name],
             )
             cam_watchdog_thread.start()
-            if cam_name not in active_camera_threads: active_camera_threads[cam_name] = {}
-            active_camera_threads[cam_name]['watchdog_manager_thread'] = cam_watchdog_thread
+            if cam_name not in active_camera_threads:
+                active_camera_threads[cam_name] = {}
+            active_camera_threads[cam_name][
+                "watchdog_manager_thread"
+            ] = cam_watchdog_thread
 
             # Start GoPro utility thread if needed
             if cam_conf.get("gopro_ip"):
                 from gopro import GoPro
+
                 gopro_instance = GoPro(
                     ip_address=cam_conf.get("gopro_ip"),
                     root_ca=cam_conf.get("gopro_root_ca"),
@@ -881,18 +962,23 @@ def manage_camera_threads():
                     preset_day=cam_conf.get("gopro_preset_day"),
                     preset_night=cam_conf.get("gopro_preset_night"),
                 )
-                gopro_utility_thread = GoProUtilityThread(gopro_instance, cam_name, cam_conf, exit_event)
+                gopro_utility_thread = GoProUtilityThread(
+                    gopro_instance, cam_name, cam_conf, exit_event
+                )
                 gopro_utility_thread.start()
-                if cam_name not in active_camera_threads: active_camera_threads[cam_name] = {}
-                active_camera_threads[cam_name]['gopro_utility'] = gopro_utility_thread
-                active_camera_threads[cam_name]['gopro_instance'] = gopro_instance
+                if cam_name not in active_camera_threads:
+                    active_camera_threads[cam_name] = {}
+                active_camera_threads[cam_name]["gopro_utility"] = gopro_utility_thread
+                active_camera_threads[cam_name]["gopro_instance"] = gopro_instance
         else:
             # For existing, running cameras, we could update settings like sleep_interval here if they change.
             fixed_snap_interval = cam_conf.get("snap_interval_s", None)
             if fixed_snap_interval is not None:
                 new_interval = float(fixed_snap_interval)
                 if sleep_intervals.get(cam_name) != new_interval:
-                    logging.info(f"Updating snap interval for camera {cam_name} to {new_interval}s")
+                    logging.info(
+                        f"Updating snap interval for camera {cam_name} to {new_interval}s"
+                    )
                     sleep_intervals[cam_name] = new_interval
 
 
@@ -1003,6 +1089,7 @@ def timelapse_scheduler_loop():
         logging.info(f"Timelapse scheduler sleeping for {interval} seconds.")
         time.sleep(interval)
 
+
 def timelapse_loop():
     """
     This is a loop with a blocking Thread to create timelapses one at a time.
@@ -1029,11 +1116,17 @@ def timelapse_loop():
                     log_dir=global_config.get("log_dir"),
                 )
                 if result:
-                    camera_name = os.path.basename(os.path.dirname(os.path.normpath(dir_to_process)))
-                    metric_timelapses_created_total.labels(camera_name=camera_name).inc()
+                    camera_name = os.path.basename(
+                        os.path.dirname(os.path.normpath(dir_to_process))
+                    )
+                    metric_timelapses_created_total.labels(
+                        camera_name=camera_name
+                    ).inc()
 
             except FileExistsError:
-                logging.warning(f"Found an existing timelapse in dir {dir_to_process}, Skipping.")
+                logging.warning(
+                    f"Found an existing timelapse in dir {dir_to_process}, Skipping."
+                )
             if result is False:
                 logging.error(
                     f"There was an error creating the timelapse for dir: {dir_to_process}"
@@ -1059,7 +1152,7 @@ def daylight_loop():
         time.sleep(1)
 
 
-def get_dir_size(path='.'):
+def get_dir_size(path="."):
     total_size = 0
     for dirpath, dirnames, filenames in os.walk(path):
         for f in filenames:
@@ -1094,21 +1187,29 @@ def disk_management_loop():
                 continue
 
             current_size_bytes = get_dir_size(camera_dir)
-            metric_camera_directory_size_bytes.labels(camera_name=camera_name).set(current_size_bytes)
-            
+            metric_camera_directory_size_bytes.labels(camera_name=camera_name).set(
+                current_size_bytes
+            )
+
             limit_bytes = camera_limit_gb * (1024**3)
 
             if current_size_bytes > limit_bytes:
-                logging.info(f"Camera {camera_name} is over its limit of {camera_limit_gb} GB. Current size: {current_size_bytes / (1024**3):.2f} GB. Deleting oldest directories.")
+                logging.info(
+                    f"Camera {camera_name} is over its limit of {camera_limit_gb} GB. Current size: {current_size_bytes / (1024**3):.2f} GB. Deleting oldest directories."
+                )
                 subdirs = sorted([d.path for d in os.scandir(camera_dir) if d.is_dir()])
                 for subdir in subdirs:
                     if current_size_bytes <= limit_bytes:
                         break
                     dir_to_delete_size = get_dir_size(subdir)
                     if dry_run:
-                        logging.info(f"[DRY RUN] Would delete {subdir} to free up {dir_to_delete_size / (1024**2):.2f} MB")
+                        logging.info(
+                            f"[DRY RUN] Would delete {subdir} to free up {dir_to_delete_size / (1024**2):.2f} MB"
+                        )
                     else:
-                        logging.info(f"Deleting {subdir} to free up {dir_to_delete_size / (1024**2):.2f} MB")
+                        logging.info(
+                            f"Deleting {subdir} to free up {dir_to_delete_size / (1024**2):.2f} MB"
+                        )
                         shutil.rmtree(subdir)
                     current_size_bytes -= dir_to_delete_size
 
@@ -1121,14 +1222,18 @@ def disk_management_loop():
             global_limit_bytes = global_limit_gb * (1024**3)
 
             if current_work_dir_size > global_limit_bytes:
-                logging.info(f"Global work_dir is over its limit of {global_limit_gb} GB. Current size: {current_work_dir_size / (1024**3):.2f} GB. Deleting oldest directories across all cameras.")
-                
+                logging.info(
+                    f"Global work_dir is over its limit of {global_limit_gb} GB. Current size: {current_work_dir_size / (1024**3):.2f} GB. Deleting oldest directories across all cameras."
+                )
+
                 all_day_dirs = []
                 for camera_name in cameras_config:
                     camera_dir = os.path.join(global_config["pic_dir"], camera_name)
                     if os.path.isdir(camera_dir):
-                        all_day_dirs.extend([d.path for d in os.scandir(camera_dir) if d.is_dir()])
-                
+                        all_day_dirs.extend(
+                            [d.path for d in os.scandir(camera_dir) if d.is_dir()]
+                        )
+
                 all_day_dirs.sort()
 
                 for day_dir in all_day_dirs:
@@ -1136,9 +1241,13 @@ def disk_management_loop():
                         break
                     dir_to_delete_size = get_dir_size(day_dir)
                     if dry_run:
-                        logging.info(f"[DRY RUN] Would delete {day_dir} to free up {dir_to_delete_size / (1024**2):.2f} MB")
+                        logging.info(
+                            f"[DRY RUN] Would delete {day_dir} to free up {dir_to_delete_size / (1024**2):.2f} MB"
+                        )
                     else:
-                        logging.info(f"Deleting {day_dir} to free up {dir_to_delete_size / (1024**2):.2f} MB")
+                        logging.info(
+                            f"Deleting {day_dir} to free up {dir_to_delete_size / (1024**2):.2f} MB"
+                        )
                         shutil.rmtree(day_dir)
                     current_work_dir_size -= dir_to_delete_size
 
@@ -1156,7 +1265,9 @@ def archive_loop():
             scan_and_publish_metrics(camera_name, camera_dir, global_config)
             daydirs = list_unarchived_dirs(camera_dir)
             for daydir in daydirs:
-                archive_daydir(daydir=daydir, global_config=global_config, dry_run=False)
+                archive_daydir(
+                    daydir=daydir, global_config=global_config, dry_run=False
+                )
         time.sleep(600)
 
 

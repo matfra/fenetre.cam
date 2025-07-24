@@ -1,6 +1,7 @@
 import yaml
 from absl import logging
 
+
 def config_load(config_file_path: str) -> list[dict]:
     try:
         with open(config_file_path, "r") as f:
@@ -15,5 +16,3 @@ def config_load(config_file_path: str) -> list[dict]:
     except yaml.YAMLError as e:
         logging.error(f"Error parsing YAML configuration file {config_file_path}: {e}")
         return [{}, {}, {}, {}]
-
-

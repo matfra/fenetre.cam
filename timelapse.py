@@ -9,6 +9,7 @@ from PIL import Image
 
 from platform_utils import is_raspberry_pi
 
+
 def get_image_dimensions(image_path: str):
     """Gets the dimensions of an image."""
     try:
@@ -17,6 +18,7 @@ def get_image_dimensions(image_path: str):
     except Exception as e:
         logging.error(f"Error getting dimensions for {image_path}: {e}")
         return None
+
 
 def create_timelapse(
     dir: str,
@@ -43,12 +45,13 @@ def create_timelapse(
             image_files.remove(image_file)
 
     if not image_files:
-        logging.error(f"No valid JPG images found in {dir} after removing 0-byte files.")
+        logging.error(
+            f"No valid JPG images found in {dir} after removing 0-byte files."
+        )
         return False
 
     first_image_path = os.path.join(dir, image_files[0])
     width, height = get_image_dimensions(first_image_path)
-
 
     if is_raspberry_pi():
         ffmpeg_options = "-c:v h264_v4l2m2m -b:v 5M"
@@ -56,29 +59,28 @@ def create_timelapse(
         max_width = 1920
         max_height = 1080
         framerate = 30
-        two_pass = False # multi pass encoding not supported with hardware encoder
+        two_pass = False  # multi pass encoding not supported with hardware encoder
     else:
         ffmpeg_options = "-c:v libvpx-vp9 -b:v 0 -crf 30"
         file_ext = "webm"
         max_width = 3840
         max_height = 2160
         if two_pass is None:
-            two_pass = True # VP9 can take advantage of multiple pass
+            two_pass = True  # VP9 can take advantage of multiple pass
         if len(image_files) > 1200:
             framerate = 60
         else:
             framerate = 30
 
-
     aspect_ratio = width / height
-    if aspect_ratio > 16/9: # Wider
+    if aspect_ratio > 16 / 9:  # Wider
         if width >= max_width:
             scale_vf = f"scale={max_width}:-2"
         elif width >= 2560:
             scale_vf = "scale=2560:-2"
         else:
             scale_vf = "scale=1920:-2"
-    else: # Taller or 16:9
+    else:  # Taller or 16:9
         if height >= max_height:
             scale_vf = f"scale=-2:{max_height}"
         elif height >= 1440:
@@ -91,7 +93,6 @@ def create_timelapse(
     timelapse_filename = os.path.basename(dir) + "." + file_ext
     timelapse_filepath = os.path.join(dir, timelapse_filename)
 
-    
     os.makedirs(log_dir, exist_ok=True)
     ffmpeg_log_filename = f"ffmpeg_{os.path.basename(dir)}.log"
     ffmpeg_log_filepath = os.path.join(log_dir, ffmpeg_log_filename)
@@ -111,13 +112,16 @@ def create_timelapse(
         "-hide_banner",
         "-loglevel",
         "warning",
-        "-framerate", str(framerate),
+        "-framerate",
+        str(framerate),
         "-pattern_type",
         "glob",
         "-i",
         os.path.join(os.path.abspath(dir), "*.jpg"),
-        "-pix_fmt", "yuv420p",
-        "-vf", f"{scale_vf},format=yuv420p",
+        "-pix_fmt",
+        "yuv420p",
+        "-vf",
+        f"{scale_vf},format=yuv420p",
     ]
     if overwrite:
         ffmpeg_cmd.append("-y")
@@ -125,31 +129,64 @@ def create_timelapse(
 
     with open(ffmpeg_log_filepath, "w") as ffmpeg_log:
         if two_pass:
-            first_pass_cmd = ffmpeg_cmd + ["-pass", "1", "-an", "-f", "null", "/dev/null"]
+            first_pass_cmd = ffmpeg_cmd + [
+                "-pass",
+                "1",
+                "-an",
+                "-f",
+                "null",
+                "/dev/null",
+            ]
             logging.info(f"Running ffmpeg first pass: {' '.join(first_pass_cmd)}")
             if not dry_run:
-                subprocess.run(first_pass_cmd, cwd=tmp_dir, check=True, stdout=ffmpeg_log, stderr=subprocess.STDOUT)
-            
-            second_pass_cmd = ffmpeg_cmd + ["-pass", "2", os.path.abspath(timelapse_filepath)]
+                subprocess.run(
+                    first_pass_cmd,
+                    cwd=tmp_dir,
+                    check=True,
+                    stdout=ffmpeg_log,
+                    stderr=subprocess.STDOUT,
+                )
+
+            second_pass_cmd = ffmpeg_cmd + [
+                "-pass",
+                "2",
+                os.path.abspath(timelapse_filepath),
+            ]
             logging.info(f"Running ffmpeg second pass: {' '.join(second_pass_cmd)}")
             if not dry_run:
-                subprocess.run(second_pass_cmd, cwd=tmp_dir, check=True, stdout=ffmpeg_log, stderr=subprocess.STDOUT)
+                subprocess.run(
+                    second_pass_cmd,
+                    cwd=tmp_dir,
+                    check=True,
+                    stdout=ffmpeg_log,
+                    stderr=subprocess.STDOUT,
+                )
         else:
             final_cmd = ffmpeg_cmd + [os.path.abspath(timelapse_filepath)]
             logging.info(f"Running ffmpeg: {' '.join(final_cmd)}")
             if not dry_run:
-                subprocess.run(final_cmd, cwd=tmp_dir, check=True, stdout=ffmpeg_log, stderr=subprocess.STDOUT)
+                subprocess.run(
+                    final_cmd,
+                    cwd=tmp_dir,
+                    check=True,
+                    stdout=ffmpeg_log,
+                    stderr=subprocess.STDOUT,
+                )
 
     if os.path.exists(timelapse_filepath):
         # Update cameras.json
         camera_name = os.path.basename(os.path.dirname(dir))
-        cameras_json_path = os.path.join(os.path.dirname(os.path.dirname(dir)), "cameras.json")
+        cameras_json_path = os.path.join(
+            os.path.dirname(os.path.dirname(dir)), "cameras.json"
+        )
         if os.path.exists(cameras_json_path):
             with open(cameras_json_path, "r+") as f:
                 data = json.load(f)
                 for camera in data.get("cameras", []):
                     if camera.get("title") == camera_name:
-                        camera["latest_timelapse"] = os.path.relpath(timelapse_filepath, os.path.dirname(cameras_json_path))
+                        camera["latest_timelapse"] = os.path.relpath(
+                            timelapse_filepath, os.path.dirname(cameras_json_path)
+                        )
                         f.seek(0)
                         json.dump(data, f, indent=4)
                         f.truncate()
@@ -160,9 +197,7 @@ def create_timelapse(
 
 def main(argv):
     del argv  # Unused.
-    create_timelapse(
-        FLAGS.dir, FLAGS.overwrite, FLAGS.two_pass, FLAGS.log_dir
-    )
+    create_timelapse(FLAGS.dir, FLAGS.overwrite, FLAGS.two_pass, FLAGS.log_dir)
 
 
 if __name__ == "__main__":
