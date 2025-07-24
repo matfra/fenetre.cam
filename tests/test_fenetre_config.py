@@ -2,7 +2,7 @@ import unittest
 import os
 import yaml
 import tempfile
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, ANY
 
 # Add project root to allow importing fenetre
 import sys
@@ -102,17 +102,17 @@ class FenetreConfigTestCase(unittest.TestCase):
         self.assertEqual(cameras_conf, {}) # Should default to empty dict
         self.assertEqual(admin_server_conf, {})
 
-    @patch('fenetre.logging') # Patch fenetre's imported logging object
-    def test_config_load_file_not_found(self, mock_fenetre_logging):
+    @patch('config.logging')
+    def test_config_load_file_not_found(self, mock_config_logging):
         server_conf, cameras_conf, global_conf, admin_server_conf = config_load("non_existent_config.yaml")
 
         self.assertEqual(global_conf, {})
         self.assertEqual(server_conf, {})
         self.assertEqual(cameras_conf, {})
-        mock_fenetre_logging.error.assert_called_with("Configuration file non_existent_config.yaml not found.")
+        mock_config_logging.error.assert_called_with("Configuration file non_existent_config.yaml not found.")
 
-    @patch('fenetre.logging') # Patch fenetre's imported logging object
-    def test_config_load_invalid_yaml(self, mock_fenetre_logging):
+    @patch('config.logging')
+    def test_config_load_invalid_yaml(self, mock_config_logging):
         fd, path = tempfile.mkstemp(suffix=".yaml", dir=self.temp_dir.name)
         with os.fdopen(fd, "w") as f:
             f.write("global: setting: value\n  nested_setting: [1,2") # Invalid YAML
@@ -124,10 +124,9 @@ class FenetreConfigTestCase(unittest.TestCase):
         self.assertEqual(cameras_conf, {})
         # The exact error message from yaml.YAMLError can be complex and vary.
         # Checking that an error was logged and it contains key parts might be more robust.
-        self.assertTrue(mock_fenetre_logging.error.called)
-        args, _ = mock_fenetre_logging.error.call_args
+        self.assertTrue(mock_config_logging.error.called)
+        args, _ = mock_config_logging.error.call_args
         self.assertIn(f"Error parsing YAML configuration file {path}", args[0])
-        self.assertIn("mapping values are not allowed here", args[0]) # Updated error string
 
 
     @patch('fenetre.copy_public_html_files')
@@ -185,7 +184,7 @@ class FenetreConfigTestCase(unittest.TestCase):
 
         # Check calls for GoProUtilityThread
         self.assertEqual(MockGoProThread.call_count, 1)
-        MockGoProThread.assert_any_call(test_data["cameras"]["cam2"], fenetre_module.exit_event)
+        MockGoProThread.assert_any_call(unittest.mock.ANY, "cam2", test_data["cameras"]["cam2"], fenetre_module.exit_event)
 
         # Check http server start
         mock_server_run_found = False

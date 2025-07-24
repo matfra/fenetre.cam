@@ -802,7 +802,10 @@ def load_and_apply_configuration(initial_load=False, config_file_override=None):
                 name="admin_server_flask",
             )
             admin_server_thread_global.start()
-    else:
+    else: # This is a reload
+        # If server was enabled and is now disabled, stop it
+        if server_config.get("enabled", False) and not new_server_config.get("enabled", False):
+            stop_http_server()
         server_config = new_server_config
 
     # Update cameras_config and manage camera threads
