@@ -102,7 +102,7 @@ def list_unarchived_dirs(camera_dir, archived_marker_file="archived"):
         daydir = entry.path
         if os.path.isfile(os.path.join(daydir, archived_marker_file)):
             photos_count = len(glob.glob(os.path.join(daydir, "*.jpg")))
-            if photos_count > 48:
+            if photos_count > 95: # 48 * 2 - 1
                 logging.warning(
                     f"{daydir} is archived but has {photos_count} photos. "
                     "This is unexpected, please check the directory."

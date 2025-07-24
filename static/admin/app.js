@@ -82,6 +82,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const loadConfigBtn = document.getElementById('loadConfigBtn');
     const saveConfigBtn = document.getElementById('saveConfigBtn');
     const reloadAppBtn = document.getElementById('reloadAppBtn');
+    const syncUiBtn = document.getElementById('syncUiBtn');
     const addCameraBtn = document.getElementById('addCameraBtn'); // Get the new button
     const configFormContainer = document.getElementById('configFormContainer');
     const statusMessage = document.getElementById('statusMessage');
@@ -89,6 +90,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadConfigBtn.addEventListener('click', fetchAndDisplayConfig);
     saveConfigBtn.addEventListener('click', saveConfiguration);
     reloadAppBtn.addEventListener('click', reloadApplication);
+    syncUiBtn.addEventListener('click', syncUI);
     addCameraBtn.addEventListener('click', handleAddCamera); // Add event listener
 
     async function fetchAndDisplayConfig() {
@@ -518,6 +520,24 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             console.error('Error reloading application:', error);
             setStatus(`Error reloading application: ${error.message}`, 'error');
+        }
+    }
+
+    async function syncUI() {
+        setStatus('Sending UI sync signal...', 'info');
+        try {
+            const response = await fetch('/api/sync_ui', {
+                method: 'POST',
+            });
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({ error: `HTTP error! status: ${response.status}` }));
+                throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+            }
+            const result = await response.json();
+            setStatus(result.message || 'UI sync signal sent successfully!', 'success');
+        } catch (error) {
+            console.error('Error sending UI sync:', error);
+            setStatus(`Error sending UI sync: ${error.message}`, 'error');
         }
     }
 
