@@ -12,6 +12,7 @@ global:
 timelapse:
   ffmpeg_options: "-framerate 30 -c:v libvpx-vp9 -b:v 3M" #default to "-framerate 30"
   ffmpeg_2pass: True #default to False
+  file_extension: "webm"
 http_server:
   port: 8888
   host: 0.0.0.0

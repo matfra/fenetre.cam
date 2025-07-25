@@ -647,7 +647,7 @@ def update_cameras_metadata(cameras_configs: Dict, work_dir: str):
         updated_cameras_metadata["cameras"].append(metadata)
 
     updated_cameras_metadata["global"] = {
-        "timelapse_file_extension": "mp4" if is_raspberry_pi() else "webm"
+        "timelapse_file_extension": timelapse_config.get("file_extension", "webm")
     }
 
     with open(json_filepath, "w") as json_file:
@@ -1080,6 +1080,7 @@ def timelapse_loop():
                     two_pass=timelapse_config.get("ffmpeg_2pass", False),
                     log_dir=global_config.get("log_dir"),
                     ffmpeg_options=timelapse_config.get("ffmpeg_options"),
+                    file_extension=timelapse_config.get("file_extension", "webm"),
                 )
                 if result:
                     camera_name = os.path.basename(

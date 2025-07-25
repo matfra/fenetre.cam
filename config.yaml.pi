@@ -70,3 +70,4 @@ admin_server:
 timelapse:
   frequent_timelapse_scheduler_enabled: true
   timelapse_scheduler_interval_s: 1200
+  file_extension: "mp4"
