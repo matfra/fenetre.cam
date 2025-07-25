@@ -1,22 +1,24 @@
-from flask import (
-    Flask,
-    request,
-    jsonify,
-    send_from_directory,
-    send_file,
-    redirect,
-    Response,
-)
-from werkzeug.exceptions import BadRequest
-import yaml
 import json  # For handling JSON input
 import os
 import signal
-import requests
 from io import BytesIO
+
+import requests
+import yaml
+from flask import (
+    Flask,
+    Response,
+    jsonify,
+    redirect,
+    request,
+    send_file,
+    send_from_directory,
+)
 from PIL import Image
+from prometheus_client import REGISTRY, Counter, Gauge, generate_latest
+from werkzeug.exceptions import BadRequest
+
 from ui_utils import copy_public_html_files
-from prometheus_client import Counter, generate_latest, REGISTRY, Gauge
 
 # Create metrics
 metric_pictures_taken_total = Counter(

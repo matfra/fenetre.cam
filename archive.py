@@ -1,27 +1,22 @@
 #!/usr/bin/env python3
 
-import os
 import glob
-import pytz
+import os
 import time
 from datetime import datetime
-from absl import app
-from absl import flags
-from absl import logging
 
+import pytz
+from absl import app, flags, logging
+
+from admin_server import (
+    metric_directories_archived_total,
+    metric_directories_daylight_total,
+    metric_directories_timelapse_total,
+    metric_directories_total,
+)
+from config import config_load
 from daylight import run_end_of_day
 from timelapse import create_timelapse
-
-import os
-
-
-from config import config_load
-from admin_server import (
-    metric_directories_total,
-    metric_directories_archived_total,
-    metric_directories_timelapse_total,
-    metric_directories_daylight_total,
-)
 
 
 def scan_and_publish_metrics(camera_name: str, camera_dir: str, global_config: dict):

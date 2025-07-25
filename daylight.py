@@ -1,22 +1,15 @@
+import calendar  # Added for getting days in month
+import glob
 import os
 import re
-import glob
-from typing import Tuple
-from typing import List
-from PIL import Image
 from collections import defaultdict
-from PIL import ImageDraw
-
-from datetime import datetime
-from datetime import timedelta
-from absl import app
-from absl import flags
-from absl import logging
-
-import numpy as np
-import calendar  # Added for getting days in month
+from datetime import datetime, timedelta
+from typing import List, Tuple
 from zoneinfo import ZoneInfo  # Python 3.9+
 
+import numpy as np
+from absl import app, flags, logging
+from PIL import Image, ImageDraw
 
 # --- Configuration ---
 # TODO: Set this to the base directory containing all individual camera subdirectories

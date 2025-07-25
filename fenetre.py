@@ -1,80 +1,61 @@
 #!/usr/bin/env python3
-from ast import Tuple
 import http.server
 import json
+import logging as std_logging
 import os
 import shutil
 import signal
 import subprocess
-import sys
 import threading
 import time
+from ast import Tuple
 from collections import deque
-from datetime import datetime
-from datetime import timedelta
+from datetime import datetime, timedelta
 from functools import partial
 from io import BytesIO
 from threading import Thread
-from typing import Dict
-from typing import List
-from typing import Tuple
-from typing import Optional
-from typing import Callable
+from typing import Callable, Dict, List, Optional, Tuple
 
 import mozjpeg_lossless_optimization
+import numpy as np
 import pytz
 import requests
-import yaml
-from absl import app
-from absl import flags
-from absl import logging
+from absl import app, flags, logging
+from astral import LocationInfo
+from astral.sun import sun
 from PIL import Image
-from PIL.ExifTags import TAGS
-
-
-import numpy as np
 from skimage.metrics import structural_similarity
-
-
-from timelapse import create_timelapse
-from daylight import run_end_of_day
-from archive import archive_daydir, list_unarchived_dirs, scan_and_publish_metrics
-from gopro_utility import GoProUtilityThread, format_gopro_sd_card
-from postprocess import postprocess, gather_metrics
-
-import logging as std_logging
-
 from waitress import serve as waitress_serve
 
-
-from astral.sun import sun
-from astral import LocationInfo
-
 from admin_server import (
-    metric_pictures_taken_total,
-    metric_last_successful_picture_timestamp,
-    metric_capture_failures_total,
-    metric_timelapses_created_total,
     metric_camera_directory_size_bytes,
-    metric_work_directory_size_bytes,
-    metric_directories_total,
+    metric_capture_failures_total,
     metric_directories_archived_total,
-    metric_directories_timelapse_total,
     metric_directories_daylight_total,
-    metric_picture_width_pixels,
-    metric_picture_height_pixels,
-    metric_picture_size_bytes,
-    metric_picture_iso,
-    metric_picture_focal_length_mm,
+    metric_directories_timelapse_total,
+    metric_directories_total,
+    metric_last_successful_picture_timestamp,
     metric_picture_aperture,
     metric_picture_exposure_time_seconds,
+    metric_picture_focal_length_mm,
+    metric_picture_height_pixels,
+    metric_picture_iso,
+    metric_picture_size_bytes,
     metric_picture_white_balance,
+    metric_picture_width_pixels,
+    metric_pictures_taken_total,
     metric_processing_time_seconds,
     metric_sleep_time_seconds,
+    metric_timelapses_created_total,
+    metric_work_directory_size_bytes,
 )
+from archive import archive_daydir, list_unarchived_dirs, scan_and_publish_metrics
 from config import config_load
-
+from daylight import run_end_of_day
+from gopro_utility import GoProUtilityThread, format_gopro_sd_card
 from platform_utils import is_raspberry_pi
+from postprocess import gather_metrics, postprocess
+from timelapse import create_timelapse
 from ui_utils import copy_public_html_files
 
 # Define flags at module level
@@ -181,8 +162,8 @@ def get_pic_from_local_command(
 
 def get_pic_from_picamera2(camera_config: Dict) -> Image.Image:
     """Captures a picture from a Raspberry Pi camera using the picamera2 library."""
-    from picamera2 import Picamera2
     from libcamera import controls
+    from picamera2 import Picamera2
 
     picam2 = Picamera2()
 
@@ -252,7 +233,6 @@ def snap(camera_name, camera_config: Dict):
     timeout = camera_config.get("timeout_s", 60)
     local_command = camera_config.get("local_command")
     gopro_ip = camera_config.get("gopro_ip")
-    gopro_root_ca = camera_config.get("gopro_root_ca")
 
     def capture() -> Image.Image:
         logging.info(f"{camera_name}: Fetching new picture.")
@@ -299,9 +279,6 @@ def snap(camera_name, camera_config: Dict):
             if isinstance(fixed_snap_interval, (int, float))
             else 60.0
         )
-
-    # daylight_metadata is a map of picture filename and their average sky color
-    daylight_metadata = {}
 
     # Capture loop
     while not exit_event.is_set():

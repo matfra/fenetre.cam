@@ -1,11 +1,11 @@
-import unittest
 import os
-import yaml
-import tempfile
-from unittest.mock import patch, MagicMock, ANY
-
 # Add project root to allow importing fenetre
 import sys
+import tempfile
+import unittest
+from unittest.mock import ANY, MagicMock, patch
+
+import yaml
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 

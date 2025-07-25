@@ -1,16 +1,16 @@
-import unittest
-from unittest.mock import patch, MagicMock
-from PIL import Image, ImageDraw, ImageFont
-from datetime import datetime, timezone
-import pytz
-
+import os
 # Assuming postprocess.py is in the parent directory or PYTHONPATH is set up
 import sys
-import os
+import unittest
+from datetime import datetime, timezone
+from unittest.mock import MagicMock, patch
+
+import pytz
+from PIL import Image, ImageDraw, ImageFont
 
 # Add the parent directory to sys.path to allow imports from postprocess
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from postprocess import add_timestamp, _parse_color, postprocess
+from postprocess import _parse_color, add_timestamp, postprocess
 
 
 class TestPostprocess(unittest.TestCase):
@@ -255,7 +255,8 @@ class TestPostprocess(unittest.TestCase):
     @patch("builtins.open", new_callable=unittest.mock.mock_open)
     @patch("yaml.safe_load")
     def test_get_timezone_from_config_success(self, mock_safe_load, mock_open_file):
-        from postprocess import get_timezone_from_config  # re-import for patch context
+        from postprocess import \
+            get_timezone_from_config  # re-import for patch context
 
         mock_safe_load.return_value = {"global": {"timezone": "America/New_York"}}
 

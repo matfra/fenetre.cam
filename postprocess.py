@@ -1,23 +1,25 @@
-import numpy as np
-from PIL import Image, ImageDraw, ImageFont
-from skimage import exposure
-from typing import Optional, Tuple, Union
-from absl import logging
+import os
 from datetime import datetime
+from typing import Optional, Tuple, Union
+
+import numpy as np
+import pyexiv2
 import pytz  # To get timezone from global_config easily
 import yaml  # For get_timezone_from_config
-import pyexiv2
+from absl import logging
+from PIL import Image, ImageDraw, ImageFont
+from skimage import exposure
+
 from admin_server import (
-    metric_picture_width_pixels,
-    metric_picture_height_pixels,
-    metric_picture_size_bytes,
-    metric_picture_iso,
-    metric_picture_focal_length_mm,
     metric_picture_aperture,
     metric_picture_exposure_time_seconds,
+    metric_picture_focal_length_mm,
+    metric_picture_height_pixels,
+    metric_picture_iso,
+    metric_picture_size_bytes,
     metric_picture_white_balance,
+    metric_picture_width_pixels,
 )
-import os
 
 
 # It's not ideal to re-read the config here, but it's the simplest way to get timezone

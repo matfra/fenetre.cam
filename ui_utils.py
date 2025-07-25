@@ -1,7 +1,7 @@
+import filecmp
+import logging
 import os
 import shutil
-import logging
-import filecmp
 
 
 def generate_index_html(work_dir: str, global_config: dict):

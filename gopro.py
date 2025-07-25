@@ -1,13 +1,15 @@
-import requests
+import datetime
+import os
 import time
 from typing import Optional
-import os
-import datetime
-from absl import logging
-from gopro_state_map import GoProEnums
+
 import pytz
-from astral.sun import sun
+import requests
+from absl import logging
 from astral import LocationInfo
+from astral.sun import sun
+
+from gopro_state_map import GoProEnums
 
 log_dir_global = None
 

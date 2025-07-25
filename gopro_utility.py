@@ -3,24 +3,23 @@
 Most of the code here is copied from tutorial modules at https://github.com/gopro/OpenGoPro.git
 """
 
-import sys
-import os
-import threading
-import time
-import requests
-import socket
 import asyncio
 import enum
-from typing import Dict, Optional, Any, Callable, Awaitable, TypeVar
-
-
-from absl import logging
-
-from bleak import BleakScanner, BleakClient
-from bleak.backends.device import BLEDevice as BleakDevice
-from bleak.backends.characteristic import BleakGATTCharacteristic
-from admin_server import gopro_state_gauge, gopro_setting_gauge
+import os
 import re
+import socket
+import sys
+import threading
+import time
+from typing import Any, Awaitable, Callable, Dict, Optional, TypeVar
+
+import requests
+from absl import logging
+from bleak import BleakClient, BleakScanner
+from bleak.backends.characteristic import BleakGATTCharacteristic
+from bleak.backends.device import BLEDevice as BleakDevice
+
+from admin_server import gopro_setting_gauge, gopro_state_gauge
 
 T = TypeVar("T")
 
