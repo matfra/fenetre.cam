@@ -1,6 +1,4 @@
 global:
-  ffmpeg_options: "-framerate 30 -c:v libvpx-vp9 -b:v 3M" #default to "-framerate 30"
-  ffmpeg_2pass: True #default to False
   work_dir: /srv/fenetre/data
   log_dir: /srv/fenetre/logs
   timezone: "America/Los_Angeles"
@@ -10,6 +8,10 @@ global:
     dry_run: true
     check_interval_s: 300
     work_dir_max_size_GB: 10
+
+timelapse:
+  ffmpeg_options: "-framerate 30 -c:v libvpx-vp9 -b:v 3M" #default to "-framerate 30"
+  ffmpeg_2pass: True #default to False
 http_server:
   port: 8888
   host: 0.0.0.0

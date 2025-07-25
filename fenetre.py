@@ -721,7 +721,7 @@ def main(argv):
     archive_thread_global.start()
     logging.info(f"Starting thread {archive_thread_global.name}")
 
-    if global_config.get("frequent_timelapse_scheduler_enabled", False):
+    if timelapse_config.get("frequent_timelapse_scheduler_enabled", False):
         timelapse_scheduler_thread_global = Thread(
             target=timelapse_scheduler_loop,
             daemon=True,
@@ -774,13 +774,15 @@ def load_and_apply_configuration(initial_load=False, config_file_override=None):
         new_cameras_config,
         new_global_config,
         new_admin_server_config,
+        new_timelapse_config,
     ) = config_load(config_path_to_load)
 
     if initial_load:
-        global global_config, admin_server_config, flask_app_instance
+        global global_config, admin_server_config, flask_app_instance, timelapse_config
         server_config = new_server_config
         global_config = new_global_config
         admin_server_config = new_admin_server_config
+        timelapse_config = new_timelapse_config
         global_config["pic_dir"] = os.path.join(
             global_config.get("work_dir", "."), "photos"
         )
@@ -1042,7 +1044,7 @@ def timelapse_scheduler_loop():
     """
     This is a loop that schedules timelapse creation for the current day periodically.
     """
-    interval = global_config.get("timelapse_scheduler_interval_s", 1200)
+    interval = timelapse_config.get("timelapse_scheduler_interval_s", 1200)
     while not exit_event.is_set():
         for camera_name in cameras_config:
             pic_dir, _ = get_pic_dir_and_filename(camera_name)
@@ -1075,9 +1077,9 @@ def timelapse_loop():
                 result = create_timelapse(
                     dir=dir_to_process,
                     overwrite=True,
-                    two_pass=global_config.get("ffmpeg_2pass", False),
+                    two_pass=timelapse_config.get("ffmpeg_2pass", False),
                     log_dir=global_config.get("log_dir"),
-                    ffmpeg_options=global_config.get("ffmpeg_options")
+                    ffmpeg_options=timelapse_config.get("ffmpeg_options"),
                 )
                 if result:
                     camera_name = os.path.basename(

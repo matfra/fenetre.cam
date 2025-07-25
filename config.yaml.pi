@@ -49,8 +49,6 @@ cameras:
     ssim_setpoint: 0.9
     redirect_stderr: true
 global:
-  frequent_timelapse_scheduler_enabled: true
-  timelapse_scheduler_interval_s: 1200
   log_dir: /srv/fenetre/logs
   timezone: America/Los_Angeles
   work_dir: /srv/fenetre/data
@@ -68,3 +66,7 @@ admin_server:
   enabled: true
   host: 0.0.0.0
   port: 8889
+
+timelapse:
+  frequent_timelapse_scheduler_enabled: true
+  timelapse_scheduler_interval_s: 1200
