@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
 import http.server
 import json
-import logging as std_logging
 import os
 import shutil
 import signal
 import subprocess
 import threading
 import time
-from ast import Tuple
 from collections import deque
 from datetime import datetime, timedelta
 from functools import partial
@@ -30,19 +28,7 @@ from waitress import serve as waitress_serve
 from admin_server import (
     metric_camera_directory_size_bytes,
     metric_capture_failures_total,
-    metric_directories_archived_total,
-    metric_directories_daylight_total,
-    metric_directories_timelapse_total,
-    metric_directories_total,
     metric_last_successful_picture_timestamp,
-    metric_picture_aperture,
-    metric_picture_exposure_time_seconds,
-    metric_picture_focal_length_mm,
-    metric_picture_height_pixels,
-    metric_picture_iso,
-    metric_picture_size_bytes,
-    metric_picture_white_balance,
-    metric_picture_width_pixels,
     metric_pictures_taken_total,
     metric_processing_time_seconds,
     metric_sleep_time_seconds,
@@ -251,7 +237,8 @@ def snap(camera_name, camera_config: Dict):
                 raise RuntimeError(f"GoPro instance not found for camera {camera_name}")
             jpeg_bytes = gopro_instance.capture_photo()
             try:
-                i = Image.open(BytesIO(jpeg_bytes))
+                # new_pic is only used to check if the image is valid
+                Image.open(BytesIO(jpeg_bytes))
             except Image.UnidentifiedImageError:
                 logging.error(
                     f"Failed to open image from GoPro: {gopro_ip}. Resetting gopro"
@@ -273,7 +260,7 @@ def snap(camera_name, camera_config: Dict):
             previous_pic, camera_config.get("postprocessing", [])
         )
     fixed_snap_interval = camera_config.get("snap_interval_s", None)
-    if not camera_name in sleep_intervals:
+    if camera_name not in sleep_intervals:
         sleep_intervals[camera_name] = (
             float(fixed_snap_interval)
             if isinstance(fixed_snap_interval, (int, float))
@@ -457,7 +444,6 @@ def run_admin_server_func(
 
     global admin_server_instance_global
     try:
-        logger = std_logging.getLogger("waitress")
         logging.info("Starting admin server")
         waitress_serve(flask_app, listen=listeners, threads=4, _quiet=False)
     except SystemExit:

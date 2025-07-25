@@ -1,12 +1,9 @@
 import os
 import sys
 import unittest
-from datetime import datetime
 from unittest import mock
 
-import numpy as np
-from PIL import (Image,  # Ensure Image is imported if spec=Image.Image is used
-                 ImageDraw)
+from PIL import Image  # Ensure Image is imported if spec=Image.Image is used
 
 # Assume your script is named daylight.py
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))

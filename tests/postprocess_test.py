@@ -5,8 +5,7 @@ import unittest
 from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
 
-import pytz
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image
 
 # Add the parent directory to sys.path to allow imports from postprocess
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))

@@ -3,14 +3,14 @@ import os
 import sys
 import tempfile
 import unittest
-from unittest.mock import ANY, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import yaml
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
 # Import the functions/classes to be tested
 from fenetre import config_load, load_and_apply_configuration
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 # Mock absl.flags and absl.logging for standalone testing
 # as fenetre.py relies on them being initialized.

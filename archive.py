@@ -2,7 +2,6 @@
 
 import glob
 import os
-import time
 from datetime import datetime
 
 import pytz
@@ -86,9 +85,8 @@ def keep_only_a_subset_of_jpeg_files(
     archive_filepath = os.path.join(directory, "archived")
     if dry_run:
         return
-    with open(archive_filepath, "w") as f:
-        logging.info(f"Writing archived file: {archive_filepath}")
-        pass
+    open(archive_filepath, "w").close()
+    logging.info(f"Writing archived file: {archive_filepath}")
 
 
 def list_unarchived_dirs(camera_dir, archived_marker_file="archived"):
@@ -147,6 +145,8 @@ def is_dir_older_than_n_days(daydir, n_days=3):
 def archive_daydir(
     daydir: str,
     global_config: dict,
+    cam: str,
+    sky_area: tuple,
     dry_run: bool = True,
     create_daylight_bands: bool = False,
     create_timelapses: bool = False,
@@ -204,7 +204,6 @@ def main(argv):
 
     log_dir = global_config.get("log_dir")
     if log_dir:
-        log_path = os.path.join(log_dir, "archive.log")
         # Add a file handler to the absl logger
         logging.get_absl_handler().use_absl_log_file("archive", log_dir)
 
@@ -220,6 +219,8 @@ def main(argv):
             archive_daydir(
                 daydir,
                 global_config,
+                cam,
+                sky_area,
                 FLAGS.dry_run,
                 FLAGS.create_daylight_bands,
                 FLAGS.create_timelapses,

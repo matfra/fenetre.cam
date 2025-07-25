@@ -5,10 +5,8 @@ Most of the code here is copied from tutorial modules at https://github.com/gopr
 
 import asyncio
 import enum
-import os
 import re
 import socket
-import sys
 import threading
 import time
 from typing import Any, Awaitable, Callable, Dict, Optional, TypeVar
@@ -19,14 +17,13 @@ from bleak import BleakClient, BleakScanner
 from bleak.backends.characteristic import BleakGATTCharacteristic
 from bleak.backends.device import BLEDevice as BleakDevice
 
+from gopro_state_map import GoProEnums
 from admin_server import gopro_setting_gauge, gopro_state_gauge
 
 T = TypeVar("T")
 
 GOPRO_BASE_UUID = "b5f9{}-aa8d-11e3-9046-0002a5d5c51b"
 noti_handler_T = Callable[[BleakGATTCharacteristic, bytearray], Awaitable[None]]
-
-from gopro_state_map import GoProEnums
 
 
 def get_human_readable_state(state: Dict) -> Dict:
@@ -284,11 +281,12 @@ def _get_gopro_state(ip_address: str, root_ca: Optional[str] = None) -> Dict:
 class GoProUtilityThread(threading.Thread):
     def __init__(
         self,
-        gopro: "GoPro",
+        gopro,
         camera_name: str,
         camera_config: Dict,
         exit_event: threading.Event,
     ):
+        from gopro import GoPro
         super().__init__(
             name=f"{camera_config.get('name', 'gopro')}_utility_thread", daemon=True
         )

@@ -1,19 +1,12 @@
 import os
 import sys
 import tempfile
-import time
 import unittest
-from datetime import datetime, timedelta
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
-import pytz
+from archive import archive_daydir, list_unarchived_dirs
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
-from archive import (archive_daydir, check_dir_has_daylight_band,
-                     check_dir_has_timelapse, get_today_date,
-                     is_dir_older_than_n_days,
-                     keep_only_a_subset_of_jpeg_files, list_unarchived_dirs)
 
 
 class TestArchive(unittest.TestCase):

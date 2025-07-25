@@ -2,11 +2,11 @@ import os
 import sys
 import tempfile
 import unittest
-from unittest.mock import MagicMock, patch
-
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+from unittest.mock import patch
 
 from timelapse import create_timelapse
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 
 class TestTimelapse(unittest.TestCase):

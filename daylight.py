@@ -5,7 +5,6 @@ import re
 from collections import defaultdict
 from datetime import datetime, timedelta
 from typing import List, Tuple
-from zoneinfo import ZoneInfo  # Python 3.9+
 
 import numpy as np
 from absl import app, flags, logging
@@ -38,7 +37,7 @@ def get_average_color_of_area(
     """
 
     x, y, width, height = area
-    average_color = np.mean(image[y : y + height, x : x + width], axis=(0, 1))
+    average_color = np.mean(image[y:y + height, x:x + width], axis=(0, 1))
     return average_color.astype(np.uint8)  # Ensure uint8 for image data
 
 
@@ -390,16 +389,18 @@ def generate_html_browser(camera_dir: str):
     HTML_FILE = os.path.join(camera_dir, "daylight.html")
     with open(HTML_FILE, "w") as f:
         f.write(
+            f.write(
             dump_html_header(
                 title=f"{camera_name} daylight browser",  # f-string for title
                 additional_headers="""
                 <style>
                 </style>""",
             )
-            + f"""
+            + """
         <body>
             <div class="right">
                 """
+        )
         )
 
         # Generate time labels (0 AM to 11 PM)
@@ -410,9 +411,7 @@ def generate_html_browser(camera_dir: str):
                 display_hour = 12
             am_pm = "AM" if hour < 12 else "PM"
             f.write(
-                f"""
-                <div class="timebox{(hour % 2) + 1}">{display_hour} {am_pm}</div>
-                """
+                f'<div class="timebox{(hour % 2) + 1}">{display_hour} {am_pm}</div>'
             )
 
         f.write(
@@ -540,10 +539,10 @@ def generate_month_html(monthband_path: str, camera_name: str):
             x1 = day_index
             x2 = day_index + 1  # Each band is 1 pixel wide
 
+            x2 = day_index + 1  # Each band is 1 pixel wide
+
             f.write(
-                f"""
-                <area shape="rect" coords="{x1},0,{x2},{DAILY_BAND_HEIGHT-1}" alt="{isodate}" href="{dirlink}" title="{isodate}">
-            """
+                f'<area shape="rect" coords="{x1},0,{x2},{DAILY_BAND_HEIGHT - 1}" alt="{isodate}" href="{dirlink}" title="{isodate}">'
             )
 
         # Write the rest of the HTML file

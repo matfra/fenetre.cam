@@ -9,7 +9,6 @@ from flask import (
     Flask,
     Response,
     jsonify,
-    redirect,
     request,
     send_file,
     send_from_directory,
@@ -353,8 +352,8 @@ def preview_crop():
         )
 
         if (
-            actual_crop_box[0] >= actual_crop_box[2]
-            or actual_crop_box[1] >= actual_crop_box[3]
+            actual_crop_box[0] >= actual_crop_box[2] or
+            actual_crop_box[1] >= actual_crop_box[3]
         ):
             return (
                 jsonify(
