@@ -70,13 +70,15 @@ class TestArchive(unittest.TestCase):
         mock_check_daylight.return_value = True
         mock_check_timelapse.return_value = True
         mock_global_config = {"timelapse_file_extension": "mp4"}
+        mock_cam = "test_cam"
+        mock_sky_area = (0, 0, 100, 100)
 
         # Create a dummy directory
         day_dir = os.path.join(self.temp_dir.name, "2023-01-01")
         os.makedirs(day_dir)
 
         # Call the function
-        archive_daydir(day_dir, mock_global_config)
+        archive_daydir(day_dir, mock_global_config, mock_cam, mock_sky_area)
 
         # Check that the correct functions were called
         mock_keep_files.assert_called_once_with(day_dir, dry_run=True)
