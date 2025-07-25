@@ -26,6 +26,7 @@ def create_timelapse(
     log_dir: str,
     tmp_dir: Optional[str] = "/dev/shm/fenetre",
     dry_run: bool = False,
+    ffmpeg_options: str = None,
 ) -> bool:
     if not os.path.exists(dir):
         raise FileNotFoundError(dir)
@@ -53,15 +54,16 @@ def create_timelapse(
     width, height = get_image_dimensions(first_image_path)
 
     if is_raspberry_pi():
-        ffmpeg_options = "-c:v h264_v4l2m2m -b:v 5M"
+        default_encoder_options = "-c:v h264_v4l2m2m -b:v 5M"
         file_ext = "mp4"
         max_width = 1920
         max_height = 1080
         framerate = 30
         two_pass = False  # multi pass encoding not supported with hardware encoder
     else:
-        ffmpeg_options = "-c:v libvpx-vp9 -b:v 0 -crf 30"
-        file_ext = "webm"
+        default_encoder_options = "-c:v libvpx-vp9 -b:v 0 -crf 30"
+        # TODO move this back to the global config
+        file_ext = "mp4" if ffmpeg_options else "webm"
         max_width = 3840
         max_height = 2160
         if two_pass is None:
@@ -117,13 +119,15 @@ def create_timelapse(
         "glob",
         "-i",
         os.path.join(os.path.abspath(dir), "*.jpg"),
-        "-pix_fmt",
-        "yuv420p",
+#        "-pix_fmt",
+#        "yuv420p",
         "-vf",
         f"{scale_vf},format=yuv420p",
     ]
     if overwrite:
         ffmpeg_cmd.append("-y")
+    if not ffmpeg_options:
+        ffmpeg_options = default_encoder_options
     ffmpeg_cmd.extend(ffmpeg_options.split(" "))
 
     with open(ffmpeg_log_filepath, "w") as ffmpeg_log:
