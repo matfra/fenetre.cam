@@ -3,6 +3,7 @@ import os
 import subprocess
 from typing import Optional
 
+from datetime import datetime
 from absl import app, flags, logging
 from PIL import Image
 
@@ -106,7 +107,7 @@ def create_timelapse(
         logging.info(f"FFmpeg log file: {ffmpeg_log_filepath}")
     else:
         logging.info(f"No log_dir defined in configs. ffmpeg logs will be shown here")
-        ffmpeg_log_stream = subprocess.PIPE
+        ffmpeg_log_stream = None
 
     logging.debug(f"timelapse_filepath: {timelapse_filepath}")
 

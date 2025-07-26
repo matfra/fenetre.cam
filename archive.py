@@ -153,14 +153,14 @@ def archive_daydir(
 ):
     today_date = get_today_date(global_config)
     if os.path.basename(daydir) == today_date:
-        logging.info(
+        logging.debug(
             f"Not archiving {daydir} as it's today and may still be in progress"
         )
         return False
 
     if not is_dir_older_than_n_days(daydir):
         # TODO(P3): Make the daydir customizable
-        logging.info(f"Skipping {daydir} as it is not old enough")
+        logging.debug(f"Skipping {daydir} as it is not old enough")
         return False
 
     if not check_dir_has_daylight_band(daydir):

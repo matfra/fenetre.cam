@@ -138,12 +138,14 @@ def get_pic_from_local_command(
         with open(log_file_path, "a") as log_file:
             s = subprocess.run(
                 cmd.split(" "),
-                stdout=log_file,
+                stdout=subprocess.PIPE,
                 stderr=log_file,
                 timeout=timeout_s,
             )
     else:
-        s = subprocess.run(cmd.split(" "), stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=timeout_s)
+        s = subprocess.run(
+            cmd.split(" "), stdout=subprocess.PIPE, stderr=None, timeout=timeout_s
+        )
     return Image.open(BytesIO(s.stdout))
 
 

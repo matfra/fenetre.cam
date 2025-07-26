@@ -1,4 +1,4 @@
-import datetime
+from datetime import datetime
 import os
 import time
 from typing import Optional
@@ -31,7 +31,7 @@ def _log_request_response(url: str, response: requests.Response):
             os.remove(old_log_file_path)
         os.rename(log_file_path, old_log_file_path)
     with open(log_file_path, "a") as f:
-        f.write(f"Timestamp: {datetime.datetime.now().isoformat()}\n")
+        f.write(f"Timestamp: {datetime.now().isoformat()}\n")
         f.write(f"Request URL: {url}\n")
         f.write(f"Response Code: {response.status_code}\n")
         f.write(f"Response Text: {response.text}\n")
@@ -207,13 +207,13 @@ class GoPro:
 
         try:
             tz = pytz.timezone(self.timezone)
-            now = datetime.datetime.now(tz)
+            now = datetime.now(tz)
             location = LocationInfo(latitude=self.latitude, longitude=self.longitude)
             s = sun(location.observer, date=now.date(), tzinfo=tz)
 
             # It's night if current time is after dusk or before dawn
             is_night_time = now > s["dusk"] or now < s["dawn"]
-            logging.info(f"It is {'night' if is_night_time else 'day'}.")
+            logging.debug(f"It is {'night' if is_night_time else 'day'}.")
             return is_night_time
         except Exception as e:
             logging.error(f"Error calculating sunrise/sunset for GoPro: {e}")
