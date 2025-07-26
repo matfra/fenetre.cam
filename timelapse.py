@@ -105,6 +105,7 @@ def create_timelapse(
         ffmpeg_log_stream = open(ffmpeg_log_filepath, "a")
         logging.info(f"FFmpeg log file: {ffmpeg_log_filepath}")
     else:
+        logging.info(f"No log_dir defined in configs. ffmpeg logs will be shown here")
         ffmpeg_log_stream = subprocess.PIPE
 
     logging.debug(f"timelapse_filepath: {timelapse_filepath}")
@@ -115,30 +116,37 @@ def create_timelapse(
         raise FileExistsError(timelapse_filepath)
 
     ffmpeg_cmd = [
+        # Lower priority
         "nice",
         "-n10",
         "ffmpeg",
+        # FFMPEG Global options
         "-hide_banner",
         "-loglevel",
         "warning",
+        # FFMPEG Input options
         "-framerate",
         str(framerate),
         "-pattern_type",
         "glob",
+        # FFMPEG Input
         "-i",
         os.path.join(os.path.abspath(dir), "*.jpg"),
 #        "-pix_fmt",
 #        "yuv420p",
+        # FFMPEG Filters
         "-vf",
         f"{scale_vf},format=yuv420p",
     ]
     if overwrite:
         ffmpeg_cmd.append("-y")
     if not ffmpeg_options:
+        # FFMPEG output options
         ffmpeg_options = default_encoder_options
     ffmpeg_cmd.extend(ffmpeg_options.split(" "))
 
     if two_pass:
+        # FFMPEG output
         first_pass_cmd = ffmpeg_cmd + [
             "-pass",
             "1",
