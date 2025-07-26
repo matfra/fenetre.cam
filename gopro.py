@@ -20,15 +20,22 @@ def _set_log_dir(log_dir: str):
 
 
 def _log_request_response(url: str, response: requests.Response):
-    if log_dir_global:
-        os.makedirs(log_dir_global, exist_ok=True)
-        log_file_path = os.path.join(log_dir_global, "gopro.log")
-        with open(log_file_path, "a") as f:
-            f.write(f"Timestamp: {datetime.datetime.now().isoformat()}\n")
-            f.write(f"Request URL: {url}\n")
-            f.write(f"Response Code: {response.status_code}\n")
-            f.write(f"Response Text: {response.text}\n")
-            f.write("-" * 20 + "\n")
+    if not log_dir_global:
+        return
+    os.makedirs(log_dir_global, exist_ok=True)
+    log_file_path = os.path.join(log_dir_global, "gopro.log")
+    # If the file was created more than 24 hours ago, rename it to gopro.log.1
+    if os.path.exists(log_file_path) and (datetime.now() - datetime.fromtimestamp(os.path.getmtime(log_file_path))).days > 1:
+        old_log_file_path = log_file_path + ".1"
+        if os.path.exists(old_log_file_path):
+            os.remove(old_log_file_path)
+        os.rename(log_file_path, old_log_file_path)
+    with open(log_file_path, "a") as f:
+        f.write(f"Timestamp: {datetime.datetime.now().isoformat()}\n")
+        f.write(f"Request URL: {url}\n")
+        f.write(f"Response Code: {response.status_code}\n")
+        f.write(f"Response Text: {response.text}\n")
+        f.write("-" * 20 + "\n")
 
 
 class GoProSettings:

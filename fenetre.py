@@ -123,26 +123,27 @@ def update_latest_link(pic_path: str):
 def get_pic_from_local_command(
     cmd: str, timeout_s: int, camera_name: str, camera_config: Dict
 ) -> Image.Image:
-    if camera_config.get("redirect_stderr"):
-        log_dir = global_config.get("log_dir")
-        if log_dir:
-            log_file_path = os.path.join(
-                log_dir,
-                f"{camera_name}_stderr_{datetime.now().strftime('%Y-%m-%d')}.log",
-            )
-            with open(log_file_path, "a") as stderr_log:
-                s = subprocess.run(
-                    cmd.split(" "),
-                    stdout=subprocess.PIPE,
-                    stderr=stderr_log,
-                    timeout=timeout_s,
-                )
-        else:
+    log_dir = global_config.get("log_dir")
+    if log_dir:
+        log_file_path = os.path.join(
+            log_dir,
+            f"{camera_name}.log",
+        )
+        # If the file was created more than 24 hours ago, rename it to camera_name.log.1
+        if os.path.exists(log_file_path) and (datetime.now() - datetime.fromtimestamp(os.path.getmtime(log_file_path))).days > 1:
+            old_log_file_path = log_file_path + ".1"
+            if os.path.exists(old_log_file_path):
+                os.remove(old_log_file_path)
+            os.rename(log_file_path, old_log_file_path)
+        with open(log_file_path, "a") as log_file:
             s = subprocess.run(
-                cmd.split(" "), stdout=subprocess.PIPE, timeout=timeout_s
+                cmd.split(" "),
+                stdout=log_file,
+                stderr=log_file,
+                timeout=timeout_s,
             )
     else:
-        s = subprocess.run(cmd.split(" "), stdout=subprocess.PIPE, timeout=timeout_s)
+        s = subprocess.run(cmd.split(" "), stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=timeout_s)
     return Image.open(BytesIO(s.stdout))
 
 
@@ -1233,7 +1234,7 @@ def archive_loop():
             daydirs = list_unarchived_dirs(camera_dir)
             for daydir in daydirs:
                 archive_daydir(
-                    daydir=daydir, global_config=global_config, dry_run=False
+                    daydir=daydir, global_config=global_config, cam=camera_name, sky_area=camera_config.get("sky_area"), dry_run=False
                 )
         time.sleep(600)
 

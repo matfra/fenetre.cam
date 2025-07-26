@@ -7,6 +7,7 @@ from absl import app, flags, logging
 from PIL import Image
 
 from platform_utils import is_raspberry_pi
+from io import TextIOWrapper
 
 
 def get_image_dimensions(image_path: str):
@@ -22,12 +23,12 @@ def get_image_dimensions(image_path: str):
 def create_timelapse(
     dir: str,
     overwrite: bool,
-    two_pass: Optional[bool],
-    log_dir: str,
+    two_pass: Optional[bool] = False,
+    log_dir: Optional[str] = None,
     tmp_dir: Optional[str] = "/dev/shm/fenetre",
     dry_run: bool = False,
     ffmpeg_options: str = None,
-    file_extension: str = "webm",
+    file_extension: str = "mp4",
 ) -> bool:
     if not os.path.exists(dir):
         raise FileNotFoundError(dir)
@@ -92,11 +93,20 @@ def create_timelapse(
     timelapse_filename = os.path.basename(dir) + "." + file_extension
     timelapse_filepath = os.path.join(dir, timelapse_filename)
 
-    os.makedirs(log_dir, exist_ok=True)
-    ffmpeg_log_filename = f"ffmpeg_{os.path.basename(dir)}.log"
-    ffmpeg_log_filepath = os.path.join(log_dir, ffmpeg_log_filename)
+    if log_dir:
+        os.makedirs(log_dir, exist_ok=True)
+        ffmpeg_log_filepath = os.path.join(log_dir, "ffmpeg.log")
+        # If the file was created more than 24 hours ago, rename it to ffmpeg.log.1
+        if os.path.exists(ffmpeg_log_filepath) and (datetime.now() - datetime.fromtimestamp(os.path.getmtime(ffmpeg_log_filepath))).days > 1:
+            old_ffmpeg_log_filepath = ffmpeg_log_filepath + ".1"
+            if os.path.exists(old_ffmpeg_log_filepath):
+                os.remove(old_ffmpeg_log_filepath)
+            os.rename(ffmpeg_log_filepath, old_ffmpeg_log_filepath)
+        ffmpeg_log_stream = open(ffmpeg_log_filepath, "a")
+        logging.info(f"FFmpeg log file: {ffmpeg_log_filepath}")
+    else:
+        ffmpeg_log_stream = subprocess.PIPE
 
-    logging.debug(f"timelapse_filename: {timelapse_filename}")
     logging.debug(f"timelapse_filepath: {timelapse_filepath}")
 
     if not os.path.exists(tmp_dir):
@@ -128,25 +138,24 @@ def create_timelapse(
         ffmpeg_options = default_encoder_options
     ffmpeg_cmd.extend(ffmpeg_options.split(" "))
 
-    with open(ffmpeg_log_filepath, "w") as ffmpeg_log:
-        if two_pass:
-            first_pass_cmd = ffmpeg_cmd + [
-                "-pass",
-                "1",
-                "-an",
-                "-f",
-                "null",
-                "/dev/null",
-            ]
-            logging.info(f"Running ffmpeg first pass: {' '.join(first_pass_cmd)}")
-            if not dry_run:
-                subprocess.run(
-                    first_pass_cmd,
-                    cwd=tmp_dir,
-                    check=True,
-                    stdout=ffmpeg_log,
-                    stderr=subprocess.STDOUT,
-                )
+    if two_pass:
+        first_pass_cmd = ffmpeg_cmd + [
+            "-pass",
+            "1",
+            "-an",
+            "-f",
+            "null",
+            "/dev/null",
+        ]
+        logging.info(f"Running ffmpeg first pass: {' '.join(first_pass_cmd)}")
+        if not dry_run:
+            subprocess.run(
+                first_pass_cmd,
+                cwd=tmp_dir,
+                check=True,
+                stdout=ffmpeg_log_stream,
+                stderr=ffmpeg_log_stream,
+            )
 
             second_pass_cmd = ffmpeg_cmd + [
                 "-pass",
@@ -159,23 +168,25 @@ def create_timelapse(
                     second_pass_cmd,
                     cwd=tmp_dir,
                     check=True,
-                    stdout=ffmpeg_log,
-                    stderr=subprocess.STDOUT,
+                    stdout=ffmpeg_log_stream,
+                    stderr=ffmpeg_log_stream,
                 )
-        else:
-            final_cmd = ffmpeg_cmd + [os.path.abspath(timelapse_filepath)]
-            logging.info(f"Running ffmpeg: {' '.join(final_cmd)}")
-            if not dry_run:
-                subprocess.run(
-                    final_cmd,
-                    cwd=tmp_dir,
-                    check=True,
-                    stdout=ffmpeg_log,
-                    stderr=subprocess.STDOUT,
-                )
+    else:
+        final_cmd = ffmpeg_cmd + [os.path.abspath(timelapse_filepath)]
+        logging.info(f"Running ffmpeg: {' '.join(final_cmd)}")
+        if not dry_run:
+            subprocess.run(
+                final_cmd,
+                cwd=tmp_dir,
+                check=True,
+                stdout=ffmpeg_log_stream,
+                stderr=ffmpeg_log_stream,
+            )
+    if isinstance(ffmpeg_log_stream, TextIOWrapper):
+        ffmpeg_log_stream.close()
 
     if os.path.exists(timelapse_filepath):
-        # Update cameras.json
+        # Update cameras.json if timelapse was created successfully
         camera_name = os.path.basename(os.path.dirname(dir))
         cameras_json_path = os.path.join(
             os.path.dirname(os.path.dirname(dir)), "cameras.json"
@@ -205,7 +216,7 @@ if __name__ == "__main__":
     FLAGS = flags.FLAGS
 
     flags.DEFINE_string("dir", None, "directory to build a timelapse from")
-    flags.DEFINE_string("log_dir", "/tmp", "directory to store logs")
+    flags.DEFINE_string("log_dir", None, "directory to store logs")
     flags.DEFINE_bool("overwrite", False, "Overwrite existing timelapse")
     flags.DEFINE_bool(
         "two_pass", False, "Tell ffmpeg to do 2 pass encoding. Recommended for VP9"
