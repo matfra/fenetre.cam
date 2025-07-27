@@ -5,6 +5,25 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "fenetre"
 version = "0.1.0"
+dependencies = [
+    "pytz",
+    "pyyaml",
+    "absl-py",
+    "logzero",
+    "numpy",
+    "astral",
+    "Flask",
+    "requests",
+    "bleak",
+    "mozjpeg-lossless-optimization",
+    "waitress",
+    "prometheus-client",
+    "pyexiv2",
+    "scikit-image",
+]
+
+[project.scripts]
+fenetre = "fenetre.fenetre:run"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

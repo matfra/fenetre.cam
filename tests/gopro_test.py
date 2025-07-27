@@ -5,7 +5,7 @@ from unittest import mock
 import json
 
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 from fenetre import gopro
 
 class TestGoPro(unittest.TestCase):

@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 from fenetre.timelapse import create_timelapse
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 
 
 class TestTimelapse(unittest.TestCase):

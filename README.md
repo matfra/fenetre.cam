@@ -12,11 +12,47 @@ Currently supported picture sources:
 - GoPro Hero 9+ via Bluetooth + WiFi with https://gopro.github.io/OpenGoPro/
 - Raspberry Pi camera (tested with v2 and HQ)
 
-## TODO:
+## Installation
 
-## How to run?
-If you have a GoPro, you will need to run
-`git submodule update --init --recursive`
+1.  **Clone the repository:**
+    ```bash
+    git clone https://github.com/your-username/fenetre.cam.git
+    cd fenetre.cam
+    ```
+
+2.  **Create and activate a virtual environment:**
+    ```bash
+    python3 -m venv venv
+    source venv/bin/activate
+    ```
+
+3.  **Install the package and its dependencies:**
+    The project uses `pyproject.toml` to manage dependencies. Installing in editable mode (`-e`) is recommended for development. This command will install the `fenetre` package and all required libraries from PyPI.
+    ```bash
+    pip install -e .
+    ```
+
+## Usage
+
+The application is run using the `fenetre` command, which is made available in your virtual environment after installation.
+
+You must provide the path to a configuration file using the `--config` flag. A sample configuration is provided in `config.example.yaml`.
+
+1.  **Copy the example configuration:**
+    ```bash
+    cp config.example.yaml config.yaml
+    ```
+
+2.  **Edit `config.yaml`** to match your setup (camera URLs, paths, etc.).
+
+3.  **Run the application:**
+    ```bash
+    fenetre --config=config.yaml
+    ```
+
+The application will start, and based on your configuration, it will begin capturing images.
+
+## TODO:
 
 
 ### UI:

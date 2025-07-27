@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 from fenetre.archive import archive_daydir, list_unarchived_dirs
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 
 
 class TestArchive(unittest.TestCase):

@@ -1241,5 +1241,10 @@ def archive_loop():
         time.sleep(600)
 
 
-if __name__ == "__main__":
+def run():
+    """Entry point for the fenetre console script."""
     app.run(main)
+
+
+if __name__ == "__main__":
+    run()

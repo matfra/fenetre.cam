@@ -11,7 +11,7 @@ import yaml
 from fenetre.config import config_load
 from fenetre.fenetre import load_and_apply_configuration
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 
 # Mock absl.flags and absl.logging for standalone testing
 # as fenetre.py relies on them being initialized.
