@@ -7,6 +7,7 @@ import signal
 import subprocess
 import threading
 import time
+import sys
 from collections import deque
 from datetime import datetime, timedelta
 from functools import partial
@@ -39,7 +40,7 @@ from fenetre.archive import archive_daydir, list_unarchived_dirs, scan_and_publi
 from fenetre.config import config_load
 from fenetre.daylight import run_end_of_day
 from fenetre.gopro_utility import GoProUtilityThread, format_gopro_sd_card
-from fenetre.platform_utils import is_raspberry_pi
+from fenetre.platform_utils import is_raspberry_pi, rotate_log_file
 from fenetre.postprocess import gather_metrics, postprocess
 from fenetre.timelapse import create_timelapse
 from fenetre.ui_utils import copy_public_html_files
@@ -64,7 +65,23 @@ timelapse_queue_file = None
 timelapse_queue_lock = threading.Lock()
 
 
-def get_pic_from_url(url: str, timeout: int, ua: str = "", camera_config: Dict = None, global_config: Dict = None) -> Image.Image:
+def log_camera_error(camera_name: str, error_message: str, global_config: Dict):
+    """Logs an error message to a camera-specific log file."""
+    log_dir = global_config.get("log_dir")
+    if not log_dir:
+        return
+
+    os.makedirs(log_dir, exist_ok=True)
+    log_file_path = os.path.join(log_dir, f"{camera_name}.log")
+    rotate_log_file(log_file_path)
+    with open(log_file_path, "a") as f:
+        f.write(f"Timestamp: {datetime.now().isoformat()}\n")
+        f.write(f"ERROR: {error_message}\n")
+        f.write("-" * 20 + "\n")
+
+
+def get_pic_from_url(url: str, timeout: int, ua: str = "", camera_name: str = "", camera_config: Dict = None, global_config: Dict = None) -> Image.Image:
+
     if camera_config is None:
         camera_config = {}
     if global_config is None:
@@ -95,12 +112,9 @@ def get_pic_from_url(url: str, timeout: int, ua: str = "", camera_config: Dict =
     log_dir = global_config.get("log_dir")
     if log_dir:
         os.makedirs(log_dir, exist_ok=True)
-        log_file_path = os.path.join(log_dir, "url_requests.log")
-        if os.path.exists(log_file_path) and (datetime.now() - datetime.fromtimestamp(os.path.getmtime(log_file_path))).days > 1:
-            old_log_file_path = log_file_path + ".1"
-            if os.path.exists(old_log_file_path):
-                os.remove(old_log_file_path)
-            os.rename(log_file_path, old_log_file_path)
+        log_file_name = f"{camera_name}.log" if camera_name else "url_requests.log"
+        log_file_path = os.path.join(log_dir, log_file_name)
+        rotate_log_file(log_file_path)
         with open(log_file_path, "a") as f:
             f.write(f"Timestamp: {datetime.now().isoformat()}\n")
             f.write(log_message + "\n")
@@ -165,12 +179,7 @@ def get_pic_from_local_command(
             log_dir,
             f"{camera_name}.log",
         )
-        # If the file was created more than 24 hours ago, rename it to camera_name.log.1
-        if os.path.exists(log_file_path) and (datetime.now() - datetime.fromtimestamp(os.path.getmtime(log_file_path))).days > 1:
-            old_log_file_path = log_file_path + ".1"
-            if os.path.exists(old_log_file_path):
-                os.remove(old_log_file_path)
-            os.rename(log_file_path, old_log_file_path)
+        rotate_log_file(log_file_path)
         with open(log_file_path, "a") as log_file:
             s = subprocess.run(
                 cmd.split(" "),
@@ -263,7 +272,7 @@ def snap(camera_name, camera_config: Dict):
         logging.info(f"{camera_name}: Fetching new picture.")
         if url is not None:
             ua = global_config.get("user_agent", "")
-            return get_pic_from_url(url, timeout, ua, camera_config, global_config)
+            return get_pic_from_url(url, timeout, ua, camera_name, camera_config, global_config)
         if local_command is not None:
             return get_pic_from_local_command(
                 local_command, timeout, camera_name, camera_config
@@ -292,7 +301,13 @@ def snap(camera_name, camera_config: Dict):
     # Initialization before the main loop
     previous_pic_dir, previous_pic_filename = get_pic_dir_and_filename(camera_name)
     previous_pic_fullpath = os.path.join(previous_pic_dir, previous_pic_filename)
-    previous_pic = capture()
+    try:
+        previous_pic = capture()
+    except Exception as e:
+        error_msg = f"Failed to capture initial image for {camera_name}: {e}"
+        logging.error(error_msg, exc_info=True)
+        log_camera_error(camera_name, error_msg, global_config)
+        raise
     previous_exif = previous_pic.info.get("exif") or b""
     if len(camera_config.get("postprocessing", [])) > 0:
         previous_pic, previous_exif = postprocess(
@@ -369,7 +384,15 @@ def snap(camera_name, camera_config: Dict):
                 )
             )
 
-        new_pic = capture()
+        try:
+            new_pic = capture()
+        except Exception as e:
+            error_msg = f"Could not fetch picture for {camera_name}: {e}"
+            logging.warning(error_msg)
+            log_camera_error(camera_name, error_msg, global_config)
+            metric_capture_failures_total.labels(camera_name=camera_name).inc()
+            time.sleep(5)
+            continue
         new_exif = new_pic.info.get("exif") or b""
         if new_pic is None:
             logging.warning(f"{camera_name}: Could not fetch picture.")
@@ -721,9 +744,9 @@ def main(argv):
     # Setup signal handling for SIGHUP for config reload and SIGINT/SIGTERM for graceful exit
     signal.signal(signal.SIGHUP, handle_sighup)
     signal.signal(signal.SIGINT, signal_handler_exit)  # Graceful exit on Ctrl+C
-    signal.signal(
-        signal.SIGTERM, signal_handler_exit
-    )  # Graceful exit on kill/systemd stop
+#    signal.signal(
+#        signal.SIGTERM, signal_handler_exit
+#    )  # Graceful exit on kill/systemd stop
 
     # Initialize global sleep_intervals (important for camera threads)
     global sleep_intervals
@@ -1008,6 +1031,9 @@ def handle_sighup(signum, frame):
 def signal_handler_exit(signum, frame):
     """Signal handler for SIGINT and SIGTERM to gracefully shut down."""
     signal_name = signal.Signals(signum).name
+    if exit_event.is_set():
+        logging.warning(f"Forcing shutdown.")
+        sys.exit(0)
     logging.info(f"{signal_name} received. Initiating graceful shutdown...")
     exit_event.set()  # Signal all threads to exit
     # The main loop's finally block will call shutdown_application()

@@ -10,6 +10,7 @@ from astral import LocationInfo
 from astral.sun import sun
 
 from fenetre.gopro_state_map import GoProEnums
+from fenetre.platform_utils import rotate_log_file
 
 log_dir_global = None
 
@@ -24,12 +25,7 @@ def _log_request_response(url: str, response: requests.Response):
         return
     os.makedirs(log_dir_global, exist_ok=True)
     log_file_path = os.path.join(log_dir_global, "gopro.log")
-    # If the file was created more than 24 hours ago, rename it to gopro.log.1
-    if os.path.exists(log_file_path) and (datetime.now() - datetime.fromtimestamp(os.path.getmtime(log_file_path))).days > 1:
-        old_log_file_path = log_file_path + ".1"
-        if os.path.exists(old_log_file_path):
-            os.remove(old_log_file_path)
-        os.rename(log_file_path, old_log_file_path)
+    rotate_log_file(log_file_path)
     with open(log_file_path, "a") as f:
         f.write(f"Timestamp: {datetime.now().isoformat()}\n")
         f.write(f"Request URL: {url}\n")
