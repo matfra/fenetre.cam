@@ -6,3 +6,4 @@ venv-*
 ssl
 *.swpconfig.dev.yaml
 fenetre.pid
+*.egg-info/
