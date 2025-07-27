@@ -439,7 +439,16 @@ def server_run():
     handler_class = partial(
         http.server.SimpleHTTPRequestHandler, directory=global_config["work_dir"]
     )
-    server_address = (server_config["host"], server_config["port"])
+
+    listen_str = server_config.get("listen", "0.0.0.0:8888")
+    try:
+        host, port_str = listen_str.split(":")
+        port = int(port_str)
+        server_address = (host, port)
+    except ValueError:
+        logging.error(f"Invalid listen address format in http_server config: '{listen_str}'. It should be 'host:port'. Defaulting to 0.0.0.0:8888.")
+        server_address = ("0.0.0.0", 8888)
+
     logging.info(f"Starting HTTP Server on {server_address}")
     httpd = server_class(server_address, handler_class)
     global http_server_instance

@@ -14,9 +14,8 @@ timelapse:
   ffmpeg_2pass: True #default to False
   file_extension: "webm"
 http_server:
-  port: 8888
-  host: 0.0.0.0
-  enabled: True
+  enabled: true
+  listen: "0.0.0.0:8888"
 admin_server:
   enabled: true
   # Waitress args https://docs.pylonsproject.org/projects/waitress/en/stable/arguments.html#arguments

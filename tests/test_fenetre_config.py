@@ -83,7 +83,24 @@ class FenetreConfigTestCase(unittest.TestCase):
     def test_config_load_success(self):
         test_data = {
             "global": {"setting": "global_val", "work_dir": self.mock_work_dir},
-            "http_server": {"port": 8080},
+            "http_server": {"listen": "0.0.0.0:8080"},
+            "cameras": {"cam1": {"url": "http://cam1"}},
+        }
+        config_path = self._create_temp_config_file(test_data)
+
+        server_conf, cameras_conf, global_conf, admin_server_conf, _ = config_load(
+            config_path
+        )
+
+        self.assertEqual(global_conf, test_data["global"])
+        self.assertEqual(server_conf, test_data["http_server"])
+        self.assertEqual(cameras_conf, test_data["cameras"])
+        self.assertEqual(admin_server_conf, {})
+
+    def test_config_dualstack_load_success(self):
+        test_data = {
+            "global": {"setting": "global_val", "work_dir": self.mock_work_dir},
+            "http_server": {"listen": "0.0.0.0:8080 [::]:8080"},
             "cameras": {"cam1": {"url": "http://cam1"}},
         }
         config_path = self._create_temp_config_file(test_data)
@@ -165,7 +182,7 @@ class FenetreConfigTestCase(unittest.TestCase):
         # Set up FLAGS.config for fenetre.py
         test_data = {
             "global": {"work_dir": self.mock_work_dir, "timezone": "UTC"},
-            "http_server": {"enabled": True, "port": 8080, "host": "0.0.0.0"},
+            "http_server": {"enabled": True, "listen": "0.0.0.0:8080"},
             "cameras": {
                 "cam1": {"url": "http://cam1", "snap_interval_s": 30},
                 "cam2": {"gopro_ip": "10.5.5.9", "gopro_ble_identifier": "XXXX"},
@@ -184,7 +201,7 @@ class FenetreConfigTestCase(unittest.TestCase):
         )
 
         self.assertEqual(fenetre_module.global_config["work_dir"], self.mock_work_dir)
-        self.assertEqual(fenetre_module.server_config["port"], 8080)
+        self.assertEqual(fenetre_module.server_config["listen"], "0.0.0.0:8080")
         self.assertIn("cam1", fenetre_module.cameras_config)
         self.assertIn("cam2", fenetre_module.cameras_config)
 
@@ -251,7 +268,7 @@ class FenetreConfigTestCase(unittest.TestCase):
         # Initial config
         initial_data = {
             "global": {"work_dir": self.mock_work_dir, "timezone": "UTC"},
-            "http_server": {"enabled": True, "port": 8080, "host": "0.0.0.0"},
+            "http_server": {"enabled": True, "listen": "0.0.0.0:8080"},
             "cameras": {
                 "cam1": {"url": "http://cam1", "snap_interval_s": 30},
                 "cam_to_remove": {"url": "http://toberemoved"},
