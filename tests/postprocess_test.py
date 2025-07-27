@@ -1,4 +1,4 @@
-from postprocess import _parse_color, add_timestamp, postprocess
+from fenetre.postprocess import _parse_color, add_timestamp, postprocess
 import os
 # Assuming postprocess.py is in the parent directory or PYTHONPATH is set up
 import sys
@@ -26,7 +26,7 @@ class TestPostprocess(unittest.TestCase):
         self.assertEqual(_parse_color("( 255, 0, 0 )"), (255, 0, 0))  # With spaces
         self.assertEqual(_parse_color((0, 255, 0)), (0, 255, 0))
         # Test fallback for invalid string
-        with patch("postprocess.logging") as mock_logging:
+        with patch("fenetre.postprocess.logging") as mock_logging:
             self.assertEqual(
                 _parse_color("invalid_color_string"), "invalid_color_string"
             )  # Will be passed to PIL
@@ -34,14 +34,14 @@ class TestPostprocess(unittest.TestCase):
                 _parse_color("(123,456)"), (255, 255, 255)
             )  # Invalid tuple string
             mock_logging.warning.assert_called()
-        with patch("postprocess.logging") as mock_logging:
+        with patch("fenetre.postprocess.logging") as mock_logging:
             self.assertEqual(_parse_color(123), (255, 255, 255))  # Invalid type
             mock_logging.warning.assert_called()
 
-    @patch("postprocess.ImageDraw.Draw")
-    @patch("postprocess.ImageFont.truetype")
-    @patch("postprocess.datetime")
-    @patch("postprocess.pytz")
+    @patch("fenetre.postprocess.ImageDraw.Draw")
+    @patch("fenetre.postprocess.ImageFont.truetype")
+    @patch("fenetre.postprocess.datetime")
+    @patch("fenetre.postprocess.pytz")
     def test_add_timestamp_basic(
         self, mock_pytz, mock_datetime, mock_truetype, mock_draw_constructor
     ):
@@ -64,7 +64,7 @@ class TestPostprocess(unittest.TestCase):
         expected_text = "2023-01-01 12:00:00 UTC"
         # If DEFAULT_TIMEZONE in postprocess.py is something else, adjust this
         # Forcing it for the test for predictability:
-        with patch("postprocess.DEFAULT_TIMEZONE", "UTC"):
+        with patch("fenetre.postprocess.DEFAULT_TIMEZONE", "UTC"):
             add_timestamp(mock_image, size=12, color="yellow", position="bottom_right")
 
         mock_pytz.timezone.assert_called_with("UTC")
@@ -90,10 +90,10 @@ class TestPostprocess(unittest.TestCase):
         self.assertTrue(0 <= text_pos_x < mock_image.width)
         self.assertTrue(0 <= text_pos_y < mock_image.height)
 
-    @patch("postprocess.ImageDraw.Draw")
-    @patch("postprocess.ImageFont.truetype")
-    @patch("postprocess.datetime")
-    @patch("postprocess.pytz")
+    @patch("fenetre.postprocess.ImageDraw.Draw")
+    @patch("fenetre.postprocess.ImageFont.truetype")
+    @patch("fenetre.postprocess.datetime")
+    @patch("fenetre.postprocess.pytz")
     def test_add_timestamp_custom_format_and_position(
         self, mock_pytz, mock_datetime, mock_truetype, mock_draw_constructor
     ):
@@ -114,7 +114,7 @@ class TestPostprocess(unittest.TestCase):
         custom_format = "%H:%M %d/%m/%Y"
         expected_text = "08:30 10/05/2024"
 
-        with patch("postprocess.DEFAULT_TIMEZONE", "UTC"):
+        with patch("fenetre.postprocess.DEFAULT_TIMEZONE", "UTC"):
             add_timestamp(
                 mock_image,
                 text_format=custom_format,
@@ -139,13 +139,13 @@ class TestPostprocess(unittest.TestCase):
         # final_y = padding - text_bbox[1]
         self.assertEqual(args[0], (padding - 0, padding - 0))
 
-    @patch("postprocess.ImageDraw.Draw")
+    @patch("fenetre.postprocess.ImageDraw.Draw")
     @patch(
-        "postprocess.ImageFont.truetype", side_effect=IOError("Font not found")
+        "fenetre.postprocess.ImageFont.truetype", side_effect=IOError("Font not found")
     )  # Mock font load failure
-    @patch("postprocess.ImageFont.load_default")  # Mock fallback font
-    @patch("postprocess.datetime")
-    @patch("postprocess.pytz")
+    @patch("fenetre.postprocess.ImageFont.load_default")  # Mock fallback font
+    @patch("fenetre.postprocess.datetime")
+    @patch("fenetre.postprocess.pytz")
     def test_add_timestamp_font_fallback(
         self,
         mock_pytz,
@@ -168,7 +168,7 @@ class TestPostprocess(unittest.TestCase):
         mock_default_font = MagicMock()
         mock_load_default.return_value = mock_default_font
 
-        with patch("postprocess.DEFAULT_TIMEZONE", "UTC"):
+        with patch("fenetre.postprocess.DEFAULT_TIMEZONE", "UTC"):
             add_timestamp(mock_image, size=15)
 
         # Check that truetype was attempted for DejaVuSans and Arial, then load_default was called
@@ -180,7 +180,7 @@ class TestPostprocess(unittest.TestCase):
         args, kwargs = mock_draw_instance.text.call_args
         self.assertEqual(kwargs["font"], mock_default_font)
 
-    @patch("postprocess.add_timestamp")  # Mock the actual timestamping function
+    @patch("fenetre.postprocess.add_timestamp")  # Mock the actual timestamping function
     def test_postprocess_integration_timestamp_enabled(self, mock_add_timestamp):
         img = self.create_test_image()
         postprocessing_steps = [
@@ -210,7 +210,7 @@ class TestPostprocess(unittest.TestCase):
             custom_text=None,
         )
 
-    @patch("postprocess.add_timestamp")
+    @patch("fenetre.postprocess.add_timestamp")
     def test_postprocess_integration_timestamp_disabled(self, mock_add_timestamp):
         img = self.create_test_image()
         postprocessing_steps = [{"type": "timestamp", "enabled": False, "size": 30}]
@@ -220,10 +220,10 @@ class TestPostprocess(unittest.TestCase):
         self.assertEqual(img, returned_img)
         mock_add_timestamp.assert_not_called()
 
-    @patch("postprocess.ImageDraw.Draw")
-    @patch("postprocess.ImageFont.truetype")
-    @patch("postprocess.datetime")
-    @patch("postprocess.pytz")
+    @patch("fenetre.postprocess.ImageDraw.Draw")
+    @patch("fenetre.postprocess.ImageFont.truetype")
+    @patch("fenetre.postprocess.datetime")
+    @patch("fenetre.postprocess.pytz")
     def test_add_timestamp_specific_coordinates(
         self, mock_pytz, mock_datetime, mock_truetype, mock_draw_constructor
     ):
@@ -241,7 +241,7 @@ class TestPostprocess(unittest.TestCase):
         # Mock textbbox return value
         mock_draw_instance.textbbox.return_value = (0, 0, 100, 20)  # l, t, r, b
 
-        with patch("postprocess.DEFAULT_TIMEZONE", "UTC"):
+        with patch("fenetre.postprocess.DEFAULT_TIMEZONE", "UTC"):
             add_timestamp(mock_image, position="50,75", size=10, color="red")
 
         mock_draw_instance.text.assert_called_once()
@@ -255,8 +255,7 @@ class TestPostprocess(unittest.TestCase):
     @patch("builtins.open", new_callable=unittest.mock.mock_open)
     @patch("yaml.safe_load")
     def test_get_timezone_from_config_success(self, mock_safe_load, mock_open_file):
-        from postprocess import \
-            get_timezone_from_config  # re-import for patch context
+        from fenetre.postprocess import get_timezone_from_config
 
         mock_safe_load.return_value = {"global": {"timezone": "America/New_York"}}
 
@@ -269,11 +268,11 @@ class TestPostprocess(unittest.TestCase):
         mock_open_file.assert_called_with("config.yaml", "r")
 
     @patch("builtins.open", side_effect=FileNotFoundError)
-    @patch("postprocess.logging")  # to check for warning
+    @patch("fenetre.postprocess.logging")  # to check for warning
     def test_get_timezone_from_config_file_not_found(
         self, mock_logging, mock_open_file
     ):
-        from postprocess import get_timezone_from_config  # re-import
+        from fenetre.postprocess import get_timezone_from_config  # re-import
 
         tz = get_timezone_from_config()
         self.assertEqual(tz, "UTC")  # Fallback
@@ -281,10 +280,10 @@ class TestPostprocess(unittest.TestCase):
             "config.yaml not found, defaulting timezone to UTC for timestamps."
         )
 
-    @patch("postprocess.ImageDraw.Draw")
-    @patch("postprocess.ImageFont.truetype")
-    @patch("postprocess.datetime")
-    @patch("postprocess.pytz")
+    @patch("fenetre.postprocess.ImageDraw.Draw")
+    @patch("fenetre.postprocess.ImageFont.truetype")
+    @patch("fenetre.postprocess.datetime")
+    @patch("fenetre.postprocess.pytz")
     def test_add_timestamp_new_positions(
         self, mock_pytz, mock_datetime, mock_truetype, mock_draw_constructor
     ):
@@ -322,7 +321,7 @@ class TestPostprocess(unittest.TestCase):
         }
 
         for position_name, expected_coords in positions_to_test.items():
-            with patch("postprocess.DEFAULT_TIMEZONE", "UTC"):
+            with patch("fenetre.postprocess.DEFAULT_TIMEZONE", "UTC"):
                 add_timestamp(
                     mock_image, position=position_name, size=10, color="green"
                 )
@@ -337,10 +336,10 @@ class TestPostprocess(unittest.TestCase):
             # Reset mock for next iteration if necessary, though here it's implicitly reset by new call_args
             mock_draw_instance.text.reset_mock()
 
-    @patch("postprocess.ImageDraw.Draw")
-    @patch("postprocess.ImageFont.truetype")
-    @patch("postprocess.datetime")
-    @patch("postprocess.pytz")
+    @patch("fenetre.postprocess.ImageDraw.Draw")
+    @patch("fenetre.postprocess.ImageFont.truetype")
+    @patch("fenetre.postprocess.datetime")
+    @patch("fenetre.postprocess.pytz")
     @patch("PIL.ImageColor.getcolor")  # Corrected patch target
     def test_add_timestamp_with_background(
         self,
@@ -376,7 +375,7 @@ class TestPostprocess(unittest.TestCase):
         # Mock what ImageColor.getcolor would return for "gray" in RGBA
         mock_pil_imagecolor_getcolor.return_value = (128, 128, 128, 255)  # Opaque gray
 
-        with patch("postprocess.DEFAULT_TIMEZONE", "UTC"):
+        with patch("fenetre.postprocess.DEFAULT_TIMEZONE", "UTC"):
             add_timestamp(
                 mock_image,
                 color="black",
@@ -444,7 +443,7 @@ class TestPostprocess(unittest.TestCase):
         # Or ensure the side_effect handles this state change
         # For simplicity, the previous check for RGBA mode on Draw init covers the general case.
 
-        with patch("postprocess.DEFAULT_TIMEZONE", "UTC"):
+        with patch("fenetre.postprocess.DEFAULT_TIMEZONE", "UTC"):
             add_timestamp(
                 mock_image,
                 color="white",
@@ -459,10 +458,10 @@ class TestPostprocess(unittest.TestCase):
         )
         self.assertEqual(rect_kwargs_transparent["fill"], background_color_to_test)
 
-    @patch("postprocess.ImageDraw.Draw")
-    @patch("postprocess.ImageFont.truetype")
-    @patch("postprocess.datetime")
-    @patch("postprocess.pytz")
+    @patch("fenetre.postprocess.ImageDraw.Draw")
+    @patch("fenetre.postprocess.ImageFont.truetype")
+    @patch("fenetre.postprocess.datetime")
+    @patch("fenetre.postprocess.pytz")
     def test_add_timestamp_with_custom_text(
         self, mock_pytz, mock_datetime, mock_truetype, mock_draw_constructor
     ):
@@ -487,7 +486,7 @@ class TestPostprocess(unittest.TestCase):
         expected_time_part = "2024-07-15 10:30:00 UTC"
         expected_full_text = f"{custom_text_to_add} {expected_time_part}"
 
-        with patch("postprocess.DEFAULT_TIMEZONE", "UTC"):
+        with patch("fenetre.postprocess.DEFAULT_TIMEZONE", "UTC"):
             add_timestamp(mock_image, custom_text=custom_text_to_add)
 
         # Verify that draw.text was called with the combined custom text and timestamp
@@ -508,7 +507,7 @@ class TestPostprocess(unittest.TestCase):
         # To test the 'postprocess' function's handling of 'custom_text' from config:
         # We need to mock 'add_timestamp' as it's called by 'postprocess'
         with patch(
-            "postprocess.add_timestamp"
+            "fenetre.postprocess.add_timestamp"
         ) as mock_add_timestamp_in_postprocess:  # This mocks the public add_timestamp
             img_for_postproc = self.create_test_image()
             postprocessing_steps = [
@@ -531,7 +530,7 @@ class TestPostprocess(unittest.TestCase):
             self.assertEqual(kwargs_passed.get("custom_text"), "Test Prefix")
 
     @patch(
-        "postprocess._add_text_overlay"
+        "fenetre.postprocess._add_text_overlay"
     )  # Mock the internal helper directly for generic text step
     def test_postprocess_integration_generic_text_step(self, mock_add_text_overlay):
         img = self.create_test_image()
@@ -576,8 +575,8 @@ class TestPostprocess(unittest.TestCase):
         self.assertEqual(kwargs_passed.get("background_padding"), bg_padding)
         self.assertEqual(kwargs_passed.get("font_path"), font_p)
 
-    @patch("postprocess._add_text_overlay")
-    @patch("postprocess.logging")
+    @patch("fenetre.postprocess._add_text_overlay")
+    @patch("fenetre.postprocess.logging")
     def test_postprocess_integration_generic_text_step_disabled_or_no_text(
         self, mock_logging, mock_add_text_overlay
     ):

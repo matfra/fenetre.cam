@@ -17,7 +17,7 @@ from PIL import Image
 from prometheus_client import REGISTRY, Counter, Gauge, generate_latest
 from werkzeug.exceptions import BadRequest
 
-from ui_utils import copy_public_html_files
+from fenetre.ui_utils import copy_public_html_files
 
 # Create metrics
 metric_pictures_taken_total = Counter(

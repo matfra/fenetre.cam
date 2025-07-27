@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from timelapse import create_timelapse
+from fenetre.timelapse import create_timelapse
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
@@ -16,9 +16,9 @@ class TestTimelapse(unittest.TestCase):
     def tearDown(self):
         self.temp_dir.cleanup()
 
-    @patch("timelapse.subprocess.run")
-    @patch("timelapse.get_image_dimensions", return_value=(1920, 1080))
-    @patch("timelapse.is_raspberry_pi", return_value=False)
+    @patch("fenetre.timelapse.subprocess.run")
+    @patch("fenetre.timelapse.get_image_dimensions", return_value=(1920, 1080))
+    @patch("fenetre.timelapse.is_raspberry_pi", return_value=False)
     def test_create_timelapse_ffmpeg_args_not_pi(
         self, mock_is_pi, mock_get_dims, mock_subprocess_run
     ):
@@ -40,11 +40,11 @@ class TestTimelapse(unittest.TestCase):
         args, kwargs = mock_subprocess_run.call_args
         self.assertIn("-c:v", args[0])
         self.assertIn("libvpx-vp9", args[0])
-        self.assertIn(".webm", args[0][-1])
+        self.assertIn(".mp4", args[0][-1])
 
-    @patch("timelapse.subprocess.run")
-    @patch("timelapse.get_image_dimensions", return_value=(1920, 1080))
-    @patch("timelapse.is_raspberry_pi", return_value=True)
+    @patch("fenetre.timelapse.subprocess.run")
+    @patch("fenetre.timelapse.get_image_dimensions", return_value=(1920, 1080))
+    @patch("fenetre.timelapse.is_raspberry_pi", return_value=True)
     def test_create_timelapse_ffmpeg_args_pi(
         self, mock_is_pi, mock_get_dims, mock_subprocess_run
     ):

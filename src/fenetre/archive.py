@@ -7,15 +7,15 @@ from datetime import datetime
 import pytz
 from absl import app, flags, logging
 
-from admin_server import (
+from fenetre.admin_server import (
     metric_directories_archived_total,
     metric_directories_daylight_total,
     metric_directories_timelapse_total,
     metric_directories_total,
 )
-from config import config_load
-from daylight import run_end_of_day
-from timelapse import create_timelapse
+from fenetre.config import config_load
+from fenetre.daylight import run_end_of_day
+from fenetre.timelapse import create_timelapse
 
 
 def scan_and_publish_metrics(camera_name: str, camera_dir: str, global_config: dict):

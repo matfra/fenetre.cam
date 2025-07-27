@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from archive import archive_daydir, list_unarchived_dirs
+from fenetre.archive import archive_daydir, list_unarchived_dirs
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
@@ -47,13 +47,13 @@ class TestArchive(unittest.TestCase):
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0], unarchived_dir)
 
-    @patch("archive.get_today_date")
-    @patch("archive.is_dir_older_than_n_days")
-    @patch("archive.check_dir_has_daylight_band")
-    @patch("archive.check_dir_has_timelapse")
-    @patch("archive.create_timelapse")
-    @patch("archive.run_end_of_day")
-    @patch("archive.keep_only_a_subset_of_jpeg_files")
+    @patch("fenetre.archive.get_today_date")
+    @patch("fenetre.archive.is_dir_older_than_n_days")
+    @patch("fenetre.archive.check_dir_has_daylight_band")
+    @patch("fenetre.archive.check_dir_has_timelapse")
+    @patch("fenetre.archive.create_timelapse")
+    @patch("fenetre.archive.run_end_of_day")
+    @patch("fenetre.archive.keep_only_a_subset_of_jpeg_files")
     def test_archive_daydir(
         self,
         mock_keep_files,

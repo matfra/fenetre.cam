@@ -8,7 +8,8 @@ from unittest.mock import MagicMock, patch
 import yaml
 
 # Import the functions/classes to be tested
-from fenetre import config_load, load_and_apply_configuration
+from fenetre.config import config_load
+from fenetre.fenetre import load_and_apply_configuration
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
@@ -51,8 +52,8 @@ class FenetreConfigTestCase(unittest.TestCase):
 
         # Reset fenetre's global config state before each test if necessary
         # We will re-initialize them in tests that call load_and_apply_configuration
-        if "fenetre" in sys.modules:
-            fenetre_module = sys.modules["fenetre"]
+        if "fenetre.fenetre" in sys.modules:
+            fenetre_module = sys.modules["fenetre.fenetre"]
             fenetre_module.server_config = {}
             fenetre_module.cameras_config = {}
             fenetre_module.global_config = {}
@@ -60,7 +61,7 @@ class FenetreConfigTestCase(unittest.TestCase):
             fenetre_module.active_camera_threads = {}
             fenetre_module.http_server_thread_global = None
             fenetre_module.http_server_instance = None
-            if fenetre_module.exit_event:  # If it was set by a previous test
+            if hasattr(fenetre_module, "exit_event") and fenetre_module.exit_event:  # If it was set by a previous test
                 fenetre_module.exit_event.clear()
 
     def tearDown(self):
@@ -87,7 +88,7 @@ class FenetreConfigTestCase(unittest.TestCase):
         }
         config_path = self._create_temp_config_file(test_data)
 
-        server_conf, cameras_conf, global_conf, admin_server_conf = config_load(
+        server_conf, cameras_conf, global_conf, admin_server_conf, _ = config_load(
             config_path
         )
 
@@ -103,7 +104,7 @@ class FenetreConfigTestCase(unittest.TestCase):
         }
         config_path = self._create_temp_config_file(test_data)
 
-        server_conf, cameras_conf, global_conf, admin_server_conf = config_load(
+        server_conf, cameras_conf, global_conf, admin_server_conf, _ = config_load(
             config_path
         )
 
@@ -112,7 +113,7 @@ class FenetreConfigTestCase(unittest.TestCase):
         self.assertEqual(cameras_conf, {})  # Should default to empty dict
         self.assertEqual(admin_server_conf, {})
 
-    @patch("config.logging")
+    @patch("fenetre.config.logging")
     def test_config_load_file_not_found(self, mock_config_logging):
         server_conf, cameras_conf, global_conf, admin_server_conf = config_load(
             "non_existent_config.yaml"
@@ -125,7 +126,7 @@ class FenetreConfigTestCase(unittest.TestCase):
             "Configuration file non_existent_config.yaml not found."
         )
 
-    @patch("config.logging")
+    @patch("fenetre.config.logging")
     def test_config_load_invalid_yaml(self, mock_config_logging):
         fd, path = tempfile.mkstemp(suffix=".yaml", dir=self.temp_dir.name)
         with os.fdopen(fd, "w") as f:
@@ -142,12 +143,12 @@ class FenetreConfigTestCase(unittest.TestCase):
         args, _ = mock_config_logging.error.call_args
         self.assertIn(f"Error parsing YAML configuration file {path}", args[0])
 
-    @patch("fenetre.copy_public_html_files")
-    @patch("fenetre.update_cameras_metadata")
-    @patch("fenetre.Thread")  # Mock threads so they don't actually start
-    @patch("fenetre.GoProUtilityThread")  # Mock GoPro threads
-    @patch("fenetre.server_run")  # Mock server_run
-    @patch("fenetre.stop_http_server")
+    @patch("fenetre.fenetre.copy_public_html_files")
+    @patch("fenetre.fenetre.update_cameras_metadata")
+    @patch("fenetre.fenetre.Thread")  # Mock threads so they don't actually start
+    @patch("fenetre.fenetre.GoProUtilityThread")  # Mock GoPro threads
+    @patch("fenetre.fenetre.server_run")  # Mock server_run
+    @patch("fenetre.fenetre.stop_http_server")
     def test_load_and_apply_configuration_initial_load(
         self,
         mock_stop_http,
@@ -159,7 +160,7 @@ class FenetreConfigTestCase(unittest.TestCase):
     ):
         # This test is more of an integration test for the config application logic,
         # focusing on variable updates and mock calls rather than actual thread behavior.
-        fenetre_module = sys.modules["fenetre"]
+        fenetre_module = sys.modules["fenetre.fenetre"]
 
         # Set up FLAGS.config for fenetre.py
         test_data = {
@@ -230,12 +231,12 @@ class FenetreConfigTestCase(unittest.TestCase):
             mock_server_run_found, "server_run should have been a target for a Thread"
         )
 
-    @patch("fenetre.copy_public_html_files")
-    @patch("fenetre.update_cameras_metadata")
-    @patch("fenetre.Thread")
-    @patch("fenetre.GoProUtilityThread")
-    @patch("fenetre.server_run")
-    @patch("fenetre.stop_http_server")
+    @patch("fenetre.fenetre.copy_public_html_files")
+    @patch("fenetre.fenetre.update_cameras_metadata")
+    @patch("fenetre.fenetre.Thread")
+    @patch("fenetre.fenetre.GoProUtilityThread")
+    @patch("fenetre.fenetre.server_run")
+    @patch("fenetre.fenetre.stop_http_server")
     def test_load_and_apply_configuration_reload_disable_server_remove_camera(
         self,
         mock_stop_http,
@@ -245,7 +246,7 @@ class FenetreConfigTestCase(unittest.TestCase):
         mock_update_meta,
         mock_copy_files,
     ):
-        fenetre_module = sys.modules["fenetre"]
+        fenetre_module = sys.modules["fenetre.fenetre"]
 
         # Initial config
         initial_data = {

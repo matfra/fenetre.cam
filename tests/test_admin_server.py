@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 import yaml
 
-from admin_server import app as flask_app
+from fenetre.admin_server import app as flask_app
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 

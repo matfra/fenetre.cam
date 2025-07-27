@@ -1,4 +1,4 @@
-import daylight
+from fenetre import daylight
 import os
 import sys
 import unittest
@@ -45,7 +45,7 @@ class TestDaylightProcessor(unittest.TestCase):
         #    Configure it so when daylight.np.array() is called,
         #    it returns our mock_array_object_instance.
         with mock.patch(
-            "daylight.np.array", return_value=mock_array_object_instance
+            "fenetre.daylight.np.array", return_value=mock_array_object_instance
         ) as mock_np_array_function:
             # Call the function under test
             avg_color_result = daylight.get_avg_color(mock_img_input, (0, 0, 10, 10))
@@ -79,7 +79,7 @@ class TestDaylightProcessor(unittest.TestCase):
 
         # Simulate an error when daylight.np.array() is called
         with mock.patch(
-            "daylight.np.array", side_effect=Exception("Simulated Numpy error")
+            "fenetre.daylight.np.array", side_effect=Exception("Simulated Numpy error")
         ):
             avg_color_result = daylight.get_avg_color(mock_img_input, (0, 0, 10, 10))
             self.assertEqual(avg_color_result, self.default_sky_color)
@@ -97,7 +97,7 @@ class TestDaylightProcessor(unittest.TestCase):
         mock_array_object_instance_for_mean_error.mean = mock_mean_method_error
 
         with mock.patch(
-            "daylight.np.array", return_value=mock_array_object_instance_for_mean_error
+            "fenetre.daylight.np.array", return_value=mock_array_object_instance_for_mean_error
         ):
             avg_color_result = daylight.get_avg_color(mock_img_input, (0, 0, 10, 10))
             self.assertEqual(avg_color_result, self.default_sky_color)
@@ -107,9 +107,9 @@ class TestDaylightProcessor(unittest.TestCase):
     # test_list_valid_days_directories, test_dump_html_header would remain the same as before.
 
     # Example of one of the previous tests for context:
-    @mock.patch("daylight.os.listdir")
-    @mock.patch("daylight.Image.new")
-    @mock.patch("daylight.ImageDraw.Draw")
+    @mock.patch("fenetre.daylight.os.listdir")
+    @mock.patch("fenetre.daylight.Image.new")
+    @mock.patch("fenetre.daylight.ImageDraw.Draw")
     # Removed @mock.patch('daylight.Image.open') as it's not used here
     # Removed @mock.patch('daylight.get_avg_color') as it's not used here
     def test_create_daily_band_no_images(
@@ -131,11 +131,11 @@ class TestDaylightProcessor(unittest.TestCase):
         mock_band_image.save.assert_called_once_with(expected_save_path)
         self.assertEqual(result_path, expected_save_path)
 
-    @mock.patch("daylight.calendar.monthrange")
-    @mock.patch("daylight.os.path.exists")
-    @mock.patch("daylight.Image.open")
-    @mock.patch("daylight.Image.new")
-    @mock.patch("daylight.os.makedirs")
+    @mock.patch("fenetre.daylight.calendar.monthrange")
+    @mock.patch("fenetre.daylight.os.path.exists")
+    @mock.patch("fenetre.daylight.Image.open")
+    @mock.patch("fenetre.daylight.Image.new")
+    @mock.patch("fenetre.daylight.os.makedirs")
     def test_create_monthly_image_mixed_days(
         self,
         mock_makedirs,
@@ -258,8 +258,8 @@ class TestDaylightProcessor(unittest.TestCase):
         self.assertEqual(daylight.get_month_pretty_name_html("2023-10"), "Oct<br>2023")
         self.assertEqual(daylight.get_month_pretty_name_html("2024-01"), "Jan<br>2024")
 
-    @mock.patch("daylight.os.path.isdir")
-    @mock.patch("daylight.os.listdir")
+    @mock.patch("fenetre.daylight.os.path.isdir")
+    @mock.patch("fenetre.daylight.os.listdir")
     def test_list_valid_days_directories(self, mock_os_listdir, mock_os_path_isdir):
         test_dir = "some_camera_dir"
         mock_os_listdir.return_value = [
@@ -281,7 +281,7 @@ class TestDaylightProcessor(unittest.TestCase):
         self.assertEqual(daylight.list_valid_days_directories(test_dir), expected)
         mock_os_listdir.assert_called_once_with(test_dir)
 
-    @mock.patch("daylight.os.path.isdir", return_value=False)
+    @mock.patch("fenetre.daylight.os.path.isdir", return_value=False)
     def test_list_valid_days_directories_non_existent_base(self, mock_os_path_isdir):
         self.assertEqual(daylight.list_valid_days_directories("non_existent_dir"), [])
 

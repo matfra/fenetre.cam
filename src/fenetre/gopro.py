@@ -9,7 +9,7 @@ from absl import logging
 from astral import LocationInfo
 from astral.sun import sun
 
-from gopro_state_map import GoProEnums
+from fenetre.gopro_state_map import GoProEnums
 
 log_dir_global = None
 

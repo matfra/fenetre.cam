@@ -10,7 +10,7 @@ from absl import logging
 from PIL import Image, ImageDraw, ImageFont
 from skimage import exposure
 
-from admin_server import (
+from fenetre.admin_server import (
     metric_picture_aperture,
     metric_picture_exposure_time_seconds,
     metric_picture_focal_length_mm,

@@ -25,7 +25,7 @@ from PIL import Image
 from skimage.metrics import structural_similarity
 from waitress import serve as waitress_serve
 
-from admin_server import (
+from fenetre.admin_server import (
     metric_camera_directory_size_bytes,
     metric_capture_failures_total,
     metric_last_successful_picture_timestamp,
@@ -35,14 +35,14 @@ from admin_server import (
     metric_timelapses_created_total,
     metric_work_directory_size_bytes,
 )
-from archive import archive_daydir, list_unarchived_dirs, scan_and_publish_metrics
-from config import config_load
-from daylight import run_end_of_day
-from gopro_utility import GoProUtilityThread, format_gopro_sd_card
-from platform_utils import is_raspberry_pi
-from postprocess import gather_metrics, postprocess
-from timelapse import create_timelapse
-from ui_utils import copy_public_html_files
+from fenetre.archive import archive_daydir, list_unarchived_dirs, scan_and_publish_metrics
+from fenetre.config import config_load
+from fenetre.daylight import run_end_of_day
+from fenetre.gopro_utility import GoProUtilityThread, format_gopro_sd_card
+from fenetre.platform_utils import is_raspberry_pi
+from fenetre.postprocess import gather_metrics, postprocess
+from fenetre.timelapse import create_timelapse
+from fenetre.ui_utils import copy_public_html_files
 
 # Define flags at module level
 flags.DEFINE_string("config", "config.yaml", "path to YAML config file")
@@ -791,7 +791,7 @@ def load_and_apply_configuration(initial_load=False, config_file_override=None):
         )
 
         try:
-            from admin_server import app as imported_flask_app
+            from .admin_server import app as imported_flask_app
 
             flask_app_instance = imported_flask_app
         except ImportError as e:
@@ -918,7 +918,7 @@ def manage_camera_threads():
 
             # Start GoPro utility thread if needed
             if cam_conf.get("gopro_ip"):
-                from gopro import GoPro
+                from .gopro import GoPro
 
                 gopro_instance = GoPro(
                     ip_address=cam_conf.get("gopro_ip"),

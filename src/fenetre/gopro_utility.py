@@ -17,8 +17,8 @@ from bleak import BleakClient, BleakScanner
 from bleak.backends.characteristic import BleakGATTCharacteristic
 from bleak.backends.device import BLEDevice as BleakDevice
 
-from gopro_state_map import GoProEnums
-from admin_server import gopro_setting_gauge, gopro_state_gauge
+from fenetre.gopro_state_map import GoProEnums
+from fenetre.admin_server import gopro_setting_gauge, gopro_state_gauge
 
 T = TypeVar("T")
 

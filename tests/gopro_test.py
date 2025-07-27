@@ -2,11 +2,11 @@ import os
 import sys
 import unittest
 from unittest import mock
+import json
 
-import gopro
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
+from fenetre import gopro
 
 class TestGoPro(unittest.TestCase):
     """Test suite for GoPro camera functions."""
@@ -15,7 +15,7 @@ class TestGoPro(unittest.TestCase):
         """Set up test fixtures."""
         self.gopro = gopro.GoPro()
 
-    @mock.patch("gopro.requests.get")
+    @mock.patch("fenetre.gopro.requests.get")
     def test_set_setting_success(self, mock_get):
         mock_response = mock.Mock()
         mock_response.status_code = 200
@@ -44,8 +44,8 @@ class TestGoPro(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.gopro.settings.video_performance_mode = "invalid_value"
 
-    @mock.patch("gopro.GoPro._get_latest_file")
-    @mock.patch("gopro.requests.get")
+    @mock.patch("fenetre.gopro.GoPro._get_latest_file")
+    @mock.patch("fenetre.gopro.requests.get")
     def test_capture_photo(self, mock_get, mock_get_latest_file):
         mock_response = mock.Mock()
         mock_response.status_code = 200
@@ -110,7 +110,7 @@ class TestGoPro(unittest.TestCase):
         ]
         mock_get.assert_has_calls(expected_calls, any_order=False)
 
-    @mock.patch("gopro.requests.get")
+    @mock.patch("fenetre.gopro.requests.get")
     def test_update_state(self, mock_get):
         import json
 
@@ -130,9 +130,8 @@ class TestGoPro(unittest.TestCase):
         )
         self.assertEqual(self.gopro.state, mock_state)
 
-    @mock.patch("gopro.requests.get")
+    @mock.patch("fenetre.gopro.requests.get")
     def test_get_presets(self, mock_get):
-        import json
 
         gopro_presets_path = os.path.join(
             os.path.dirname(__file__), "gopro_presets_get.json"
@@ -176,8 +175,8 @@ class TestGoProPresetValidation(unittest.TestCase):
             ]
         }
 
-    @mock.patch("gopro.requests.get")
-    @mock.patch("gopro.logging")
+    @mock.patch("fenetre.gopro.requests.get")
+    @mock.patch("fenetre.gopro.logging")
     def test_validate_presets_success(self, mock_logging, mock_get):
         """Test that validation passes when configured presets are available."""
         mock_response = mock.Mock()
@@ -193,8 +192,8 @@ class TestGoProPresetValidation(unittest.TestCase):
         )
         mock_logging.error.assert_not_called()
 
-    @mock.patch("gopro.requests.get")
-    @mock.patch("gopro.logging")
+    @mock.patch("fenetre.gopro.requests.get")
+    @mock.patch("fenetre.gopro.logging")
     def test_validate_presets_failure_invalid_id(self, mock_logging, mock_get):
         """Test that validation fails when a configured preset is not available."""
         mock_response = mock.Mock()
@@ -211,8 +210,8 @@ class TestGoProPresetValidation(unittest.TestCase):
             "Configured day preset ID '12345' is not available on the camera."
         )
 
-    @mock.patch("gopro.requests.get")
-    @mock.patch("gopro.logging")
+    @mock.patch("fenetre.gopro.requests.get")
+    @mock.patch("fenetre.gopro.logging")
     def test_validate_presets_failure_no_presets_retrieved(
         self, mock_logging, mock_get
     ):
@@ -229,8 +228,8 @@ class TestGoProPresetValidation(unittest.TestCase):
             "Could not retrieve available presets from the camera."
         )
 
-    @mock.patch("gopro.GoPro._get_latest_file")
-    @mock.patch("gopro.requests.get")
+    @mock.patch("fenetre.gopro.GoPro._get_latest_file")
+    @mock.patch("fenetre.gopro.requests.get")
     def test_capture_photo_with_preset_settings(self, mock_get, mock_get_latest_file):
         """Test that capture_photo applies preset and its settings via HTTP calls."""
         mock_response = mock.Mock()

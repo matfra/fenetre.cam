@@ -7,7 +7,7 @@ from datetime import datetime
 from absl import app, flags, logging
 from PIL import Image
 
-from platform_utils import is_raspberry_pi
+from fenetre.platform_utils import is_raspberry_pi
 from io import TextIOWrapper
 
 
