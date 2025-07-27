@@ -64,16 +64,52 @@ timelapse_queue_file = None
 timelapse_queue_lock = threading.Lock()
 
 
-def get_pic_from_url(url: str, timeout: int, ua: str = "") -> Image.Image:
+def get_pic_from_url(url: str, timeout: int, ua: str = "", camera_config: Dict = None, global_config: Dict = None) -> Image.Image:
+    if camera_config is None:
+        camera_config = {}
+    if global_config is None:
+        global_config = {}
+
+    request_url = url
+    if camera_config.get("cache_bust", False):
+        timestamp = int(time.time())
+        if "?" in request_url:
+            request_url = f"{request_url}&_={timestamp}"
+        else:
+            request_url = f"{request_url}?_={timestamp}"
+
     headers = {"Accept": "image/*,*"}
     if ua:
         requests_version = requests.__version__
         headers = {"User-Agent": f"{ua} v{requests_version}"}
-    r = requests.get(url, timeout=timeout, headers=headers)
+    r = requests.get(request_url, timeout=timeout, headers=headers)
+
+    log_message = (f"URL fetch for {url}:"
+                   f"\n\tRequest URL: {r.request.url}"
+                   f"\n\tRequest Headers: {r.request.headers}"
+                   f"\n\tResponse Status: {r.status_code}"
+                   f"\n\tResponse Headers: {r.headers}")
+
+    logging.debug(log_message)
+
+    log_dir = global_config.get("log_dir")
+    if log_dir:
+        os.makedirs(log_dir, exist_ok=True)
+        log_file_path = os.path.join(log_dir, "url_requests.log")
+        if os.path.exists(log_file_path) and (datetime.now() - datetime.fromtimestamp(os.path.getmtime(log_file_path))).days > 1:
+            old_log_file_path = log_file_path + ".1"
+            if os.path.exists(old_log_file_path):
+                os.remove(old_log_file_path)
+            os.rename(log_file_path, old_log_file_path)
+        with open(log_file_path, "a") as f:
+            f.write(f"Timestamp: {datetime.now().isoformat()}\n")
+            f.write(log_message + "\n")
+            f.write("-" * 20 + "\n")
+
     if r.status_code != 200:
         raise RuntimeError(
             f"HTTP Request Failed!\n"
-            f"URL: {url}\n"
+            f"URL: {request_url}\n"
             f"Status Code: {r.status_code}\n"
             f"Request Headers: {r.request.headers}\n"
             f"Response Headers: {r.headers}\n"
@@ -227,7 +263,7 @@ def snap(camera_name, camera_config: Dict):
         logging.info(f"{camera_name}: Fetching new picture.")
         if url is not None:
             ua = global_config.get("user_agent", "")
-            return get_pic_from_url(url, timeout, ua)
+            return get_pic_from_url(url, timeout, ua, camera_config, global_config)
         if local_command is not None:
             return get_pic_from_local_command(
                 local_command, timeout, camera_name, camera_config
