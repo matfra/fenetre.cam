@@ -181,8 +181,12 @@ def archive_daydir(
             create_timelapse(
                 dir=daydir,
                 overwrite=True,
-                two_pass=global_config.get("ffmpeg_2pass", False),
+                log_dir=global_config.get("log_dir"),
+                two_pass=timelapse_config.get("ffmpeg_2pass", False),
                 dry_run=dry_run,
+                ffmpeg_options=timelapse_config.get("ffmpeg_options"),
+                file_extension=timelapse_config.get("file_extension")
+
             )
         else:
             logging.warning(f"{daydir} does not contain a timelapse file.")
@@ -196,8 +200,8 @@ def archive_daydir(
 def main(argv):
     del argv  # Unused.
 
-    global cameras_config, global_config
-    _, cameras_config, global_config, _ = config_load(FLAGS.config)
+    global cameras_config, global_config, timelapse_config
+    _, cameras_config, global_config, _, timelapse_config = config_load(FLAGS.config)
     global_config["pic_dir"] = os.path.join(global_config["work_dir"], "photos")
 
     log_dir = global_config.get("log_dir")

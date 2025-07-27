@@ -65,6 +65,23 @@ timelapse_queue_file = None
 timelapse_queue_lock = threading.Lock()
 
 
+def interruptible_sleep(duration: float, event: threading.Event, check_interval: float = 1.0):
+    """Sleeps for a given duration, but checks an event periodically."""
+    if duration <= 0:
+        return
+
+    end_time = time.time() + duration
+    while time.time() < end_time:
+        if event.is_set():
+            break
+
+        remaining_time = end_time - time.time()
+        sleep_duration = min(check_interval, remaining_time)
+
+        if sleep_duration > 0:
+            time.sleep(sleep_duration)
+
+
 def log_camera_error(camera_name: str, error_message: str, global_config: Dict):
     """Logs an error message to a camera-specific log file."""
     log_dir = global_config.get("log_dir")
@@ -368,7 +385,7 @@ def snap(camera_name, camera_config: Dict):
             current_sleep_interval
         )
         logging.info(f"{camera_name}: Sleeping {current_sleep_interval}s")
-        time.sleep(current_sleep_interval)
+        interruptible_sleep(current_sleep_interval, exit_event)
 
         start_time = time.time()
         new_pic_dir, new_pic_filename = get_pic_dir_and_filename(camera_name)
@@ -391,7 +408,7 @@ def snap(camera_name, camera_config: Dict):
             logging.warning(error_msg)
             log_camera_error(camera_name, error_msg, global_config)
             metric_capture_failures_total.labels(camera_name=camera_name).inc()
-            time.sleep(5)
+            interruptible_sleep(5, exit_event)
             continue
         new_exif = new_pic.info.get("exif") or b""
         if new_pic is None:
@@ -645,7 +662,7 @@ def create_and_start_and_watch_thread(
                     metric_capture_failures_total.labels(
                         camera_name=camera_name_for_management
                     ).inc()
-                time.sleep(exp_backoff_delay)
+                interruptible_sleep(exp_backoff_delay, exit_event)
 
             failure_count += 1
             last_failure = datetime.now()
@@ -656,7 +673,7 @@ def create_and_start_and_watch_thread(
                 logging.error(f"Failed to start thread {name}: {e}", exc_info=True)
                 thread_instance = None  # Ensure we try to restart it
 
-        time.sleep(5)  # Check every 5 seconds
+        interruptible_sleep(5, exit_event)  # Check every 5 seconds
 
 
 def update_cameras_metadata(cameras_configs: Dict, work_dir: str):
@@ -1126,7 +1143,7 @@ def timelapse_scheduler_loop():
                 with open(timelapse_queue_file, "a") as f:
                     f.write(f"{pic_dir}\n")
         logging.info(f"Timelapse scheduler sleeping for {interval} seconds.")
-        time.sleep(interval)
+        interruptible_sleep(interval, exit_event)
 
 
 def timelapse_loop():
@@ -1146,7 +1163,6 @@ def timelapse_loop():
                     f.writelines(lines)
 
         if dir_to_process:
-            result = False
             try:
                 result = create_timelapse(
                     dir=dir_to_process,
@@ -1163,14 +1179,18 @@ def timelapse_loop():
                     metric_timelapses_created_total.labels(
                         camera_name=camera_name
                     ).inc()
-
+                else:
+                    logging.error(
+                        f"There was an error creating the timelapse for dir: {dir_to_process}"
+                    )
             except FileExistsError:
                 logging.warning(
                     f"Found an existing timelapse in dir {dir_to_process}, Skipping."
                 )
-            if result is False:
+            except Exception as e:
                 logging.error(
-                    f"There was an error creating the timelapse for dir: {dir_to_process}"
+                    f"There was an error creating the timelapse for dir: {dir_to_process}: {e}",
+                    exc_info=True,
                 )
         time.sleep(1)
 
@@ -1238,7 +1258,7 @@ def disk_management_loop():
                 logging.info(
                     f"Camera {camera_name} is over its limit of {camera_limit_gb} GB. Current size: {current_size_bytes / (1024**3):.2f} GB. Deleting oldest directories."
                 )
-                subdirs = sorted([d.path for d in os.scandir(camera_dir) if d.is_dir()])
+                subdirs = sorted([d.path for d in os.scandir(camera_dir) if d.is_dir() and d.name != "daylight"])
                 for subdir in subdirs:
                     if current_size_bytes <= limit_bytes:
                         break
@@ -1272,10 +1292,10 @@ def disk_management_loop():
                     camera_dir = os.path.join(global_config["pic_dir"], camera_name)
                     if os.path.isdir(camera_dir):
                         all_day_dirs.extend(
-                            [d.path for d in os.scandir(camera_dir) if d.is_dir()]
+                            [d.path for d in os.scandir(camera_dir) if d.is_dir() and d.name != "daylight"]
                         )
 
-                all_day_dirs.sort()
+                all_day_dirs.sort(key=lambda x: os.path.basename(x))
 
                 for day_dir in all_day_dirs:
                     if current_work_dir_size <= global_limit_bytes:
@@ -1293,7 +1313,7 @@ def disk_management_loop():
                     current_work_dir_size -= dir_to_delete_size
 
         logging.debug(f"Disk management sleeping for {interval} seconds.")
-        time.sleep(interval)
+        interruptible_sleep(interval, exit_event)
 
 
 def archive_loop():
@@ -1309,7 +1329,7 @@ def archive_loop():
                 archive_daydir(
                     daydir=daydir, global_config=global_config, cam=camera_name, sky_area=camera_config.get("sky_area"), dry_run=False
                 )
-        time.sleep(600)
+        interruptible_sleep(600, exit_event)
 
 
 def run():
