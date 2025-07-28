@@ -7,6 +7,7 @@ import signal
 import subprocess
 import threading
 import time
+import sys
 from collections import deque
 from datetime import datetime, timedelta
 from functools import partial
@@ -39,7 +40,7 @@ from fenetre.archive import archive_daydir, list_unarchived_dirs, scan_and_publi
 from fenetre.config import config_load
 from fenetre.daylight import run_end_of_day
 from fenetre.gopro_utility import GoProUtilityThread, format_gopro_sd_card
-from fenetre.platform_utils import is_raspberry_pi
+from fenetre.platform_utils import is_raspberry_pi, rotate_log_file
 from fenetre.postprocess import gather_metrics, postprocess
 from fenetre.timelapse import create_timelapse
 from fenetre.ui_utils import copy_public_html_files
@@ -64,7 +65,40 @@ timelapse_queue_file = None
 timelapse_queue_lock = threading.Lock()
 
 
-def get_pic_from_url(url: str, timeout: int, ua: str = "", camera_config: Dict = None, global_config: Dict = None) -> Image.Image:
+def interruptible_sleep(duration: float, event: threading.Event, check_interval: float = 1.0):
+    """Sleeps for a given duration, but checks an event periodically."""
+    if duration <= 0:
+        return
+
+    end_time = time.time() + duration
+    while time.time() < end_time:
+        if event.is_set():
+            break
+
+        remaining_time = end_time - time.time()
+        sleep_duration = min(check_interval, remaining_time)
+
+        if sleep_duration > 0:
+            time.sleep(sleep_duration)
+
+
+def log_camera_error(camera_name: str, error_message: str, global_config: Dict):
+    """Logs an error message to a camera-specific log file."""
+    log_dir = global_config.get("log_dir")
+    if not log_dir:
+        return
+
+    os.makedirs(log_dir, exist_ok=True)
+    log_file_path = os.path.join(log_dir, f"{camera_name}.log")
+    rotate_log_file(log_file_path)
+    with open(log_file_path, "a") as f:
+        f.write(f"Timestamp: {datetime.now().isoformat()}\n")
+        f.write(f"ERROR: {error_message}\n")
+        f.write("-" * 20 + "\n")
+
+
+def get_pic_from_url(url: str, timeout: int, ua: str = "", camera_name: str = "", camera_config: Dict = None, global_config: Dict = None) -> Image.Image:
+
     if camera_config is None:
         camera_config = {}
     if global_config is None:
@@ -95,12 +129,9 @@ def get_pic_from_url(url: str, timeout: int, ua: str = "", camera_config: Dict =
     log_dir = global_config.get("log_dir")
     if log_dir:
         os.makedirs(log_dir, exist_ok=True)
-        log_file_path = os.path.join(log_dir, "url_requests.log")
-        if os.path.exists(log_file_path) and (datetime.now() - datetime.fromtimestamp(os.path.getmtime(log_file_path))).days > 1:
-            old_log_file_path = log_file_path + ".1"
-            if os.path.exists(old_log_file_path):
-                os.remove(old_log_file_path)
-            os.rename(log_file_path, old_log_file_path)
+        log_file_name = f"{camera_name}.log" if camera_name else "url_requests.log"
+        log_file_path = os.path.join(log_dir, log_file_name)
+        rotate_log_file(log_file_path)
         with open(log_file_path, "a") as f:
             f.write(f"Timestamp: {datetime.now().isoformat()}\n")
             f.write(log_message + "\n")
@@ -165,12 +196,7 @@ def get_pic_from_local_command(
             log_dir,
             f"{camera_name}.log",
         )
-        # If the file was created more than 24 hours ago, rename it to camera_name.log.1
-        if os.path.exists(log_file_path) and (datetime.now() - datetime.fromtimestamp(os.path.getmtime(log_file_path))).days > 1:
-            old_log_file_path = log_file_path + ".1"
-            if os.path.exists(old_log_file_path):
-                os.remove(old_log_file_path)
-            os.rename(log_file_path, old_log_file_path)
+        rotate_log_file(log_file_path)
         with open(log_file_path, "a") as log_file:
             s = subprocess.run(
                 cmd.split(" "),
@@ -263,7 +289,7 @@ def snap(camera_name, camera_config: Dict):
         logging.info(f"{camera_name}: Fetching new picture.")
         if url is not None:
             ua = global_config.get("user_agent", "")
-            return get_pic_from_url(url, timeout, ua, camera_config, global_config)
+            return get_pic_from_url(url, timeout, ua, camera_name, camera_config, global_config)
         if local_command is not None:
             return get_pic_from_local_command(
                 local_command, timeout, camera_name, camera_config
@@ -292,7 +318,13 @@ def snap(camera_name, camera_config: Dict):
     # Initialization before the main loop
     previous_pic_dir, previous_pic_filename = get_pic_dir_and_filename(camera_name)
     previous_pic_fullpath = os.path.join(previous_pic_dir, previous_pic_filename)
-    previous_pic = capture()
+    try:
+        previous_pic = capture()
+    except Exception as e:
+        error_msg = f"Failed to capture initial image for {camera_name}: {e}"
+        logging.error(error_msg, exc_info=True)
+        log_camera_error(camera_name, error_msg, global_config)
+        raise
     previous_exif = previous_pic.info.get("exif") or b""
     if len(camera_config.get("postprocessing", [])) > 0:
         previous_pic, previous_exif = postprocess(
@@ -353,7 +385,7 @@ def snap(camera_name, camera_config: Dict):
             current_sleep_interval
         )
         logging.info(f"{camera_name}: Sleeping {current_sleep_interval}s")
-        time.sleep(current_sleep_interval)
+        interruptible_sleep(current_sleep_interval, exit_event)
 
         start_time = time.time()
         new_pic_dir, new_pic_filename = get_pic_dir_and_filename(camera_name)
@@ -369,7 +401,15 @@ def snap(camera_name, camera_config: Dict):
                 )
             )
 
-        new_pic = capture()
+        try:
+            new_pic = capture()
+        except Exception as e:
+            error_msg = f"Could not fetch picture for {camera_name}: {e}"
+            logging.warning(error_msg)
+            log_camera_error(camera_name, error_msg, global_config)
+            metric_capture_failures_total.labels(camera_name=camera_name).inc()
+            interruptible_sleep(5, exit_event)
+            continue
         new_exif = new_pic.info.get("exif") or b""
         if new_pic is None:
             logging.warning(f"{camera_name}: Could not fetch picture.")
@@ -622,7 +662,7 @@ def create_and_start_and_watch_thread(
                     metric_capture_failures_total.labels(
                         camera_name=camera_name_for_management
                     ).inc()
-                time.sleep(exp_backoff_delay)
+                interruptible_sleep(exp_backoff_delay, exit_event)
 
             failure_count += 1
             last_failure = datetime.now()
@@ -633,7 +673,7 @@ def create_and_start_and_watch_thread(
                 logging.error(f"Failed to start thread {name}: {e}", exc_info=True)
                 thread_instance = None  # Ensure we try to restart it
 
-        time.sleep(5)  # Check every 5 seconds
+        interruptible_sleep(5, exit_event)  # Check every 5 seconds
 
 
 def update_cameras_metadata(cameras_configs: Dict, work_dir: str):
@@ -721,9 +761,9 @@ def main(argv):
     # Setup signal handling for SIGHUP for config reload and SIGINT/SIGTERM for graceful exit
     signal.signal(signal.SIGHUP, handle_sighup)
     signal.signal(signal.SIGINT, signal_handler_exit)  # Graceful exit on Ctrl+C
-    signal.signal(
-        signal.SIGTERM, signal_handler_exit
-    )  # Graceful exit on kill/systemd stop
+#    signal.signal(
+#        signal.SIGTERM, signal_handler_exit
+#    )  # Graceful exit on kill/systemd stop
 
     # Initialize global sleep_intervals (important for camera threads)
     global sleep_intervals
@@ -1008,6 +1048,9 @@ def handle_sighup(signum, frame):
 def signal_handler_exit(signum, frame):
     """Signal handler for SIGINT and SIGTERM to gracefully shut down."""
     signal_name = signal.Signals(signum).name
+    if exit_event.is_set():
+        logging.warning(f"Forcing shutdown.")
+        sys.exit(0)
     logging.info(f"{signal_name} received. Initiating graceful shutdown...")
     exit_event.set()  # Signal all threads to exit
     # The main loop's finally block will call shutdown_application()
@@ -1100,7 +1143,7 @@ def timelapse_scheduler_loop():
                 with open(timelapse_queue_file, "a") as f:
                     f.write(f"{pic_dir}\n")
         logging.info(f"Timelapse scheduler sleeping for {interval} seconds.")
-        time.sleep(interval)
+        interruptible_sleep(interval, exit_event)
 
 
 def timelapse_loop():
@@ -1120,7 +1163,6 @@ def timelapse_loop():
                     f.writelines(lines)
 
         if dir_to_process:
-            result = False
             try:
                 result = create_timelapse(
                     dir=dir_to_process,
@@ -1137,14 +1179,18 @@ def timelapse_loop():
                     metric_timelapses_created_total.labels(
                         camera_name=camera_name
                     ).inc()
-
+                else:
+                    logging.error(
+                        f"There was an error creating the timelapse for dir: {dir_to_process}"
+                    )
             except FileExistsError:
                 logging.warning(
                     f"Found an existing timelapse in dir {dir_to_process}, Skipping."
                 )
-            if result is False:
+            except Exception as e:
                 logging.error(
-                    f"There was an error creating the timelapse for dir: {dir_to_process}"
+                    f"There was an error creating the timelapse for dir: {dir_to_process}: {e}",
+                    exc_info=True,
                 )
         time.sleep(1)
 
@@ -1212,7 +1258,7 @@ def disk_management_loop():
                 logging.info(
                     f"Camera {camera_name} is over its limit of {camera_limit_gb} GB. Current size: {current_size_bytes / (1024**3):.2f} GB. Deleting oldest directories."
                 )
-                subdirs = sorted([d.path for d in os.scandir(camera_dir) if d.is_dir()])
+                subdirs = sorted([d.path for d in os.scandir(camera_dir) if d.is_dir() and d.name != "daylight"])
                 for subdir in subdirs:
                     if current_size_bytes <= limit_bytes:
                         break
@@ -1246,10 +1292,10 @@ def disk_management_loop():
                     camera_dir = os.path.join(global_config["pic_dir"], camera_name)
                     if os.path.isdir(camera_dir):
                         all_day_dirs.extend(
-                            [d.path for d in os.scandir(camera_dir) if d.is_dir()]
+                            [d.path for d in os.scandir(camera_dir) if d.is_dir() and d.name != "daylight"]
                         )
 
-                all_day_dirs.sort()
+                all_day_dirs.sort(key=lambda x: os.path.basename(x))
 
                 for day_dir in all_day_dirs:
                     if current_work_dir_size <= global_limit_bytes:
@@ -1267,7 +1313,7 @@ def disk_management_loop():
                     current_work_dir_size -= dir_to_delete_size
 
         logging.debug(f"Disk management sleeping for {interval} seconds.")
-        time.sleep(interval)
+        interruptible_sleep(interval, exit_event)
 
 
 def archive_loop():
@@ -1283,7 +1329,7 @@ def archive_loop():
                 archive_daydir(
                     daydir=daydir, global_config=global_config, cam=camera_name, sky_area=camera_config.get("sky_area"), dry_run=False
                 )
-        time.sleep(600)
+        interruptible_sleep(600, exit_event)
 
 
 def run():

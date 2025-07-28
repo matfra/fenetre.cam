@@ -1,3 +1,4 @@
+import glob
 import json
 import os
 import subprocess
@@ -7,7 +8,7 @@ from datetime import datetime
 from absl import app, flags, logging
 from PIL import Image
 
-from fenetre.platform_utils import is_raspberry_pi
+from fenetre.platform_utils import is_raspberry_pi, rotate_log_file
 from io import TextIOWrapper
 
 
@@ -34,27 +35,27 @@ def create_timelapse(
     if not os.path.exists(dir):
         raise FileNotFoundError(dir)
 
-    image_files = sorted([f for f in os.listdir(dir) if f.lower().endswith(".jpg")])
-    if not image_files:
-        logging.error(f"No JPG images found in {dir}.")
+    image_files = glob.glob(os.path.join(dir, "*.jpg"))
+    images_count = len(image_files)
+    if images_count == 0:
+        logging.error(f"No jpg images found in {dir}.")
+        print("Nothing found")
         return False
 
     # Delete 0-byte images
-    for image_file in image_files:
-        image_path = os.path.join(dir, image_file)
+    for image_path in image_files:
         if os.path.getsize(image_path) == 0:
             logging.warning(f"Deleting 0-byte image: {image_path}")
             os.remove(image_path)
-            image_files.remove(image_file)
+            images_count -= 1
 
-    if not image_files:
+    if images_count < 1:
         logging.error(
-            f"No valid JPG images found in {dir} after removing 0-byte files."
+            f"No valid jpg images found in {dir} after removing 0-byte files."
         )
         return False
 
-    first_image_path = os.path.join(dir, image_files[0])
-    width, height = get_image_dimensions(first_image_path)
+    width, height = get_image_dimensions(image_files[0])
 
     if is_raspberry_pi():
         default_encoder_options = "-c:v h264_v4l2m2m -b:v 5M"
@@ -97,12 +98,7 @@ def create_timelapse(
     if log_dir:
         os.makedirs(log_dir, exist_ok=True)
         ffmpeg_log_filepath = os.path.join(log_dir, "ffmpeg.log")
-        # If the file was created more than 24 hours ago, rename it to ffmpeg.log.1
-        if os.path.exists(ffmpeg_log_filepath) and (datetime.now() - datetime.fromtimestamp(os.path.getmtime(ffmpeg_log_filepath))).days > 1:
-            old_ffmpeg_log_filepath = ffmpeg_log_filepath + ".1"
-            if os.path.exists(old_ffmpeg_log_filepath):
-                os.remove(old_ffmpeg_log_filepath)
-            os.rename(ffmpeg_log_filepath, old_ffmpeg_log_filepath)
+        rotate_log_file(ffmpeg_log_filepath)
         ffmpeg_log_stream = open(ffmpeg_log_filepath, "a")
         logging.info(f"FFmpeg log file: {ffmpeg_log_filepath}")
     else:

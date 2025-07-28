@@ -389,18 +389,16 @@ def generate_html_browser(camera_dir: str):
     HTML_FILE = os.path.join(camera_dir, "daylight.html")
     with open(HTML_FILE, "w") as f:
         f.write(
-            f.write(
-                dump_html_header(
-                    title=f"{camera_name} daylight browser",  # f-string for title
-                    additional_headers="""
-                <style>
-                </style>""",
-                )
-                + """
-        <body>
-            <div class="right">
-                """
+            dump_html_header(
+                title=f"{camera_name} daylight browser",  # f-string for title
+                additional_headers="""
+            <style>
+            </style>""",
             )
+            + """
+    <body>
+        <div class="right">
+            """
         )
 
         # Generate time labels (0 AM to 11 PM)

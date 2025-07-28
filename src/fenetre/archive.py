@@ -29,11 +29,10 @@ def scan_and_publish_metrics(camera_name: str, camera_dir: str, global_config: d
     archived_count = 0
     timelapse_count = 0
     daylight_count = 0
-    timelapse_ext = global_config.get("timelapse_file_extension", "mp4")
     for subdir in subdirs:
         if os.path.exists(os.path.join(subdir, "archived")):
             archived_count += 1
-        if check_dir_has_timelapse(subdir, timelapse_ext):
+        if check_dir_has_timelapse(subdir):
             timelapse_count += 1
         if check_dir_has_daylight_band(subdir):
             daylight_count += 1
@@ -117,14 +116,15 @@ def list_unarchived_dirs(camera_dir, archived_marker_file="archived"):
     return res
 
 
-def check_dir_has_timelapse(daydir, timelapse_video_ext="mp4"):
+def check_dir_has_timelapse(daydir):
     subdirectory = os.path.basename(daydir)
-    timelapse_filepath = os.path.join(daydir, f"{subdirectory}.{timelapse_video_ext}")
-    if not os.path.isfile(timelapse_filepath):
+    for timelapse_video_ext in ["mp4", "webm"]:
+        timelapse_filepath = os.path.join(daydir, f"{subdirectory}.{timelapse_video_ext}")
+        if not os.path.isfile(timelapse_filepath):
+            return False
+        if os.path.getsize(timelapse_filepath) > 1024 * 1024:
+            return True
         return False
-    if os.path.getsize(timelapse_filepath) > 1024 * 1024:
-        return True
-    return False
 
 
 def check_dir_has_daylight_band(daydir):
@@ -175,16 +175,18 @@ def archive_daydir(
         return False
 
     # Check if the subdirectory contains a file name daylight.png and a file named $year-$month-$day.webm.
-    if not check_dir_has_timelapse(
-        daydir, global_config.get("timelapse_file_extension", "mp4")
-    ):
+    if not check_dir_has_timelapse(daydir):
         if create_timelapses:
             logging.info(f"Creating timelapse for {daydir}")
             create_timelapse(
                 dir=daydir,
                 overwrite=True,
-                two_pass=global_config.get("ffmpeg_2pass", False),
+                log_dir=global_config.get("log_dir"),
+                two_pass=timelapse_config.get("ffmpeg_2pass", False),
                 dry_run=dry_run,
+                ffmpeg_options=timelapse_config.get("ffmpeg_options"),
+                file_extension=timelapse_config.get("file_extension")
+
             )
         else:
             logging.warning(f"{daydir} does not contain a timelapse file.")
@@ -198,8 +200,8 @@ def archive_daydir(
 def main(argv):
     del argv  # Unused.
 
-    global cameras_config, global_config
-    _, cameras_config, global_config, _ = config_load(FLAGS.config)
+    global cameras_config, global_config, timelapse_config
+    _, cameras_config, global_config, _, timelapse_config = config_load(FLAGS.config)
     global_config["pic_dir"] = os.path.join(global_config["work_dir"], "photos")
 
     log_dir = global_config.get("log_dir")
