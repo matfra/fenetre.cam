@@ -286,7 +286,7 @@ class GoProUtilityThread(threading.Thread):
         camera_config: Dict,
         exit_event: threading.Event,
     ):
-        from gopro import GoPro
+        from fenetre.gopro import GoPro
         super().__init__(
             name=f"{camera_config.get('name', 'gopro')}_utility_thread", daemon=True
         )
