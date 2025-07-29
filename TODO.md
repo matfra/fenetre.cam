@@ -12,10 +12,6 @@
 - Tested hardware
 - Tested picture sources
 
-### Testing and integration
-- Working Dockerfile and docker-compose
-Testing
-- Raspberry pi zero deployment
 
 ### Daylight
 - On the daylight.html, there should be a top banner saying: average color of the sky for {camera_name}. Also a link to come back to the camera view
@@ -24,11 +20,17 @@ Testing
 - Refine UX. List of view:
   - index with redirect to selected view
   - fullscreen
-    - window title
+    - window title. From config file, otherwise take hostname
     - favicon
   - map
   - list
+    - On the list view, there should be a details button that unfold information about the camera:
+      - Link to original URL
+      - Polling frequency
+      - The status button should be based on the polling interval for that camera instead o fbeing hardcoded to N minutes.
   - camera details
+    - Add to yesterday timelapse link
+    - Uniformize the behaviour of the camera details page wheter we come from the map view, the list view and the fullscreen view.
   - daylight year
   - daylight month
   - directory browser
@@ -36,17 +38,19 @@ Testing
 - Add a camera details view for deployments with a single camera
 - If multiple cameras, add a link back to list
 
+### Admin interface.
+- For a given section of configuration, make all the text boxes and buttons side by side to make the view a little bit more compact.
+- Add an option to "fold" sections.
+
 ### Postprocessing
-- Add an option for overlay that shows the progression of the day with blue yellow gradient
-  - Add an option for alternative data display on that overlay (solar power, EXIF infos, temperature, humidity)
+- Add an option for small overlay image that shows the progression of the time throughout the as a marker on top of a blue yellow gradient. The gradient will be based on the camera location if setup.
+- Add an option for alternative data display on that overlay (solar power, EXIF infos, temperature, humidity)
 
-UI:
-On the list view, there should be a details button that unfold information about the camera:
-- Link to original URL
-- Polling frequency
+### Raspberry Pi specific:
+- Implement native libcamera python functions instead of relying on libcamera-still
+- Raspberry pi zero deployment
 
-The status button should be based on the polling interval for that camera instead o fbeing hardcoded to N minutes.
 
-- Add to yesterday timelapse link
-
-Cliking on the picture from unfolded list view should pull up the fullscreen mode.
+### Testing and integration
+- Working Dockerfile and docker-compose
+Testing

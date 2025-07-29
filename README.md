@@ -1,18 +1,25 @@
 # fenetre
 
-Takes pictures periodically ( Raspberry Pi camera, GoPro, local command or any URL), make timelapse and publish them on a self-hosted website. Try it with you own cameras! Example: https://fenetre.cam
+Takes pictures periodically, build timelapses, archive the footage and share it on a self-hosted website. Check it out at https://fenetre.cam or try it with your own cameras!
 
 
-This is the inspired by https://github.com/matfra/isitfoggy.today and https://github.com/matfra/camaredn
-
-This is mostly written in Python and meant to run on Linux in a virtualenv or in docker.
-
-Currently supported picture sources:
-- any local command yielding an image format supported by PIL https://pillow.readthedocs.io/en/latest/reference/features.html#features-module
-- GoPro Hero 9+ via Bluetooth + WiFi with https://gopro.github.io/OpenGoPro/
-- Raspberry Pi camera (tested with v2 and HQ)
+## Features
+- Support taking pictures from:
+  - Raspberry Pi camera, GoPro Hero 9+, local command or any URL)
+  - GoPro Hero 9+ via Bluetooth + WiFi with https://gopro.github.io/OpenGoPro/
+  - Raspberry Pi camera (tested with v2 and HQ)
+  - any local command yielding an image format supported by PIL https://pillow.readthedocs.io/en/latest/reference/features.html#features-module
+- Fixed interval or dynamic intervals (sunrise, sunset or fast changing landscape)
+- Continuous timelapses (every 20 minutes) + daily high quality ones.
+- Daylight browser to browser years of footage easily.
+- Produces a fully static website, easy to self-host and put behind Cloudflare.
+- Janky admin interface to help adjust picture settings
+- Premetheus exporter to collect metrics for monitoring
 
 ## Installation
+
+This is mostly written in Python and it's been tested on Linux but it could run on MacOS and Windows too.
+
 
 1.  **Clone the repository:**
     ```bash
@@ -31,6 +38,7 @@ Currently supported picture sources:
     ```bash
     pip install -e .
     ```
+
 
 ## Usage
 
@@ -52,159 +60,4 @@ You must provide the path to a configuration file using the `--config` flag. A s
 
 The application will start, and based on your configuration, it will begin capturing images.
 
-## TODO:
-
-
-### UI:
-- Each camera should have a main visualization page
-- If cameras don't have coordinates (lat and lon), don't display the map. Display only the right panel
-
-### Utility
-- Enforce the disk usage limits
-- Add an http listener for a prometheus exporter
-- Create counters for the number of pictures taken since start for each camera
-- Create counters for the size of each camera directory
-
-### Picture capture:
-- Implement native libcamera python functions instead of relying on libcamera-still
-- Add a preprocessing stage based on the previous picture to customize settings for the next picture
-- Add a postprocessing stage with basic features to crop, resize, correct AWB, etc.
-- Add support for time of day (day/sunset/sunrise/night) for different frequency and settings/profiles
-
-### GoPro
-- Add the ability to enable Wi-Fi AP on a GoPro using Bluetooth
-- Fix unittests with the correct paths
-- Create a custom photo profile
-- Use the Python SDK https://gopro.github.io/OpenGoPro/python_sdk/api.html
-
-## Configuration Management Interface
-
-Fenetre now includes a separate HTTP server for managing its configuration (`config.yaml`) dynamically. This allows for viewing, updating, and reloading the application's configuration without needing to restart the main `fenetre.py` process.
-
-**By default, the configuration server runs on `http://0.0.0.0:8889`.**
-
-### Prerequisites
-
-1.  **Install Flask**: If not already installed, add `Flask` to your `requirements.txt` and install it:
-    ```bash
-    pip install Flask PyYAML
-    ```
-
-2.  **Running `config_server.py`**:
-    The configuration server (`config_server.py`) must be run as a separate process alongside the main `fenetre.py` application.
-    ```bash
-    python config_server.py
-    ```
-    You can configure its host, port, the path to `config.yaml`, and the path to `fenetre.pid` using environment variables:
-    *   `CONFIG_SERVER_HOST` (default: `0.0.0.0`)
-    *   `CONFIG_SERVER_PORT` (default: `8889`)
-    *   `CONFIG_FILE_PATH` (default: `config.yaml`) - This should point to the same `config.yaml` used by `fenetre.py`.
-    *   `FENETRE_PID_FILE` (default: `fenetre.pid`) - `fenetre.py` writes its process ID here, which the config server uses to send a reload signal. Ensure this path is consistent between both processes.
-
-### Web UI for Configuration
-
-A web-based UI is provided to easily view and edit the configuration.
-
-*   **Accessing the UI**: Once `config_server.py` is running (see above), open your browser and navigate to:
-    ```
-    http://<config_server_host>:<config_server_port>/ui
-    ```
-    For example, if running locally with defaults: `http://localhost:8889/ui`
-
-*   **Features**:
-    *   **Load Current Config**: Fetches the active `config.yaml` and dynamically renders an editable form.
-    *   **Edit Values**: Modify configuration values directly in the form. Handles nested objects and arrays.
-    *   **Add/Remove Array Items**: Basic support for adding new items to arrays and removing existing ones.
-    *   **Save to config.yaml**: Saves the current state of the form back to `config.yaml` on the server (converts UI form data to JSON, then server converts JSON to YAML).
-    *   **Reload Application Config**: Sends a signal to the main `fenetre.py` process to reload and apply the updated `config.yaml`.
-    *   **Link to Visual Crop Tool**: Provides a link to a visual tool for defining crop areas.
-
-#### Visual Crop Configuration Tool
-
-Accessible from the main configuration UI, this tool helps visually define crop areas for cameras.
-
-*   **Access**: Navigate from the main config UI (`/ui`) to the "Visual Crop Configuration Tool" (typically `/static/visual_config.html`).
-*   **Functionality**:
-    1.  **Select Camera**: Choose a URL-based camera from the dropdown.
-    2.  **Fetch Image**: Click "Fetch & Display Image" to load the current image from the camera's URL.
-        *   The image is displayed, potentially scaled to fit your screen.
-        *   Information about the image's **natural (original) size** and the current **display scale factor** is shown.
-    3.  **Define Areas**:
-        *   **Crop Area (Red Rectangle)**: Input fields for X1, Y1, X2, Y2 are initialized to the full *displayed* image dimensions.
-        *   **Sky Area (Cyan Rectangle, Optional)**: Enable via checkbox. If a `sky_area` exists in `config.yaml`, its coordinates (from natural image dimensions) are loaded and converted to the current *displayed* image coordinates for the input fields.
-        *   **SSIM Area (Yellow Rectangle, Optional)**: Enable via checkbox. Similar loading and scaling logic as Sky Area.
-        *   As you adjust the X1,Y1,X2,Y2 input fields for any area:
-            *   The corresponding colored rectangle on the canvas updates instantly.
-            *   A display below each area's inputs shows the **calculated natural (real pixel) coordinates** that would result from your current UI selection, based on the image's display scale.
-    4.  **Window Resize**: If you resize your browser window while an image is displayed:
-        *   The displayed image will resize to fit the new layout.
-        *   The scale factor display will update.
-        *   The X1,Y1,X2,Y2 input fields for all active areas will automatically adjust their values so that the drawn rectangles maintain their position and coverage relative to the **actual image content**.
-        *   The displayed natural coordinates will remain consistent, reflecting the true selection on the original image.
-    5.  **Preview Crop**: Click "Preview Crop". This uses the **Crop Area's** current UI coordinates, scales them to natural image dimensions, and requests a preview from the server. The cropped image is displayed vertically below the original.
-    6.  **Apply to Configuration**: Click "Apply Visual Settings" (or similar button name). This will:
-        *   Fetch the latest full `config.yaml` content.
-        *   Use the **stored natural coordinates** (derived from your UI inputs and scaling) for Crop, Sky, and SSIM areas to update the configuration.
-        *   For Crop Area: Updates the `postprocessing` array.
-        *   For Sky/SSIM Areas: Updates or removes the `sky_area` / `ssim_area` fields directly on the camera object.
-        *   The entire modified configuration is saved back to `config.yaml`.
-    7.  **Reload**: After applying, use the "Reload Application Config" button on the main configuration UI to make `fenetre.py` pick up changes.
-*   **Layout**: The original image (with drawn rectangles) and the cropped preview image are displayed vertically.
-*   **Current Limitations**:
-    *   The image fetching for the visual tool primarily supports URL-based cameras.
-
-### API Endpoints
-
-*   **`GET /config`**
-    *   Retrieves the current content of `config.yaml`.
-    *   **Response**: `200 OK` with JSON body of the configuration (used by the Web UI).
-
-*   **`PUT /config`**
-    *   Updates `config.yaml` with the provided JSON data in the request body.
-    *   **Request Body**: Raw JSON content. The server converts this to YAML before saving.
-    *   **Response**: `200 OK` with `{"message": "Configuration updated successfully (saved as YAML). Reload is required to apply changes."}`.
-    *   **Note**: This only updates the file on disk. A subsequent call to `/config/reload` (via API or UI button) is needed to make the running `fenetre.py` application apply these changes.
-
-*   **`POST /config/reload`**
-    *   Signals the main `fenetre.py` process to reload its configuration from `config.yaml`.
-    *   `fenetre.py` will attempt to apply changes, which may include:
-        *   Updating global settings.
-        *   Starting/stopping threads for added/removed cameras.
-        *   Restarting the main file-serving HTTP server if its configuration (e.g., port) changed.
-        *   Updating `snap_interval_s` for existing cameras.
-    *   **Response**: `200 OK` with `{"message": "Reload signal sent to process <pid>."}` if successful.
-    *   **Important**: The main `fenetre.py` application must be running and have successfully written its PID to the `FENETRE_PID_FILE` (default: `fenetre.pid`) for the reload signal to be sent.
-
-### Example Workflow (using `curl`)
-
-1.  **View current configuration**:
-    ```bash
-    curl http://localhost:8889/config
-    ```
-
-2.  **Update configuration**:
-    Save your new configuration to a file, e.g., `new_config.json` (note it should be JSON).
-    ```bash
-    curl -X PUT -H "Content-Type: application/json" --data-binary "@new_config.json" http://localhost:8889/config
-    ```
-
-3.  **Reload configuration in `fenetre.py`**:
-    ```bash
-    curl -X POST http://localhost:8889/config/reload
-    ```
-
-### Limitations of Dynamic Reload
-
-*   While many settings can be reloaded dynamically, changes to certain fundamental aspects of existing, active camera threads (e.g., changing a camera's `url` or `postprocessing` steps) might not fully apply without a full restart of `fenetre.py`. The reload mechanism primarily handles adding/removing cameras, updating global settings, and specific dynamic parameters like `snap_interval_s`.
-*   The timelapse and daylight processing loops currently pick up changes to `global_config` (like `ffmpeg_options`) upon their next iteration but are not fully restarted.
-
-
-# Manual notes:
-If on Raspberry Pi using a Pi camera, you need to use the python system package for libcamera2
-
-```
-sudo apt install python3-numpy python3-picamera2
-
-python -m venv --system-site-packages venv
-./venv/bin/pip install -r requirements.txt
-```
+**By default, the admin server runs on `http://0.0.0.0:8889`.**
