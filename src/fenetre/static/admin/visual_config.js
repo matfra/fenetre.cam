@@ -72,22 +72,50 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function setupCoordinateInputListeners() {
         const inputs = [
-            { el: cropX1Input, area: 'crop', coord: 'x1' }, { el: cropY1Input, area: 'crop', coord: 'y1' },
-            { el: cropX2Input, area: 'crop', coord: 'x2' }, { el: cropY2Input, area: 'crop', coord: 'y2' },
-            { el: skyX1Input, area: 'sky', coord: 'x1' }, { el: skyY1Input, area: 'sky', coord: 'y1' },
-            { el: skyX2Input, area: 'sky', coord: 'x2' }, { el: skyY2Input, area: 'sky', coord: 'y2' },
-            { el: ssimX1Input, area: 'ssim', coord: 'x1' }, { el: ssimY1Input, area: 'ssim', coord: 'y1' },
-            { el: ssimX2Input, area: 'ssim', coord: 'x2' }, { el: ssimY2Input, area: 'ssim', coord: 'y2' }
+            { el: cropX1Input, area: 'crop', coord: 'x1', valueEl: document.getElementById('cropX1Value') },
+            { el: cropY1Input, area: 'crop', coord: 'y1', valueEl: document.getElementById('cropY1Value') },
+            { el: cropX2Input, area: 'crop', coord: 'x2', valueEl: document.getElementById('cropX2Value') },
+            { el: cropY2Input, area: 'crop', coord: 'y2', valueEl: document.getElementById('cropY2Value') },
+            { el: skyX1Input, area: 'sky', coord: 'x1', valueEl: document.getElementById('skyX1Value') },
+            { el: skyY1Input, area: 'sky', coord: 'y1', valueEl: document.getElementById('skyY1Value') },
+            { el: skyX2Input, area: 'sky', coord: 'x2', valueEl: document.getElementById('skyX2Value') },
+            { el: skyY2Input, area: 'sky', coord: 'y2', valueEl: document.getElementById('skyY2Value') },
+            { el: ssimX1Input, area: 'ssim', coord: 'x1', valueEl: document.getElementById('ssimX1Value') },
+            { el: ssimY1Input, area: 'ssim', coord: 'y1', valueEl: document.getElementById('ssimY1Value') },
+            { el: ssimX2Input, area: 'ssim', coord: 'x2', valueEl: document.getElementById('ssimX2Value') },
+            { el: ssimY2Input, area: 'ssim', coord: 'y2', valueEl: document.getElementById('ssimY2Value') }
         ];
         inputs.forEach(item => {
             item.el.addEventListener('input', () => {
-                const uiValue = parseInt(item.el.value) || 0;
-                let naturalValue;
-                if (item.coord === 'x1' || item.coord === 'x2') {
-                    naturalValue = Math.round(uiValue * scaleFactors.x);
-                } else {
-                    naturalValue = Math.round(uiValue * scaleFactors.y);
+                const percentageValue = parseFloat(item.el.value) || 0;
+                
+                // Update the value display
+                if (item.valueEl) {
+                    item.valueEl.textContent = percentageValue.toFixed(1) + '%';
                 }
+                
+                // Convert percentage to natural coordinates
+                let naturalValue;
+                
+                if (item.area === 'crop') {
+                    // Crop area percentages are relative to the full image
+                    if (item.coord === 'x1' || item.coord === 'x2') {
+                        naturalValue = Math.round((percentageValue / 100) * imageDimensions.naturalWidth);
+                    } else {
+                        naturalValue = Math.round((percentageValue / 100) * imageDimensions.naturalHeight);
+                    }
+                } else {
+                    // Sky and SSIM area percentages are relative to the crop area
+                    const cropWidth = naturalAreas.crop.x2 - naturalAreas.crop.x1;
+                    const cropHeight = naturalAreas.crop.y2 - naturalAreas.crop.y1;
+                    
+                    if (item.coord === 'x1' || item.coord === 'x2') {
+                        naturalValue = naturalAreas.crop.x1 + Math.round((percentageValue / 100) * cropWidth);
+                    } else {
+                        naturalValue = naturalAreas.crop.y1 + Math.round((percentageValue / 100) * cropHeight);
+                    }
+                }
+                
                 naturalAreas[item.area][item.coord] = naturalValue;
 
                 drawAllRectangles();
@@ -121,30 +149,37 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        const cx1 = parseInt(cropX1Input.value) || 0;
-        const cy1 = parseInt(cropY1Input.value) || 0;
-        const cx2 = parseInt(cropX2Input.value) || 0;
-        const cy2 = parseInt(cropY2Input.value) || 0;
+        // Convert percentage values to display coordinates for drawing
+        const cx1 = (parseFloat(cropX1Input.value) || 0) * imageDimensions.displayWidth / 100;
+        const cy1 = (parseFloat(cropY1Input.value) || 0) * imageDimensions.displayHeight / 100;
+        const cx2 = (parseFloat(cropX2Input.value) || 0) * imageDimensions.displayWidth / 100;
+        const cy2 = (parseFloat(cropY2Input.value) || 0) * imageDimensions.displayHeight / 100;
         if (!(cx1 === 0 && cy1 === 0 && cx2 === 0 && cy2 === 0)) {
              drawRect(ctx, cx1, cy1, cx2, cy2, 'red');
         }
 
         if (enableSkyAreaCheckbox.checked) {
-            const sx1 = parseInt(skyX1Input.value) || 0;
-            const sy1 = parseInt(skyY1Input.value) || 0;
-            const sx2 = parseInt(skyX2Input.value) || 0;
-            const sy2 = parseInt(skyY2Input.value) || 0;
-            if (!(sx1 === 0 && sy1 === 0 && sx2 === 0 && sy2 === 0)) {
+            // Sky area percentages are relative to the crop area display coordinates
+            const cropDisplayWidth = cx2 - cx1;
+            const cropDisplayHeight = cy2 - cy1;
+            const sx1 = cx1 + (parseFloat(skyX1Input.value) || 0) * cropDisplayWidth / 100;
+            const sy1 = cy1 + (parseFloat(skyY1Input.value) || 0) * cropDisplayHeight / 100;
+            const sx2 = cx1 + (parseFloat(skyX2Input.value) || 0) * cropDisplayWidth / 100;
+            const sy2 = cy1 + (parseFloat(skyY2Input.value) || 0) * cropDisplayHeight / 100;
+            if (!(sx1 === cx1 && sy1 === cy1 && sx2 === cx1 && sy2 === cy1)) {
                 drawRect(ctx, sx1, sy1, sx2, sy2, 'cyan');
             }
         }
 
         if (enableSsimAreaCheckbox.checked) {
-            const ssx1 = parseInt(ssimX1Input.value) || 0;
-            const ssy1 = parseInt(ssimY1Input.value) || 0;
-            const ssx2 = parseInt(ssimX2Input.value) || 0;
-            const ssy2 = parseInt(ssimY2Input.value) || 0;
-            if (!(ssx1 === 0 && ssy1 === 0 && ssx2 === 0 && ssy2 === 0)) {
+            // SSIM area percentages are relative to the crop area display coordinates
+            const cropDisplayWidth = cx2 - cx1;
+            const cropDisplayHeight = cy2 - cy1;
+            const ssx1 = cx1 + (parseFloat(ssimX1Input.value) || 0) * cropDisplayWidth / 100;
+            const ssy1 = cy1 + (parseFloat(ssimY1Input.value) || 0) * cropDisplayHeight / 100;
+            const ssx2 = cx1 + (parseFloat(ssimX2Input.value) || 0) * cropDisplayWidth / 100;
+            const ssy2 = cy1 + (parseFloat(ssimY2Input.value) || 0) * cropDisplayHeight / 100;
+            if (!(ssx1 === cx1 && ssy1 === cy1 && ssx2 === cx1 && ssy2 === cy1)) {
                  drawRect(ctx, ssx1, ssy1, ssx2, ssy2, 'yellow');
             }
         }
@@ -160,47 +195,60 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        naturalSizeSpan.textContent = `${imageDimensions.naturalWidth}x${imageDimensions.naturalHeight}`;
+        // Convert percentage values to natural coordinates for display
+        const cx1Percent = parseFloat(cropX1Input.value) || 0;
+        const cy1Percent = parseFloat(cropY1Input.value) || 0;
+        const cx2Percent = parseFloat(cropX2Input.value) || 0;
+        const cy2Percent = parseFloat(cropY2Input.value) || 0;
+        const cNatX1 = Math.round((cx1Percent / 100) * imageDimensions.naturalWidth);
+        const cNatY1 = Math.round((cy1Percent / 100) * imageDimensions.naturalHeight);
+        const cNatX2 = Math.round((cx2Percent / 100) * imageDimensions.naturalWidth);
+        const cNatY2 = Math.round((cy2Percent / 100) * imageDimensions.naturalHeight);
+        cropNaturalCoordsDiv.textContent = `Natural: X1:${cNatX1}, Y1:${cNatY1}, X2:${cNatX2}, Y2:${cNatY2}`;
+
+        // Show cropped area dimensions instead of full image dimensions
+        const cropNaturalWidth = cNatX2 - cNatX1;
+        const cropNaturalHeight = cNatY2 - cNatY1;
+        naturalSizeSpan.textContent = `${cropNaturalWidth}x${cropNaturalHeight} (cropped from ${imageDimensions.naturalWidth}x${imageDimensions.naturalHeight})`;
+        
         if (scaleFactors.x === 1 && scaleFactors.y === 1) {
             displayScaleSpan.textContent = '1.00 (No scaling)';
         } else {
             displayScaleSpan.textContent = `X: ${scaleFactors.x.toFixed(2)}, Y: ${scaleFactors.y.toFixed(2)}`;
         }
 
-        const cx1 = parseInt(cropX1Input.value) || 0;
-        const cy1 = parseInt(cropY1Input.value) || 0;
-        const cx2 = parseInt(cropX2Input.value) || 0;
-        const cy2 = parseInt(cropY2Input.value) || 0;
-        const cNatX1 = Math.round(cx1 * scaleFactors.x);
-        const cNatY1 = Math.round(cy1 * scaleFactors.y);
-        const cNatX2 = Math.round(cx2 * scaleFactors.x);
-        const cNatY2 = Math.round(cy2 * scaleFactors.y);
-        cropNaturalCoordsDiv.textContent = `Natural: X1:${cNatX1}, Y1:${cNatY1}, X2:${cNatX2}, Y2:${cNatY2}`;
-
         if (enableSkyAreaCheckbox.checked) {
-            const sx1 = parseInt(skyX1Input.value) || 0;
-            const sy1 = parseInt(skyY1Input.value) || 0;
-            const sx2 = parseInt(skyX2Input.value) || 0;
-            const sy2 = parseInt(skyY2Input.value) || 0;
-            const sNatX1 = Math.round(sx1 * scaleFactors.x);
-            const sNatY1 = Math.round(sy1 * scaleFactors.y);
-            const sNatX2 = Math.round(sx2 * scaleFactors.x);
-            const sNatY2 = Math.round(sy2 * scaleFactors.y);
-            skyNaturalCoordsDiv.textContent = `Natural: X1:${sNatX1}, Y1:${sNatY1}, X2:${sNatX2}, Y2:${sNatY2}`;
+            const sx1Percent = parseFloat(skyX1Input.value) || 0;
+            const sy1Percent = parseFloat(skyY1Input.value) || 0;
+            const sx2Percent = parseFloat(skyX2Input.value) || 0;
+            const sy2Percent = parseFloat(skyY2Input.value) || 0;
+            
+            // Sky area percentages are relative to crop area
+            const cropWidth = cNatX2 - cNatX1;
+            const cropHeight = cNatY2 - cNatY1;
+            const sRelX1 = Math.round((sx1Percent / 100) * cropWidth);
+            const sRelY1 = Math.round((sy1Percent / 100) * cropHeight);
+            const sRelX2 = Math.round((sx2Percent / 100) * cropWidth);
+            const sRelY2 = Math.round((sy2Percent / 100) * cropHeight);
+            skyNaturalCoordsDiv.textContent = `Cropped area coords: X1:${sRelX1}, Y1:${sRelY1}, X2:${sRelX2}, Y2:${sRelY2}`;
         } else {
             skyNaturalCoordsDiv.textContent = 'Natural: - (Disabled)';
         }
 
         if (enableSsimAreaCheckbox.checked) {
-            const ssx1 = parseInt(ssimX1Input.value) || 0;
-            const ssy1 = parseInt(ssimY1Input.value) || 0;
-            const ssx2 = parseInt(ssimX2Input.value) || 0;
-            const ssy2 = parseInt(ssimY2Input.value) || 0;
-            const ssNatX1 = Math.round(ssx1 * scaleFactors.x);
-            const ssNatY1 = Math.round(ssy1 * scaleFactors.y);
-            const ssNatX2 = Math.round(ssx2 * scaleFactors.x);
-            const ssNatY2 = Math.round(ssy2 * scaleFactors.y);
-            ssimNaturalCoordsDiv.textContent = `Natural: X1:${ssNatX1}, Y1:${ssNatY1}, X2:${ssNatX2}, Y2:${ssNatY2}`;
+            const ssx1Percent = parseFloat(ssimX1Input.value) || 0;
+            const ssy1Percent = parseFloat(ssimY1Input.value) || 0;
+            const ssx2Percent = parseFloat(ssimX2Input.value) || 0;
+            const ssy2Percent = parseFloat(ssimY2Input.value) || 0;
+            
+            // SSIM area percentages are relative to crop area
+            const cropWidth = cNatX2 - cNatX1;
+            const cropHeight = cNatY2 - cNatY1;
+            const ssRelX1 = Math.round((ssx1Percent / 100) * cropWidth);
+            const ssRelY1 = Math.round((ssy1Percent / 100) * cropHeight);
+            const ssRelX2 = Math.round((ssx2Percent / 100) * cropWidth);
+            const ssRelY2 = Math.round((ssy2Percent / 100) * cropHeight);
+            ssimNaturalCoordsDiv.textContent = `Cropped area coords: X1:${ssRelX1}, Y1:${ssRelY1}, X2:${ssRelX2}, Y2:${ssRelY2}`;
         } else {
             ssimNaturalCoordsDiv.textContent = 'Natural: - (Disabled)';
         }
@@ -388,21 +436,52 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updateAllUiInputsFromNaturalAreas() {
-        if (!(scaleFactors.x && scaleFactors.y && imageDimensions.naturalWidth > 0)) return;
+        if (!(imageDimensions.naturalWidth > 0 && imageDimensions.naturalHeight > 0)) return;
 
         function updateInputFieldsFromNatural(areaName) {
             const area = naturalAreas[areaName];
             if (!area) return;
 
-            const uiX1 = Math.round(area.x1 / scaleFactors.x);
-            const uiY1 = Math.round(area.y1 / scaleFactors.y);
-            const uiX2 = Math.round(area.x2 / scaleFactors.x);
-            const uiY2 = Math.round(area.y2 / scaleFactors.y);
+            let percentX1, percentY1, percentX2, percentY2;
 
-            document.getElementById(`${areaName}X1`).value = uiX1;
-            document.getElementById(`${areaName}Y1`).value = uiY1;
-            document.getElementById(`${areaName}X2`).value = uiX2;
-            document.getElementById(`${areaName}Y2`).value = uiY2;
+            if (areaName === 'crop') {
+                // Crop area percentages are relative to the full image
+                percentX1 = (area.x1 / imageDimensions.naturalWidth) * 100;
+                percentY1 = (area.y1 / imageDimensions.naturalHeight) * 100;
+                percentX2 = (area.x2 / imageDimensions.naturalWidth) * 100;
+                percentY2 = (area.y2 / imageDimensions.naturalHeight) * 100;
+            } else {
+                // Sky and SSIM area percentages are relative to the crop area
+                const cropWidth = naturalAreas.crop.x2 - naturalAreas.crop.x1;
+                const cropHeight = naturalAreas.crop.y2 - naturalAreas.crop.y1;
+                
+                if (cropWidth > 0 && cropHeight > 0) {
+                    percentX1 = ((area.x1 - naturalAreas.crop.x1) / cropWidth) * 100;
+                    percentY1 = ((area.y1 - naturalAreas.crop.y1) / cropHeight) * 100;
+                    percentX2 = ((area.x2 - naturalAreas.crop.x1) / cropWidth) * 100;
+                    percentY2 = ((area.y2 - naturalAreas.crop.y1) / cropHeight) * 100;
+                } else {
+                    // If crop area is invalid, default to 0%
+                    percentX1 = percentY1 = percentX2 = percentY2 = 0;
+                }
+            }
+
+            // Update slider values
+            document.getElementById(`${areaName}X1`).value = percentX1.toFixed(1);
+            document.getElementById(`${areaName}Y1`).value = percentY1.toFixed(1);
+            document.getElementById(`${areaName}X2`).value = percentX2.toFixed(1);
+            document.getElementById(`${areaName}Y2`).value = percentY2.toFixed(1);
+
+            // Update value displays
+            const x1ValueEl = document.getElementById(`${areaName}X1Value`);
+            const y1ValueEl = document.getElementById(`${areaName}Y1Value`);
+            const x2ValueEl = document.getElementById(`${areaName}X2Value`);
+            const y2ValueEl = document.getElementById(`${areaName}Y2Value`);
+            
+            if (x1ValueEl) x1ValueEl.textContent = percentX1.toFixed(1) + '%';
+            if (y1ValueEl) y1ValueEl.textContent = percentY1.toFixed(1) + '%';
+            if (x2ValueEl) x2ValueEl.textContent = percentX2.toFixed(1) + '%';
+            if (y2ValueEl) y2ValueEl.textContent = percentY2.toFixed(1) + '%';
         }
 
         updateInputFieldsFromNatural('crop');

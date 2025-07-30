@@ -102,6 +102,22 @@
             flex: 1;
             min-width: 0;
         }
+        .slider-row .input-wrapper {
+            display: flex;
+            align-items: center;
+            width: 100%;
+        }
+        .coord-slider {
+            flex-grow: 1;
+            margin-right: 10px;
+        }
+        .slider-value {
+            font-family: monospace;
+            font-size: 0.9em;
+            min-width: 50px;
+            text-align: right;
+            color: #666;
+        }
     </style>
 </head>
 <body>
@@ -129,10 +145,10 @@
             <fieldset class="coordinate-inputs">
                 <legend class="collapsible">Crop Area (Red Rectangle)</legend>
                 <div class="collapsible-content">
-                    <div class="form-row"><label for="cropX1">X1:</label><div class="input-wrapper"><input type="number" id="cropX1" value="0"></div></div>
-                    <div class="form-row"><label for="cropY1">Y1:</label><div class="input-wrapper"><input type="number" id="cropY1" value="0"></div></div>
-                    <div class="form-row"><label for="cropX2">X2:</label><div class="input-wrapper"><input type="number" id="cropX2" value="0"></div></div>
-                    <div class="form-row"><label for="cropY2">Y2:</label><div class="input-wrapper"><input type="number" id="cropY2" value="0"></div></div>
+                    <div class="form-row slider-row"><label for="cropX1">X1%:</label><div class="input-wrapper"><input type="range" id="cropX1" value="0" min="0" max="100" step="0.1" class="coord-slider"><span id="cropX1Value" class="slider-value">0%</span></div></div>
+                    <div class="form-row slider-row"><label for="cropY1">Y1%:</label><div class="input-wrapper"><input type="range" id="cropY1" value="0" min="0" max="100" step="0.1" class="coord-slider"><span id="cropY1Value" class="slider-value">0%</span></div></div>
+                    <div class="form-row slider-row"><label for="cropX2">X2%:</label><div class="input-wrapper"><input type="range" id="cropX2" value="100" min="0" max="100" step="0.1" class="coord-slider"><span id="cropX2Value" class="slider-value">100%</span></div></div>
+                    <div class="form-row slider-row"><label for="cropY2">Y2%:</label><div class="input-wrapper"><input type="range" id="cropY2" value="100" min="0" max="100" step="0.1" class="coord-slider"><span id="cropY2Value" class="slider-value">100%</span></div></div>
                     <div class="natural-coords-display" id="cropNaturalCoords">Natural: -</div>
                 </div>
             </fieldset>
@@ -140,10 +156,10 @@
             <fieldset class="coordinate-inputs" id="skyAreaControls" style="display: none;">
                 <legend class="collapsible">Sky Area (Cyan Rectangle)</legend>
                 <div class="collapsible-content">
-                    <div class="form-row"><label for="skyX1">X1:</label><div class="input-wrapper"><input type="number" id="skyX1" value="0"></div></div>
-                    <div class="form-row"><label for="skyY1">Y1:</label><div class="input-wrapper"><input type="number" id="skyY1" value="0"></div></div>
-                    <div class="form-row"><label for="skyX2">X2:</label><div class="input-wrapper"><input type="number" id="skyX2" value="0"></div></div>
-                    <div class="form-row"><label for="skyY2">Y2:</label><div class="input-wrapper"><input type="number" id="skyY2" value="0"></div></div>
+                    <div class="form-row slider-row"><label for="skyX1">X1%:</label><div class="input-wrapper"><input type="range" id="skyX1" value="0" min="0" max="100" step="0.1" class="coord-slider"><span id="skyX1Value" class="slider-value">0%</span></div></div>
+                    <div class="form-row slider-row"><label for="skyY1">Y1%:</label><div class="input-wrapper"><input type="range" id="skyY1" value="0" min="0" max="100" step="0.1" class="coord-slider"><span id="skyY1Value" class="slider-value">0%</span></div></div>
+                    <div class="form-row slider-row"><label for="skyX2">X2%:</label><div class="input-wrapper"><input type="range" id="skyX2" value="0" min="0" max="100" step="0.1" class="coord-slider"><span id="skyX2Value" class="slider-value">0%</span></div></div>
+                    <div class="form-row slider-row"><label for="skyY2">Y2%:</label><div class="input-wrapper"><input type="range" id="skyY2" value="0" min="0" max="100" step="0.1" class="coord-slider"><span id="skyY2Value" class="slider-value">0%</span></div></div>
                     <div class="natural-coords-display" id="skyNaturalCoords">Natural: -</div>
                 </div>
             </fieldset>
@@ -151,10 +167,10 @@
             <fieldset class="coordinate-inputs" id="ssimAreaControls" style="display: none;">
                 <legend class="collapsible">SSIM Area (Yellow Rectangle)</legend>
                 <div class="collapsible-content">
-                    <div class="form-row"><label for="ssimX1">X1:</label><div class="input-wrapper"><input type="number" id="ssimX1" value="0"></div></div>
-                    <div class="form-row"><label for="ssimY1">Y1:</label><div class="input-wrapper"><input type="number" id="ssimY1" value="0"></div></div>
-                    <div class="form-row"><label for="ssimX2">X2:</label><div class="input-wrapper"><input type="number" id="ssimX2" value="0"></div></div>
-                    <div class="form-row"><label for="ssimY2">Y2:</label><div class="input-wrapper"><input type="number" id="ssimY2" value="0"></div></div>
+                    <div class="form-row slider-row"><label for="ssimX1">X1%:</label><div class="input-wrapper"><input type="range" id="ssimX1" value="0" min="0" max="100" step="0.1" class="coord-slider"><span id="ssimX1Value" class="slider-value">0%</span></div></div>
+                    <div class="form-row slider-row"><label for="ssimY1">Y1%:</label><div class="input-wrapper"><input type="range" id="ssimY1" value="0" min="0" max="100" step="0.1" class="coord-slider"><span id="ssimY1Value" class="slider-value">0%</span></div></div>
+                    <div class="form-row slider-row"><label for="ssimX2">X2%:</label><div class="input-wrapper"><input type="range" id="ssimX2" value="0" min="0" max="100" step="0.1" class="coord-slider"><span id="ssimX2Value" class="slider-value">0%</span></div></div>
+                    <div class="form-row slider-row"><label for="ssimY2">Y2%:</label><div class="input-wrapper"><input type="range" id="ssimY2" value="0" min="0" max="100" step="0.1" class="coord-slider"><span id="ssimY2Value" class="slider-value">0%</span></div></div>
                     <div class="natural-coords-display" id="ssimNaturalCoords">Natural: -</div>
                 </div>
             </fieldset>
