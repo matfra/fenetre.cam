@@ -500,27 +500,72 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        const payload = {
-            cameras: {
-                [cameraName]: {
-                    crop: `${naturalAreas.crop.x1},${naturalAreas.crop.y1},${naturalAreas.crop.x2},${naturalAreas.crop.y2}`,
-                    sky_area: naturalAreas.sky.active ? `${naturalAreas.sky.x1},${naturalAreas.sky.y1},${naturalAreas.sky.x2},${naturalAreas.sky.y2}` : null,
-                    ssim_area: naturalAreas.ssim.active ? `${naturalAreas.ssim.x1},${naturalAreas.ssim.y1},${naturalAreas.ssim.x2},${naturalAreas.ssim.y2}` : null,
-                }
-            }
-        };
-
-        const camSettings = payload.cameras[cameraName];
-        if (camSettings.sky_area === null) delete camSettings.sky_area;
-        if (camSettings.ssim_area === null) delete camSettings.ssim_area;
-
         setStatus('Applying settings to main config...', 'info');
 
         try {
+            // First, fetch the current configuration
+            const currentConfigResponse = await fetch('/config');
+            if (!currentConfigResponse.ok) {
+                throw new Error(`Failed to fetch current config: ${currentConfigResponse.status}`);
+            }
+            const currentConfig = await currentConfigResponse.json();
+
+            // Ensure the cameras object exists
+            if (!currentConfig.cameras) {
+                currentConfig.cameras = {};
+            }
+            if (!currentConfig.cameras[cameraName]) {
+                currentConfig.cameras[cameraName] = {};
+            }
+
+            // Update only the visual settings for this camera
+            currentConfig.cameras[cameraName].crop = `${naturalAreas.crop.x1},${naturalAreas.crop.y1},${naturalAreas.crop.x2},${naturalAreas.crop.y2}`;
+            
+            if (naturalAreas.sky.active) {
+                // Calculate Sky area coordinates relative to the crop area
+                const skyX1Percent = parseFloat(skyX1Input.value) || 0;
+                const skyY1Percent = parseFloat(skyY1Input.value) || 0;
+                const skyX2Percent = parseFloat(skyX2Input.value) || 0;
+                const skyY2Percent = parseFloat(skyY2Input.value) || 0;
+                
+                const cropWidth = naturalAreas.crop.x2 - naturalAreas.crop.x1;
+                const cropHeight = naturalAreas.crop.y2 - naturalAreas.crop.y1;
+                
+                const skyRelX1 = Math.round((skyX1Percent / 100) * cropWidth);
+                const skyRelY1 = Math.round((skyY1Percent / 100) * cropHeight);
+                const skyRelX2 = Math.round((skyX2Percent / 100) * cropWidth);
+                const skyRelY2 = Math.round((skyY2Percent / 100) * cropHeight);
+                
+                currentConfig.cameras[cameraName].sky_area = `${skyRelX1},${skyRelY1},${skyRelX2},${skyRelY2}`;
+            } else {
+                delete currentConfig.cameras[cameraName].sky_area;
+            }
+            
+            if (naturalAreas.ssim.active) {
+                // Calculate SSIM area coordinates relative to the crop area
+                const ssimX1Percent = parseFloat(ssimX1Input.value) || 0;
+                const ssimY1Percent = parseFloat(ssimY1Input.value) || 0;
+                const ssimX2Percent = parseFloat(ssimX2Input.value) || 0;
+                const ssimY2Percent = parseFloat(ssimY2Input.value) || 0;
+                
+                const cropWidth = naturalAreas.crop.x2 - naturalAreas.crop.x1;
+                const cropHeight = naturalAreas.crop.y2 - naturalAreas.crop.y1;
+                
+                const ssimRelX1 = Math.round((ssimX1Percent / 100) * cropWidth);
+                const ssimRelY1 = Math.round((ssimY1Percent / 100) * cropHeight);
+                const ssimRelX2 = Math.round((ssimX2Percent / 100) * cropWidth);
+                const ssimRelY2 = Math.round((ssimY2Percent / 100) * cropHeight);
+                
+                currentConfig.cameras[cameraName].ssim_area = `${ssimRelX1},${ssimRelY1},${ssimRelX2},${ssimRelY2}`;
+            } else {
+                delete currentConfig.cameras[cameraName].ssim_area;
+            }
+
+            // Save the complete updated configuration
             const response = await fetch('/config', {
-                method: 'POST',
+                method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
+                body: JSON.stringify(currentConfig)
             });
 
             if (!response.ok) {
