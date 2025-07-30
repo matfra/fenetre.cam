@@ -780,9 +780,10 @@ def main(argv):
 
     # These queues are global and should persist across reloads if fenetre.py itself isn't restarted.
     # If reload implies restarting these loops, then re-initialization might be needed in reload_configuration_logic
-    global daylight_q, archive_q
+    global daylight_q, archive_q, frequent_timelapse_queue
     daylight_q = deque()
     archive_q = deque()
+    frequent_timelapse_q = deque()
 
     # Timelapse and Daylight threads are started here.
     # Consider if they need to be managed (restarted) on config changes.
@@ -790,7 +791,13 @@ def main(argv):
     # If their core behavior (e.g., ffmpeg_options) changes, a restart might be cleaner.
     # However, these are long-running loops processing queues; restarting them might be disruptive.
     # Let's assume for now that updating global_config is sufficient for them.
-    global timelapse_thread_global, daylight_thread_global, archive_thread_global
+    global timelapse_thread_global, daylight_thread_global, archive_thread_global, frequent_timelapse_loop_thread_global
+    frequent_timelapse_loop_thread_global = Thread(
+        target=frequent_timelapse_loop, daemon=True, name="frequent_timelapse_loop"
+    )
+    frequent_timelapse_loop_thread_global.start()
+    logging.info(f"Starting thread {frequent_timelapse_loop_thread_global.name}")
+
     timelapse_thread_global = Thread(
         target=timelapse_loop, daemon=True, name="timelapse_loop"
     )
@@ -809,16 +816,16 @@ def main(argv):
     archive_thread_global.start()
     logging.info(f"Starting thread {archive_thread_global.name}")
 
-    if timelapse_config.get("frequent_timelapse_scheduler_enabled", False):
-        timelapse_scheduler_thread_global = Thread(
-            target=timelapse_scheduler_loop,
+    if timelapse_config.get("frequent_timelapse"):
+        frequent_timelapse_scheduler_thread_global = Thread(
+            target=frequent_timelapse_scheduler_loop,
             daemon=True,
-            name="timelapse_scheduler_loop",
+            name="frequent_timelapse_scheduler_loop",
         )
-        timelapse_scheduler_thread_global.start()
-        logging.info(f"Starting thread {timelapse_scheduler_thread_global.name}")
+        frequent_timelapse_scheduler_thread_global.start()
+        logging.info(f"Starting thread {frequent_timelapse_scheduler_thread_global.name}")
     else:
-        logging.info("Timelapse scheduler is disabled.")
+        logging.info("Frequent timelapse scheduler is disabled.")
 
     disk_management_thread_global = Thread(
         target=disk_management_loop, daemon=True, name="disk_management_loop"
@@ -1130,21 +1137,53 @@ def shutdown_application():
     # sys.exit(0) # Explicitly exit. This might be too abrupt if called from signal handler context.
     # Rely on main thread exiting naturally after exit_event is processed.
 
-
-def timelapse_scheduler_loop():
+def frequent_timelapse_scheduler_loop():
     """
     This is a loop that schedules timelapse creation for the current day periodically.
     """
-    interval = timelapse_config.get("timelapse_scheduler_interval_s", 1200)
+    interval = timelapse_config.get("frequent_timelapse").get("interval_s", 1200)
     while not exit_event.is_set():
         for camera_name in cameras_config:
             pic_dir, _ = get_pic_dir_and_filename(camera_name)
-            with timelapse_queue_lock:
-                with open(timelapse_queue_file, "a") as f:
-                    f.write(f"{pic_dir}\n")
+            timelapse_settings_tuple = (pic_dir, timelapse_config.get("frequent_timelapse"))
+            frequent_timelapse_q.append(timelapse_settings_tuple)
         logging.info(f"Timelapse scheduler sleeping for {interval} seconds.")
         interruptible_sleep(interval, exit_event)
 
+def frequent_timelapse_loop():
+    while len(frequent_timelapse_q) > 0 and not exit_event.is_set():
+        timelapse_settings_tuple = frequent_timelapse_q.popleft()
+        pic_dir, timelapse_settings = timelapse_settings_tuple
+        try:
+            result = create_timelapse(
+                dir=pic_dir,
+                overwrite=True,
+                two_pass=timelapse_settings.get("ffmpeg_2pass", False),
+                log_dir=global_config.get("log_dir"),
+                ffmpeg_options=timelapse_settings.get("ffmpeg_options", ""),
+                file_extension=timelapse_settings.get("file_extension"),
+                framerate=timelapse_settings.get("framerate"),
+            )
+            if result:
+                camera_name = os.path.basename(
+                    os.path.dirname(os.path.normpath(pic_dir))
+                )
+                metric_timelapses_created_total.labels(
+                    camera_name=camera_name
+                ).inc()
+            else:
+                logging.error(
+                    f"There was an error creating the timelapse for dir: {pic_dir}"
+                )
+        except FileExistsError:
+            logging.warning(
+                f"Found an existing timelapse in dir {pic_dir}, Skipping."
+            )
+        except Exception as e:
+            logging.error(
+                f"There was an error creating the timelapse for dir: {pic_dir}: {e}",
+                exc_info=True,
+            )
 
 def timelapse_loop():
     """
@@ -1167,10 +1206,11 @@ def timelapse_loop():
                 result = create_timelapse(
                     dir=dir_to_process,
                     overwrite=True,
-                    two_pass=timelapse_config.get("ffmpeg_2pass", False),
+                    two_pass=timelapse_config.get("ffmpeg_2pass", True),
                     log_dir=global_config.get("log_dir"),
-                    ffmpeg_options=timelapse_config.get("ffmpeg_options"),
+                    ffmpeg_options=timelapse_config.get("ffmpeg_options", "-c:v libvpx-vp9 -b:v 0 -crf 30 -deadline best"),
                     file_extension=timelapse_config.get("file_extension", "webm"),
+                    framerate=timelapse_config.get("framerate", 60),
                 )
                 if result:
                     camera_name = os.path.basename(

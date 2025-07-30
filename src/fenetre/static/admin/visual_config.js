@@ -30,7 +30,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const previewCropBtn = document.getElementById('previewCropBtn');
     const croppedPreviewImage = document.getElementById('croppedPreviewImage');
-    const cropPreviewBox = document.getElementById('cropPreviewBox');
+    const cropPreviewSection = document.getElementById('cropPreviewSection');
+    const cropPreviewPlaceholder = document.getElementById('cropPreviewPlaceholder');
     const applyCropBtn = document.getElementById('applyCropBtn');
     const visualStatusMessage = document.getElementById('visualStatusMessage');
 
@@ -275,7 +276,8 @@ document.addEventListener('DOMContentLoaded', () => {
         setStatus(`Fetching image for ${cameraName}...`, 'info');
         sourceImage.src = '';
         croppedPreviewImage.src = '';
-        cropPreviewBox.style.display = 'none';
+        croppedPreviewImage.style.display = 'none';
+        cropPreviewPlaceholder.style.display = 'flex';
         previewCropBtn.disabled = true;
         applyCropBtn.disabled = true;
         originalImageBlob = null;
@@ -402,7 +404,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         setStatus('Generating crop preview...', 'info');
         croppedPreviewImage.src = '';
-        cropPreviewBox.style.display = 'none';
+        croppedPreviewImage.style.display = 'none';
+        cropPreviewPlaceholder.style.display = 'flex';
 
         const formData = new FormData();
         formData.append('image', originalImageBlob, 'source_image.jpg');
@@ -426,7 +429,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const blob = await response.blob();
             croppedPreviewImage.src = URL.createObjectURL(blob);
-            cropPreviewBox.style.display = 'block';
+            croppedPreviewImage.style.display = 'block';
+            cropPreviewPlaceholder.style.display = 'none';
             setStatus('Crop preview generated successfully.', 'success');
 
         } catch (error) {

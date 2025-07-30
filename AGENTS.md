@@ -5,3 +5,5 @@
 - Always ask for permission before modifying a file that is listed in @.gitignore
 - Use the local python virtualenv, typically in @venv directory
 - Do not fix things non-blocking problems unrelated to the current task. Add a TODO instead.
+- Read the README.md to familiarize yourself with the project.
+- The code for this project is in the directory src/fenetre

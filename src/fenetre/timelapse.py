@@ -30,7 +30,8 @@ def create_timelapse(
     tmp_dir: Optional[str] = "/dev/shm/fenetre",
     dry_run: bool = False,
     ffmpeg_options: str = None,
-    file_extension: str = "mp4",
+    file_extension: Optional[str] = None,
+    framerate: Optional[int] = None,
 ) -> bool:
     if not os.path.exists(dir):
         raise FileNotFoundError(dir)
@@ -91,6 +92,13 @@ def create_timelapse(
             scale_vf = "scale=-2:1080"
         else:
             scale_vf = "scale=-2:720"
+
+    if file_extension is None:
+        # search the ffmpeg_options string for vp9
+        if ffmpeg_options:
+            if "vp9" in ffmpeg_options:
+                file_extension = "webm"
+        file_extension = "mp4"
 
     timelapse_filename = os.path.basename(dir) + "." + file_extension
     timelapse_filepath = os.path.join(dir, timelapse_filename)
@@ -156,7 +164,7 @@ def create_timelapse(
         if not dry_run:
             subprocess.run(
                 first_pass_cmd,
-                cwd=tmp_dir,
+                cwd=tmp_dir, # We need a temporary file to store the first pass log
                 check=True,
                 stdout=ffmpeg_log_stream,
                 stderr=ffmpeg_log_stream,

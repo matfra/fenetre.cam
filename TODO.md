@@ -39,8 +39,7 @@
 - If multiple cameras, add a link back to list
 
 ### Admin interface.
-- For a given section of configuration, make all the text boxes and buttons side by side to make the view a little bit more compact.
-- Add an option to "fold" sections.
+- [BUG] Crop preview is broken
 
 ### Postprocessing
 - Add an option for small overlay image that shows the progression of the time throughout the as a marker on top of a blue yellow gradient. The gradient will be based on the camera location if setup.

@@ -1,4 +1,4 @@
-global:
+global: #Requires app restart
   work_dir: /Users/fenetre
   log_dir: /Users/fenetre/logs
   timezone: "America/Los_Angeles"
@@ -10,12 +10,24 @@ global:
     work_dir_max_size_GB: 10
 
 timelapse:
-  ffmpeg_options: "-framerate 30 -c:v libvpx-vp9 -b:v 3M" #default to "-framerate 30"
-  ffmpeg_2pass: True #default to False
-  file_extension: "webm"
+  frequent_timelapse:
+    ffmpeg_2pass: false
+    # Recommended for Intel
+    ffmpeg_options: -extbrc 1 -look_ahead 1 -look_ahead_depth 60 -g 120 -bf 3 -preset
+      veryslow -c:v hevc_qsv -b:v 4M -maxrate 5M -bufsize 8M -profile:v main -movflags
+      +faststart
+    file_extension: mp4  
+    enabled: true
+  daily_timelapse:
+    # https://trac.ffmpeg.org/wiki/Encode/VP9#twopass
+    enabled: true
+    framerate: 60 # 60 fps if more than 1000 pictures in the day, 30 otherwise
+    ffmpeg_options: -c:v libvpx-vp9 -b:v 0 -crf 30 -deadline best
+    ffmpeg_2pass: True
+    file_extension: webm
 http_server:
   enabled: true
-  listen: "0.0.0.0:8888"
+  listen: "0.0.0.0:8888 [::]:8888"
 admin_server:
   enabled: true
   # Waitress args https://docs.pylonsproject.org/projects/waitress/en/stable/arguments.html#arguments
