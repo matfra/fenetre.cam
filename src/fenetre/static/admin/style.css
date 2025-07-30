@@ -70,17 +70,30 @@ h1 {
     color: #0056b3;
 }
 
+#configFormContainer .form-row {
+    display: flex;
+    align-items: center; /* Align items vertically */
+    margin-bottom: 10px; /* Space between rows */
+}
+
 #configFormContainer label {
-    display: block;
-    margin-top: 10px;
-    margin-bottom: 5px;
     font-weight: bold;
+    margin-right: 10px; /* Space between label and input */
+    flex: 0 0 200px; /* Fixed width for labels */
+    white-space: nowrap;
+}
+
+#configFormContainer .input-wrapper {
+    flex-grow: 1; /* Input takes remaining space */
+    display: flex;
+    align-items: center;
 }
 
 #configFormContainer input[type="text"],
 #configFormContainer input[type="number"],
-#configFormContainer textarea {
-    width: calc(100% - 22px); /* Account for padding and border */
+#configFormContainer textarea,
+#configFormContainer select {
+    width: 100%; /* Take up all space in the wrapper */
     padding: 8px;
     margin-bottom: 10px;
     border-radius: 4px;
@@ -90,7 +103,7 @@ h1 {
 
 #configFormContainer input[type="checkbox"] {
     margin-right: 5px;
-    vertical-align: middle;
+    /* vertical-align is not needed with flexbox */
 }
 
 /* Indentation and styling for nested fieldsets */
@@ -98,6 +111,28 @@ h1 {
     margin-left: 20px;
     border-left: 3px solid #007bff; /* Make border more prominent */
     background-color: #f9f9f9; /* Slightly different background for nested objects */
+}
+
+#configFormContainer fieldset legend.collapsible {
+    cursor: pointer;
+    display: inline-flex; /* Use flex to align text and arrow */
+    align-items: center;
+    width: 100%; /* Make the whole legend clickable */
+}
+
+#configFormContainer fieldset legend.collapsible::before {
+    content: '▼'; /* Down arrow for expanded */
+    margin-right: 8px;
+    font-size: 0.8em;
+    transition: transform 0.2s ease-in-out;
+}
+
+#configFormContainer fieldset legend.collapsible.collapsed::before {
+    transform: rotate(-90deg); /* Right arrow for collapsed */
+}
+
+#configFormContainer fieldset .collapsible-content.collapsed {
+    display: none;
 }
 
 #configFormContainer fieldset fieldset legend {
@@ -216,3 +251,132 @@ h1 {
     margin-bottom: 10px;
     color: #b38600;
 }
+
+/* Visual Config Page Specific Styles */
+.visual-config-container fieldset {
+    border: 1px solid #ddd;
+    padding: 10px;
+    margin-bottom: 10px;
+    border-radius: 4px;
+}
+
+.visual-config-container legend {
+    font-weight: bold;
+    padding: 0 5px;
+    color: #0056b3;
+}
+
+.visual-config-container legend.collapsible {
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    width: 100%;
+}
+
+.visual-config-container legend.collapsible::before {
+    content: '▼';
+    margin-right: 8px;
+    font-size: 0.8em;
+    transition: transform 0.2s ease-in-out;
+}
+
+.visual-config-container legend.collapsible.collapsed::before {
+    transform: rotate(-90deg);
+}
+
+.visual-config-container .collapsible-content.collapsed {
+    display: none;
+}
+
+.collapsible-content .coord-input-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px; /* Provides space between items */
+    align-items: center;
+    padding: 5px 0;
+}
+
+.collapsible-content .coord-input-group label {
+    margin-right: 5px;
+}
+
+.collapsible-content .coord-input-group input[type="number"] {
+    width: 75px; /* Compact width for coordinate inputs */
+    padding: 5px;
+    margin-bottom: 0; /* Override general margin */
+}
+
+.image-container {
+    position: relative;
+    margin-bottom: 20px;
+    max-width: 100%;
+    background-color: #000;
+}
+
+#sourceImage {
+    max-width: 100%;
+    height: auto;
+    display: block;
+}
+
+#cropCanvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+}
+
+#cropPreviewBox {
+    margin-top: 20px;
+    padding: 10px;
+    border: 1px solid #ddd;
+    background-color: #f9f9f9;
+}
+
+#cropPreviewBox h3 {
+    margin-top: 0;
+}
+
+#croppedPreviewImage {
+    max-width: 100%;
+    height: auto;
+}
+
+#visualStatusMessage {
+    margin-top: 15px;
+    padding: 10px;
+    border-radius: 4px;
+    text-align: center;
+}
+
+#visualStatusMessage.success {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+#visualStatusMessage.error {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+#visualStatusMessage.info {
+    background-color: #d1ecf1;
+    color: #0c5460;
+    border: 1px solid #bee5eb;
+}
+
+.info-box {
+    background-color: #eef;
+    padding: 10px;
+    margin-bottom: 15px;
+    border-radius: 4px;
+    font-size: 0.9em;
+}
+
+.info-box span {
+    display: block;
+    margin-bottom: 5px;
+}
+

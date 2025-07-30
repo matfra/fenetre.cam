@@ -1,7 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
     const cameraSelect = document.getElementById('cameraSelect');
     const fetchImageBtn = document.getElementById('fetchImageBtn');
-    // const imageContainer = document.getElementById('imageContainer'); // Not directly used, imageWrapper is new parent
     const sourceImage = document.getElementById('sourceImage');
     const cropCanvas = document.getElementById('cropCanvas');
     const cropX1Input = document.getElementById('cropX1');
@@ -31,6 +30,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const previewCropBtn = document.getElementById('previewCropBtn');
     const croppedPreviewImage = document.getElementById('croppedPreviewImage');
+    const cropPreviewBox = document.getElementById('cropPreviewBox');
     const applyCropBtn = document.getElementById('applyCropBtn');
     const visualStatusMessage = document.getElementById('visualStatusMessage');
 
@@ -38,14 +38,12 @@ document.addEventListener('DOMContentLoaded', () => {
     let imageDimensions = { displayWidth: 0, displayHeight: 0, naturalWidth: 0, naturalHeight: 0 };
     let scaleFactors = { x: 1, y: 1 };
 
-    // Store the defined areas in NATURAL image coordinates
     let naturalAreas = {
-        crop: { x1: 0, y1: 0, x2: 0, y2: 0, active: true }, // Crop is always "active" conceptually
+        crop: { x1: 0, y1: 0, x2: 0, y2: 0, active: true },
         sky: { x1: 0, y1: 0, x2: 0, y2: 0, active: false },
         ssim: { x1: 0, y1: 0, x2: 0, y2: 0, active: false }
     };
 
-    // --- Initialization ---
     async function populateCameraSelect() {
         try {
             const response = await fetch('/config');
@@ -54,7 +52,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (config && config.cameras) {
                 for (const camName in config.cameras) {
-                    if (config.cameras[camName].url) { // Only list URL-based cameras for V1
+                    if (config.cameras[camName].url) {
                         const option = document.createElement('option');
                         option.value = camName;
                         option.textContent = camName;
@@ -68,13 +66,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- Event Listeners ---
     fetchImageBtn.addEventListener('click', handleFetchImage);
     previewCropBtn.addEventListener('click', handlePreviewCrop);
-    applyCropBtn.addEventListener('click', handleApplyVisualSettings); // Renamed
+    applyCropBtn.addEventListener('click', handleApplyVisualSettings);
 
-    // Event listeners for coordinate inputs
-    // Event listeners for coordinate inputs - now also update naturalAreas
     function setupCoordinateInputListeners() {
         const inputs = [
             { el: cropX1Input, area: 'crop', coord: 'x1' }, { el: cropY1Input, area: 'crop', coord: 'y1' },
@@ -86,32 +81,25 @@ document.addEventListener('DOMContentLoaded', () => {
         ];
         inputs.forEach(item => {
             item.el.addEventListener('input', () => {
-                // Update the natural coordinates store based on UI input
                 const uiValue = parseInt(item.el.value) || 0;
                 let naturalValue;
                 if (item.coord === 'x1' || item.coord === 'x2') {
                     naturalValue = Math.round(uiValue * scaleFactors.x);
-                } else { // y1, y2
+                } else {
                     naturalValue = Math.round(uiValue * scaleFactors.y);
                 }
                 naturalAreas[item.area][item.coord] = naturalValue;
 
-                drawAllRectangles(); // Uses UI input values directly for drawing
-                updateCoordinateDisplays(); // Uses UI input values and scaleFactors
+                drawAllRectangles();
+                updateCoordinateDisplays();
             });
         });
     }
     setupCoordinateInputListeners();
 
-
-    // Event listeners for checkboxes
     enableSkyAreaCheckbox.addEventListener('change', () => {
         skyAreaControlsDiv.style.display = enableSkyAreaCheckbox.checked ? 'block' : 'none';
         naturalAreas.sky.active = enableSkyAreaCheckbox.checked;
-        if (!naturalAreas.sky.active) { // If disabling, reset its natural coords (optional)
-            // naturalAreas.sky = { x1: 0, y1: 0, x2: 0, y2: 0, active: false };
-            // updateInputFieldsFromNatural('sky'); // And update UI to reflect reset
-        }
         drawAllRectangles();
         updateCoordinateDisplays();
     });
@@ -125,27 +113,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
     window.addEventListener('resize', handleResize);
 
-
-    // --- Core Functions ---
-    function drawAllRectangles() { // Renamed from drawCropRectangle
+    function drawAllRectangles() {
         const ctx = cropCanvas.getContext('2d');
         ctx.clearRect(0, 0, cropCanvas.width, cropCanvas.height);
 
         if (!(imageDimensions.displayWidth > 0 && imageDimensions.displayHeight > 0)) {
-            return; // No image loaded or dimensions not set
+            return;
         }
 
-        // Draw Crop Rectangle (Red)
         const cx1 = parseInt(cropX1Input.value) || 0;
         const cy1 = parseInt(cropY1Input.value) || 0;
         const cx2 = parseInt(cropX2Input.value) || 0;
         const cy2 = parseInt(cropY2Input.value) || 0;
-        if (!(cx1 === 0 && cy1 === 0 && cx2 === 0 && cy2 === 0)) { // Avoid drawing 0-size rect if all are 0
+        if (!(cx1 === 0 && cy1 === 0 && cx2 === 0 && cy2 === 0)) {
              drawRect(ctx, cx1, cy1, cx2, cy2, 'red');
         }
 
-
-        // Draw Sky Area Rectangle (Cyan)
         if (enableSkyAreaCheckbox.checked) {
             const sx1 = parseInt(skyX1Input.value) || 0;
             const sy1 = parseInt(skyY1Input.value) || 0;
@@ -156,7 +139,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        // Draw SSIM Area Rectangle (Yellow)
         if (enableSsimAreaCheckbox.checked) {
             const ssx1 = parseInt(ssimX1Input.value) || 0;
             const ssy1 = parseInt(ssimY1Input.value) || 0;
@@ -185,7 +167,6 @@ document.addEventListener('DOMContentLoaded', () => {
             displayScaleSpan.textContent = `X: ${scaleFactors.x.toFixed(2)}, Y: ${scaleFactors.y.toFixed(2)}`;
         }
 
-        // Crop Area Natural Coords
         const cx1 = parseInt(cropX1Input.value) || 0;
         const cy1 = parseInt(cropY1Input.value) || 0;
         const cx2 = parseInt(cropX2Input.value) || 0;
@@ -196,7 +177,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const cNatY2 = Math.round(cy2 * scaleFactors.y);
         cropNaturalCoordsDiv.textContent = `Natural: X1:${cNatX1}, Y1:${cNatY1}, X2:${cNatX2}, Y2:${cNatY2}`;
 
-        // Sky Area Natural Coords
         if (enableSkyAreaCheckbox.checked) {
             const sx1 = parseInt(skyX1Input.value) || 0;
             const sy1 = parseInt(skyY1Input.value) || 0;
@@ -211,7 +191,6 @@ document.addEventListener('DOMContentLoaded', () => {
             skyNaturalCoordsDiv.textContent = 'Natural: - (Disabled)';
         }
 
-        // SSIM Area Natural Coords
         if (enableSsimAreaCheckbox.checked) {
             const ssx1 = parseInt(ssimX1Input.value) || 0;
             const ssy1 = parseInt(ssimY1Input.value) || 0;
@@ -238,7 +217,6 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.strokeRect(startX, startY, width, height);
     }
 
-
     async function handleFetchImage() {
         const cameraName = cameraSelect.value;
         if (!cameraName) {
@@ -249,6 +227,7 @@ document.addEventListener('DOMContentLoaded', () => {
         setStatus(`Fetching image for ${cameraName}...`, 'info');
         sourceImage.src = '';
         croppedPreviewImage.src = '';
+        cropPreviewBox.style.display = 'none';
         previewCropBtn.disabled = true;
         applyCropBtn.disabled = true;
         originalImageBlob = null;
@@ -267,7 +246,7 @@ document.addEventListener('DOMContentLoaded', () => {
             originalImageBlob = await response.blob();
             sourceImage.src = URL.createObjectURL(originalImageBlob);
 
-            sourceImage.onload = async () => { // Made this an async function
+            sourceImage.onload = async () => {
                 imageDimensions.naturalWidth = sourceImage.naturalWidth;
                 imageDimensions.naturalHeight = sourceImage.naturalHeight;
                 imageDimensions.displayWidth = sourceImage.offsetWidth;
@@ -276,7 +255,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (imageDimensions.displayWidth > 0 && imageDimensions.displayHeight > 0) {
                     scaleFactors.x = imageDimensions.naturalWidth / imageDimensions.displayWidth;
                     scaleFactors.y = imageDimensions.naturalHeight / imageDimensions.displayHeight;
-                } else { // Fallback if offsetWidth/Height are zero (e.g. image hidden)
+                } else {
                     scaleFactors.x = 1;
                     scaleFactors.y = 1;
                 }
@@ -289,7 +268,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 cropX2Input.value = imageDimensions.displayWidth;
                 cropY2Input.value = imageDimensions.displayHeight;
 
-                // Initialize naturalAreas store
                 naturalAreas.crop = {
                     x1: 0, y1: 0,
                     x2: imageDimensions.naturalWidth, y2: imageDimensions.naturalHeight,
@@ -298,8 +276,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 naturalAreas.sky = { x1: 0, y1: 0, x2: 0, y2: 0, active: false };
                 naturalAreas.ssim = { x1: 0, y1: 0, x2: 0, y2: 0, active: false };
 
-
-                // After image is loaded, fetch full config to check for existing sky/ssim areas
                 try {
                     const fullConfigResponse = await fetch('/config');
                     if (fullConfigResponse.ok) {
@@ -326,7 +302,6 @@ document.addEventListener('DOMContentLoaded', () => {
                                 enableSsimAreaCheckbox.checked = false;
                                 ssimAreaControlsDiv.style.display = 'none';
                             }
-                            // Update UI input fields from naturalAreas after loading config
                             updateAllUiInputsFromNaturalAreas();
                         }
                     }
@@ -362,7 +337,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const x2 = parseInt(cropX2Input.value);
         const y2 = parseInt(cropY2Input.value);
 
-        // UI coordinates
         const uiCropX = Math.min(x1, x2);
         const uiCropY = Math.min(y1, y2);
         const uiCropWidth = Math.abs(x2 - x1);
@@ -373,7 +347,6 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Scale UI coordinates to natural image coordinates for the backend
         const naturalCropX = Math.round(uiCropX * scaleFactors.x);
         const naturalCropY = Math.round(uiCropY * scaleFactors.y);
         const naturalCropWidth = Math.round(uiCropWidth * scaleFactors.x);
@@ -381,6 +354,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         setStatus('Generating crop preview...', 'info');
         croppedPreviewImage.src = '';
+        cropPreviewBox.style.display = 'none';
 
         const formData = new FormData();
         formData.append('image', originalImageBlob, 'source_image.jpg');
@@ -399,173 +373,130 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({ error: `HTTP error! status: ${response.status}` }));
-                throw new Error(errorData.error || 'Failed to generate crop preview.');
+                throw new Error(errorData.error || 'Failed to generate preview.');
             }
 
-            const croppedImageBlob = await response.blob();
-            croppedPreviewImage.src = URL.createObjectURL(croppedImageBlob);
-            setStatus('Crop preview generated.', 'success');
+            const blob = await response.blob();
+            croppedPreviewImage.src = URL.createObjectURL(blob);
+            cropPreviewBox.style.display = 'block';
+            setStatus('Crop preview generated successfully.', 'success');
 
         } catch (error) {
-            console.error('Error in previewCrop:', error);
+            console.error('Error in handlePreviewCrop:', error);
             setStatus(`Error generating preview: ${error.message}`, 'error');
         }
     }
 
     function updateAllUiInputsFromNaturalAreas() {
-        if (!(scaleFactors.x && scaleFactors.y && imageDimensions.naturalWidth > 0)) return; // Guard against division by zero or no scale
+        if (!(scaleFactors.x && scaleFactors.y && imageDimensions.naturalWidth > 0)) return;
 
-        // Crop Area
-        cropX1Input.value = Math.round(naturalAreas.crop.x1 / scaleFactors.x);
-        cropY1Input.value = Math.round(naturalAreas.crop.y1 / scaleFactors.y);
-        cropX2Input.value = Math.round(naturalAreas.crop.x2 / scaleFactors.x);
-        cropY2Input.value = Math.round(naturalAreas.crop.y2 / scaleFactors.y);
+        function updateInputFieldsFromNatural(areaName) {
+            const area = naturalAreas[areaName];
+            if (!area) return;
 
-        // Sky Area
-        if (naturalAreas.sky.active) {
-            skyX1Input.value = Math.round(naturalAreas.sky.x1 / scaleFactors.x);
-            skyY1Input.value = Math.round(naturalAreas.sky.y1 / scaleFactors.y);
-            skyX2Input.value = Math.round(naturalAreas.sky.x2 / scaleFactors.x);
-            skyY2Input.value = Math.round(naturalAreas.sky.y2 / scaleFactors.y);
+            const uiX1 = Math.round(area.x1 / scaleFactors.x);
+            const uiY1 = Math.round(area.y1 / scaleFactors.y);
+            const uiX2 = Math.round(area.x2 / scaleFactors.x);
+            const uiY2 = Math.round(area.y2 / scaleFactors.y);
+
+            document.getElementById(`${areaName}X1`).value = uiX1;
+            document.getElementById(`${areaName}Y1`).value = uiY1;
+            document.getElementById(`${areaName}X2`).value = uiX2;
+            document.getElementById(`${areaName}Y2`).value = uiY2;
         }
 
-        // SSIM Area
+        updateInputFieldsFromNatural('crop');
+        if (naturalAreas.sky.active) {
+            updateInputFieldsFromNatural('sky');
+        }
         if (naturalAreas.ssim.active) {
-            ssimX1Input.value = Math.round(naturalAreas.ssim.x1 / scaleFactors.x);
-            ssimY1Input.value = Math.round(naturalAreas.ssim.y1 / scaleFactors.y);
-            ssimX2Input.value = Math.round(naturalAreas.ssim.x2 / scaleFactors.x);
-            ssimY2Input.value = Math.round(naturalAreas.ssim.y2 / scaleFactors.y);
+            updateInputFieldsFromNatural('ssim');
         }
     }
 
-
-    function handleResize() {
-        if (!originalImageBlob || !sourceImage.src || !(imageDimensions.naturalWidth > 0)) {
-            // No image loaded or natural dimensions unknown
+    async function handleApplyVisualSettings() {
+        const cameraName = cameraSelect.value;
+        if (!cameraName) {
+            setStatus('Please select a camera first.', 'error');
             return;
         }
 
-        // Update display dimensions and scale factors
+        const payload = {
+            cameras: {
+                [cameraName]: {
+                    crop: `${naturalAreas.crop.x1},${naturalAreas.crop.y1},${naturalAreas.crop.x2},${naturalAreas.crop.y2}`,
+                    sky_area: naturalAreas.sky.active ? `${naturalAreas.sky.x1},${naturalAreas.sky.y1},${naturalAreas.sky.x2},${naturalAreas.sky.y2}` : null,
+                    ssim_area: naturalAreas.ssim.active ? `${naturalAreas.ssim.x1},${naturalAreas.ssim.y1},${naturalAreas.ssim.x2},${naturalAreas.ssim.y2}` : null,
+                }
+            }
+        };
+
+        const camSettings = payload.cameras[cameraName];
+        if (camSettings.sky_area === null) delete camSettings.sky_area;
+        if (camSettings.ssim_area === null) delete camSettings.ssim_area;
+
+        setStatus('Applying settings to main config...', 'info');
+
+        try {
+            const response = await fetch('/config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({ error: `HTTP error! status: ${response.status}` }));
+                throw new Error(errorData.error || 'Failed to apply settings.');
+            }
+
+            const result = await response.json();
+            setStatus(result.message || 'Settings applied successfully!', 'success');
+
+        } catch (error) {
+            console.error('Error applying visual settings:', error);
+            setStatus(`Error: ${error.message}`, 'error');
+        }
+    }
+
+    function setStatus(message, type = 'info') {
+        visualStatusMessage.textContent = message;
+        visualStatusMessage.className = `status-message ${type}`;
+    }
+
+    function handleResize() {
+        if (!sourceImage.src || !imageDimensions.naturalWidth) {
+            return;
+        }
+
         imageDimensions.displayWidth = sourceImage.offsetWidth;
         imageDimensions.displayHeight = sourceImage.offsetHeight;
 
-        if (imageDimensions.displayWidth > 0 && imageDimensions.displayHeight > 0) {
+        if (imageDimensions.displayWidth > 0) {
             scaleFactors.x = imageDimensions.naturalWidth / imageDimensions.displayWidth;
             scaleFactors.y = imageDimensions.naturalHeight / imageDimensions.displayHeight;
-        } else { // Fallback if offsetWidth/Height are zero (e.g. image hidden temporarily)
-            scaleFactors.x = 1;
-            scaleFactors.y = 1;
-            // Canvas size also becomes 0, which is fine, drawing will be skipped.
+        } else {
+            scaleFactors = { x: 1, y: 1 };
         }
 
         cropCanvas.width = imageDimensions.displayWidth;
         cropCanvas.height = imageDimensions.displayHeight;
 
-        // Update UI input fields from stored natural coordinates
         updateAllUiInputsFromNaturalAreas();
 
         drawAllRectangles();
         updateCoordinateDisplays();
     }
 
-
-    async function handleApplyVisualSettings() {
-        const cameraName = cameraSelect.value;
-        if (!cameraName) {
-            setStatus('No camera selected.', 'error');
-            return;
+    const container = document.querySelector('.visual-config-container');
+    container.addEventListener('click', function(event) {
+        if (event.target.classList.contains('collapsible')) {
+            event.target.classList.toggle('collapsed');
+            const content = event.target.nextElementSibling;
+            if (content && content.classList.contains('collapsible-content')) {
+                content.classList.toggle('collapsed');
+            }
         }
+    });
 
-        setStatus(`Applying visual settings for ${cameraName} to configuration...`, 'info');
-
-        try {
-            const configResponse = await fetch('/config');
-            if (!configResponse.ok) throw new Error('Failed to fetch current configuration.');
-            let currentConfig = await configResponse.json();
-
-            if (!currentConfig.cameras || !currentConfig.cameras[cameraName]) {
-                throw new Error(`Camera ${cameraName} not found in current configuration.`);
-            }
-            let camConfig = currentConfig.cameras[cameraName];
-
-            // Handle Crop Area - use stored natural coordinates
-            const cNatL = naturalAreas.crop.x1;
-            const cNatT = naturalAreas.crop.y1;
-            const cNatR = naturalAreas.crop.x2;
-            const cNatB = naturalAreas.crop.y2;
-
-            if ((cNatR - cNatL) > 0 && (cNatB - cNatT) > 0) {
-                if (!camConfig.postprocessing) camConfig.postprocessing = [];
-                camConfig.postprocessing = camConfig.postprocessing.filter(step => step.type !== 'crop');
-                camConfig.postprocessing.unshift({
-                    type: "crop",
-                    area: `${cNatL},${cNatT},${cNatR},${cNatB}`
-                });
-            } else {
-                 camConfig.postprocessing = camConfig.postprocessing.filter(step => step.type !== 'crop');
-                 // setStatus might be overwritten by subsequent messages, consider collecting status messages
-            }
-
-            // Handle Sky Area - use stored natural coordinates
-            if (naturalAreas.sky.active) {
-                const sNatL = naturalAreas.sky.x1;
-                const sNatT = naturalAreas.sky.y1;
-                const sNatR = naturalAreas.sky.x2;
-                const sNatB = naturalAreas.sky.y2;
-                if ((sNatR - sNatL) > 0 && (sNatB - sNatT) > 0) {
-                    camConfig.sky_area = `${sNatL},${sNatT},${sNatR},${sNatB}`;
-                } else {
-                    delete camConfig.sky_area;
-                }
-            } else {
-                delete camConfig.sky_area;
-            }
-
-            // Handle SSIM Area - use stored natural coordinates
-            if (naturalAreas.ssim.active) {
-                const ssNatL = naturalAreas.ssim.x1;
-                const ssNatT = naturalAreas.ssim.y1;
-                const ssNatR = naturalAreas.ssim.x2;
-                const ssNatB = naturalAreas.ssim.y2;
-                 if ((ssNatR - ssNatL) > 0 && (ssNatB - ssNatT) > 0) {
-                    camConfig.ssim_area = `${ssNatL},${ssNatT},${ssNatR},${ssNatB}`;
-                } else {
-                    delete camConfig.ssim_area;
-                }
-            } else {
-                delete camConfig.ssim_area;
-            }
-
-            const updateResponse = await fetch('/config', {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(currentConfig)
-            });
-
-            if (!updateResponse.ok) {
-                const errorData = await updateResponse.json().catch(() => ({ error: `HTTP error! status: ${updateResponse.status}` }));
-                throw new Error(errorData.error || 'Failed to save updated configuration.');
-            }
-
-            const result = await updateResponse.json();
-            setStatus(result.message || `Visual settings for ${cameraName} applied. Remember to reload application config.`, 'success');
-
-        } catch (error) {
-            console.error('Error applying visual settings to config:', error);
-            setStatus(`Error applying settings: ${error.message}`, 'error');
-        }
-    }
-
-    function setStatus(message, type = 'info') {
-        visualStatusMessage.textContent = message;
-        visualStatusMessage.className = 'status-message'; // Clear previous classes
-        if (type === 'success') {
-            visualStatusMessage.classList.add('success');
-        } else if (type === 'error') {
-            visualStatusMessage.classList.add('error');
-        }
-    }
-
-    // --- Initial Load ---
     populateCameraSelect();
 });

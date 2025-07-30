@@ -120,10 +120,16 @@ document.addEventListener('DOMContentLoaded', () => {
             const value = data[key];
             const currentKey = parentKey ? `${parentKey}.${key}` : key;
 
+            const formRow = document.createElement('div');
+            formRow.className = 'form-row';
+
             const label = document.createElement('label');
             label.textContent = key;
             label.htmlFor = currentKey;
-            parentElement.appendChild(label);
+            formRow.appendChild(label);
+
+            const inputWrapper = document.createElement('div');
+            inputWrapper.className = 'input-wrapper';
 
             if (typeof value === 'boolean') {
                 const input = document.createElement('input');
@@ -131,15 +137,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 input.id = currentKey;
                 input.checked = value;
                 input.dataset.key = currentKey;
-                parentElement.appendChild(input);
-                parentElement.appendChild(document.createElement('br'));
+                inputWrapper.appendChild(input);
+                formRow.appendChild(inputWrapper);
+                parentElement.appendChild(formRow);
             } else if (typeof value === 'number') {
                 const input = document.createElement('input');
                 input.type = 'number';
                 input.id = currentKey;
                 input.value = value;
                 input.dataset.key = currentKey;
-                parentElement.appendChild(input);
+                inputWrapper.appendChild(input);
+                formRow.appendChild(inputWrapper);
+                parentElement.appendChild(formRow);
             } else if (typeof value === 'string') {
                 // Use textarea for multi-line strings (e.g. gopro_root_ca)
                 if (value.includes('\n')) {
@@ -148,44 +157,58 @@ document.addEventListener('DOMContentLoaded', () => {
                     textarea.value = value;
                     textarea.rows = value.split('\n').length + 1;
                     textarea.dataset.key = currentKey;
-                    parentElement.appendChild(textarea);
+                    inputWrapper.appendChild(textarea);
+                    formRow.appendChild(inputWrapper);
+                    parentElement.appendChild(formRow);
                 } else {
                     const input = document.createElement('input');
                     input.type = 'text';
                     input.id = currentKey;
                     input.value = value;
                     input.dataset.key = currentKey;
-                    parentElement.appendChild(input);
+                    inputWrapper.appendChild(input);
+                    formRow.appendChild(inputWrapper);
+                    parentElement.appendChild(formRow);
                 }
             } else if (Array.isArray(value)) {
                 const fieldset = document.createElement('fieldset');
                 const legend = document.createElement('legend');
                 legend.textContent = key + ' (List)';
+                legend.classList.add('collapsible');
                 fieldset.appendChild(legend);
+
+                const content = document.createElement('div');
+                content.className = 'collapsible-content';
                 fieldset.dataset.key = currentKey;
                 fieldset.dataset.type = 'array';
 
                 value.forEach((item, index) => {
-                    const itemContainer = createArrayItemContainer(item, `${currentKey}[${index}]`, index, fieldset);
-                    fieldset.appendChild(itemContainer);
+                    const itemContainer = createArrayItemContainer(item, `${currentKey}[${index}]`, index, content);
+                    content.appendChild(itemContainer);
                 });
 
                 const addButton = document.createElement('button');
                 addButton.textContent = 'Add Item';
                 addButton.type = 'button';
                 addButton.classList.add('add-item-btn');
-                addButton.addEventListener('click', () => addArrayItem(fieldset, `${currentKey}[${value.length}]`, value.length, (value.length > 0 && typeof value[0] === 'object' ? {} : '')));
-                fieldset.appendChild(addButton);
+                addButton.addEventListener('click', () => addArrayItem(content, `${currentKey}[${value.length}]`, value.length, (value.length > 0 && typeof value[0] === 'object' ? {} : '')));
+                content.appendChild(addButton);
+                fieldset.appendChild(content);
                 parentElement.appendChild(fieldset);
 
             } else if (typeof value === 'object' && value !== null) {
                 const fieldset = document.createElement('fieldset');
                 const legend = document.createElement('legend');
                 legend.textContent = key;
+                legend.classList.add('collapsible');
                 fieldset.appendChild(legend);
+
+                const content = document.createElement('div');
+                content.className = 'collapsible-content';
                 fieldset.dataset.key = currentKey;
                 fieldset.dataset.type = 'object';
-                renderConfigForm(value, fieldset, currentKey);
+                renderConfigForm(value, content, currentKey);
+                fieldset.appendChild(content);
                 parentElement.appendChild(fieldset);
             }
         }
@@ -550,6 +573,17 @@ document.addEventListener('DOMContentLoaded', () => {
             statusMessage.classList.add('error');
         }
     }
+
+    // Add event listener for collapsible sections
+    configFormContainer.addEventListener('click', function(event) {
+        if (event.target.classList.contains('collapsible')) {
+            event.target.classList.toggle('collapsed');
+            const content = event.target.nextElementSibling;
+            if (content && content.classList.contains('collapsible-content')) {
+                content.classList.toggle('collapsed');
+            }
+        }
+    });
 
     // Automatically load the configuration when the page loads
     fetchAndDisplayConfig();
