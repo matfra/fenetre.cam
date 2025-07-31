@@ -36,25 +36,33 @@ def create_timelapse(
     if not os.path.exists(dir):
         raise FileNotFoundError(dir)
 
-    image_files = glob.glob(os.path.join(dir, "*.jpg"))
+    image_files = sorted(glob.glob(os.path.join(os.path.abspath(dir), "*.jpg")))
     images_count = len(image_files)
+    images_count_before = images_count
     if images_count == 0:
         logging.error(f"No jpg images found in {dir}.")
-        print("Nothing found")
-        return False
-
+        return
+    
+    previous_image_size_bytes = 0
     # Delete 0-byte images
     for image_path in image_files:
-        if os.path.getsize(image_path) == 0:
+        image_size_bytes = os.path.getsize(image_path)
+        if image_size_bytes == 0:
             logging.warning(f"Deleting 0-byte image: {image_path}")
             os.remove(image_path)
             images_count -= 1
+        elif image_size_bytes == previous_image_size_bytes:
+            logging.warning(f"Deleting duplicate image: {image_path}")
+            os.remove(image_path)
+            images_count -= 1
+        previous_image_size_bytes = image_size_bytes
 
+    logging.warning(f"Kept {images_count} out of {images_count_before} in {dir}")
     if images_count < 1:
         logging.error(
             f"No valid jpg images found in {dir} after removing 0-byte files."
         )
-        return False
+        return
 
     width, height = get_image_dimensions(image_files[0])
 
@@ -198,7 +206,7 @@ def create_timelapse(
     if isinstance(ffmpeg_log_stream, TextIOWrapper):
         ffmpeg_log_stream.close()
 
-    if os.path.exists(timelapse_filepath):
+    if os.path.exists(timelapse_filepath) and os.path.getsize(timelapse_filepath) > 0:
         # Update cameras.json if timelapse was created successfully
         camera_name = os.path.basename(os.path.dirname(dir))
         cameras_json_path = os.path.join(
@@ -218,7 +226,8 @@ def create_timelapse(
                         break
         return True
     return False
-
+    
+    
 
 def main(argv):
     del argv  # Unused.

@@ -1187,7 +1187,7 @@ def frequent_timelapse_loop():
 
 def timelapse_loop():
     """
-    This is a loop with a blocking Thread to create timelapses one at a time.
+    This is a loop with a blocking Thread to create high quality timelapses one at a time.
     This prevent overloading the system by creating new daily timelapses for all the cameras at the same time.
     """
     while not exit_event.is_set():
@@ -1219,6 +1219,15 @@ def timelapse_loop():
                     metric_timelapses_created_total.labels(
                         camera_name=camera_name
                     ).inc()
+                    # Now we can delete the frequent timelapse file if it exists
+                    frequent_timelapse_config = timelapse_config.get("frequent_timelapse", {})
+                    if frequent_timelapse_config:
+                        frequent_timelapse_file_extention = frequent_timelapse_config.get("file_extension", "mp4")
+                        if frequent_timelapse_file_extention != timelapse_config.get("file_extension", "webm"):
+                            frequent_timelapse_filepath = os.path.join(dir_to_process, os.path.basename(dir_to_process) + "." + frequent_timelapse_file_extention)
+                            if os.path.exists(frequent_timelapse_filepath):
+                                os.remove(frequent_timelapse_filepath)
+                                logging.info(f"Deleted frequent timelapse file: {frequent_timelapse_filepath}")
                 else:
                     logging.error(
                         f"There was an error creating the timelapse for dir: {dir_to_process}"
