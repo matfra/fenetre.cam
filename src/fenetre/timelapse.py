@@ -42,7 +42,7 @@ def create_timelapse(
     if images_count == 0:
         logging.error(f"No jpg images found in {dir}.")
         return
-    
+
     previous_image_size_bytes = 0
     # Delete 0-byte images
     for image_path in image_files:
@@ -73,7 +73,7 @@ def create_timelapse(
         framerate = 30
         two_pass = False  # multi pass encoding not supported with hardware encoder
     else:
-        default_encoder_options = "-c:v libvpx-vp9 -b:v 0 -crf 30"
+        default_encoder_options = "-c:v libvpx-vp9 -b:v 5M"
         max_width = 3840
         max_height = 2160
         if two_pass is None:
@@ -111,6 +111,8 @@ def create_timelapse(
     timelapse_filename = os.path.basename(dir) + "." + file_extension
     timelapse_filepath = os.path.join(dir, timelapse_filename)
 
+    logging.info(f"Encoding {images_count} images to {timelapse_filepath} at {framerate} fps")
+
     if log_dir:
         os.makedirs(log_dir, exist_ok=True)
         ffmpeg_log_filepath = os.path.join(log_dir, "ffmpeg.log")
@@ -145,8 +147,8 @@ def create_timelapse(
         # FFMPEG Input
         "-i",
         os.path.join(os.path.abspath(dir), "*.jpg"),
-#        "-pix_fmt",
-#        "yuv420p",
+        #        "-pix_fmt",
+        #        "yuv420p",
         # FFMPEG Filters
         "-vf",
         f"{scale_vf},format=yuv420p",
@@ -172,7 +174,7 @@ def create_timelapse(
         if not dry_run:
             subprocess.run(
                 first_pass_cmd,
-                cwd=tmp_dir, # We need a temporary file to store the first pass log
+                cwd=tmp_dir,  # We need a temporary file to store the first pass log
                 check=True,
                 stdout=ffmpeg_log_stream,
                 stderr=ffmpeg_log_stream,
@@ -226,8 +228,7 @@ def create_timelapse(
                         break
         return True
     return False
-    
-    
+
 
 def main(argv):
     del argv  # Unused.

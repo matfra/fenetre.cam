@@ -141,6 +141,7 @@ function updateCamera(camera, cameraData) {
             const todayStr = formatDate(today);
             const yesterdayStr = formatDate(yesterday);
             const timelapseExtension = cameraData.global.timelapse_file_extension || 'webm';
+            const frequentTimelapseExtension = cameraData.global.frequent_timelapse_file_extension || 'mp4';
             const photo_dir = `/photos/${camera.title}`;
 
             linkFullscreen.href = `fullscreen.html?camera=${encodeURIComponent(camera.title)}`;
@@ -149,16 +150,13 @@ function updateCamera(camera, cameraData) {
             const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
             const minutesElapsed = (today - startOfDay) / 60000;
             const cacheBuster = Math.floor(minutesElapsed / 20);
-            linkTimelapseToday.href = `${photo_dir}/${todayStr}/${todayStr}.${timelapseExtension}?v=${cacheBuster}`;
+            linkTimelapseToday.href = `${photo_dir}/${todayStr}/${todayStr}.${frequentTimelapseExtension}?v=${cacheBuster}`;
             linkTimelapseToday.textContent = `Today's Timelapse`;
 
-            if (camera.latest_timelapse) {
-                linkTimelapse.href = camera.latest_timelapse;
-                linkTimelapse.textContent = `Yesterday's Timelapse`;
-                linkTimelapse.style.display = 'inline-block';
-            } else {
-                linkTimelapse.style.display = 'none';
-            }
+            linkTimelapse.href = `${photo_dir}/${yesterdayStr}/${yesterdayStr}.${timelapseExtension}`;
+            linkTimelapse.textContent = `Yesterday's Timelapse`;
+            linkTimelapse.style.display = 'inline-block';
+
             linkHistory.href = `${photo_dir}/daylight.html`;
         })
         .catch(error => {
