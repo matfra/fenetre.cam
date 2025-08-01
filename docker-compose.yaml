@@ -7,31 +7,31 @@ services:
     restart: unless-stopped
     user: "1000:1000"
     shm_size: '256m'
+    ports:
+      - "8888:8888"  # For python unsecure public web interface
+      - "8889:8889"  # For admin interface
     devices:
       - /dev/dri/renderD128:/dev/dri/renderD128
-      - /dev/dri/card1:/dev/dri/card1
+      - /dev/dri/card0:/dev/dri/card0
     group_add:
       - video # For Intel OpenCL
-      - 993 # render
+      - render
     volumes:
       # Mount the local config.yaml to the container's /app/config.yaml
-      - ./config.yaml:/app/config.yaml
+      - ./config.yaml:/srv/fenetre/config.yaml
       # Mount the local directory /srv/fenetre/data to /app/data in the container
-      - /srv/fenetre/data:/app/data
+      - /srv/fenetre/data:/srv/fenetre/data
+      # Optional log to directory instead of stdout
+      - /srv/fenetre/logs:/srv/fenetre/logs
       # OpenCL
       - /etc/OpenCL/vendors:/etc/OpenCL/vendors
-    command: /app/config.yaml
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "1m"  # Maximum size of each log file
-        max-file: "3"    # Number of log files to keep
+
   nginx:
     image: nginx:alpine
     container_name: fenetre_webserver
     restart: unless-stopped
     ports:
-      - "8888:80"  # Expose port 8080 on the host to port 80 in the container
+      - "8887:80"  # Robust static nginx public web server
         #      - "5803:443" # Expose port 5803 on the host to port 443 for HTTPS in the container
     volumes:
       # Mount the same data directory to the Nginx container to serve it
