@@ -13,7 +13,7 @@ from fenetre.admin_server import (
     metric_directories_timelapse_total,
     metric_directories_total,
 )
-from fenetre.config import config_load
+from fenetre.config import FenetreConfig
 from fenetre.daylight import run_end_of_day
 from fenetre.timelapse import create_timelapse
 
@@ -200,18 +200,20 @@ def archive_daydir(
 def main(argv):
     del argv  # Unused.
 
-    global cameras_config, global_config, timelapse_config
-    _, cameras_config, global_config, _, timelapse_config = config_load(FLAGS.config)
-    global_config["pic_dir"] = os.path.join(global_config["work_dir"], "photos")
+    config = FenetreConfig(FLAGS.config)
+    cameras_config = config.get_config().cameras
+    global_config = config.get_config().global_config
+    timelapse_config = config.get_config().timelapse
+    global_config.pic_dir = os.path.join(global_config.work_dir, "photos")
 
-    log_dir = global_config.get("log_dir")
+    log_dir = global_config.log_dir
     if log_dir:
         # Add a file handler to the absl logger
         logging.get_absl_handler().use_absl_log_file("archive", log_dir)
 
     for cam in cameras_config:
         camera_dir = os.path.join(global_config["pic_dir"], cam)
-        sky_area = cameras_config[cam].get("sky_area", None)
+        sky_area = cameras_config[cam].sky_area
         if sky_area is None:
             logging.warning(f"No sky area defined for cam {cam}")
         if not os.path.isdir(camera_dir):

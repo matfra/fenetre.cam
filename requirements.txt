@@ -39,3 +39,4 @@ scikit-image
 mock
 black
 pytest
+pydantic

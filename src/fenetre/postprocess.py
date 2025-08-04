@@ -29,7 +29,7 @@ def get_timezone_from_config():
     try:
         with open("config.yaml", "r") as f:
             config = yaml.safe_load(f)
-            return config.get("global", {}).get("timezone", "UTC")
+            return config.global_config.timezone
     except FileNotFoundError:
         logging.warning(
             "config.yaml not found, defaulting timezone to UTC for timestamps."
@@ -291,67 +291,32 @@ def postprocess(
     """
     exif_data = pic.info.get("exif") or b""
     for step in postprocessing_steps:
-        if step["type"] == "crop":
-            logging.debug(f"Cropping image to area: {step['area']}")
-            pic = crop(pic, step["area"])
-        elif step["type"] == "resize":
+        if step.type == "crop":
+            logging.debug(f"Cropping image to area: {step.area}")
+            pic = crop(pic, step.area)
+        elif step.type == "resize":
             logging.debug(
-                f"Resizing image to width: {step.get('width')}, height: {step.get('height')}"
+                f"Resizing image to width: {step.width}, height: {step.height}"
             )
-            pic = resize(pic, step.get("width"), step.get("height"))
-        elif step["type"] == "awb":
+            pic = resize(pic, step.width, step.height)
+        elif step.type == "awb":
             logging.debug("Applying auto white balance to image")
             pic = auto_white_balance(pic)
-        elif step["type"] == "timestamp":
-            if step.get("enabled", False):
+        elif step.type == "timestamp":
+            if step.enabled:
                 logging.debug(
                     f"Adding timestamp with config: "
-                    f"format={step.get('format', '%Y-%m-%d %H:%M:%S %Z')}, "
-                    f"position={step.get('position', 'bottom_right')}, "
-                    f"size={step.get('size', 24)}, "
-                    f"color={step.get('color', 'white')}, "
-                    f"background_color={step.get('background_color', None)}, "
-                    f"background_padding={step.get('background_padding', 2)}, "
-                    f"custom_text={step.get('custom_text', None)}"
+                    f"format={step.format}, "
+                    f"position={step.position}, "
+                    f"size={step.size}, "
+                    f"color={step.color}, "
                 )
                 pic = add_timestamp(
                     pic,
-                    text_format=step.get("format", "%Y-%m-%d %H:%M:%S %Z"),
-                    position=step.get("position", "bottom_right"),
-                    size=step.get("size", 24),
-                    color=step.get("color", "white"),
-                    font_path=step.get(
-                        "font_path"
-                    ),  # Allow custom font path from config
-                    background_color=step.get("background_color", None),
-                    background_padding=step.get("background_padding", 2),
-                    custom_text=step.get("custom_text", None),
-                )
-        elif step["type"] == "text":
-            if step.get("enabled", False) and step.get("text_content"):
-                logging.debug(
-                    f"Adding generic text overlay with config: "
-                    f"text_content='{step.get('text_content')}', "
-                    f"position={step.get('position', 'bottom_right')}, "
-                    f"size={step.get('size', 24)}, "
-                    f"color={step.get('color', 'white')}, "
-                    f"font_path={step.get('font_path', None)}, "
-                    f"background_color={step.get('background_color', None)}, "
-                    f"background_padding={step.get('background_padding', 2)}"
-                )
-                pic = _add_text_overlay(
-                    pic=pic,
-                    text_to_draw=step.get("text_content"),
-                    position=step.get("position", "bottom_right"),
-                    size=step.get("size", 24),
-                    color=step.get("color", "white"),
-                    font_path=step.get("font_path", None),
-                    background_color=step.get("background_color", None),
-                    background_padding=step.get("background_padding", 2),
-                )
-            elif not step.get("text_content") and step.get("enabled", False):
-                logging.warning(
-                    "Generic text step is enabled but no 'text_content' was provided."
+                    text_format=step.format,
+                    position=step.position,
+                    size=step.size,
+                    color=step.color,
                 )
 
     return pic, exif_data

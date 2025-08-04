@@ -288,15 +288,15 @@ class GoProUtilityThread(threading.Thread):
     ):
         from fenetre.gopro import GoPro
         super().__init__(
-            name=f"{camera_config.get('name', 'gopro')}_utility_thread", daemon=True
+            name=f"{camera_config.name}_utility_thread", daemon=True
         )
         self.gopro = gopro
         self.camera_name = camera_name
         self.camera_config = camera_config
         self.exit_event = exit_event
-        self.gopro_ip = camera_config.get("gopro_ip")
-        self.gopro_ble_identifier = camera_config.get("gopro_ble_identifier")
-        self.poll_interval_s = camera_config.get("gopro_utility_poll_interval_s", 10)
+        self.gopro_ip = camera_config.gopro_ip
+        self.gopro_ble_identifier = camera_config.gopro_ble_identifier
+        self.poll_interval_s = camera_config.gopro_utility_poll_interval_s
         self.bluetooth_retry_delay_s = camera_config.get(
             "gopro_bluetooth_retry_delay_s", 180
         )  # Default to 3 minutes

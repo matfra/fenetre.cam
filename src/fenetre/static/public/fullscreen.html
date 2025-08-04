@@ -34,6 +34,14 @@
   const imageElement = document.getElementById('cameraImage');
   const cameraLink = document.getElementById('cameraLink');
 
+  fetch('/cameras.json')
+    .then(response => response.json())
+    .then(data => {
+        if (data.global && data.global.title) {
+            document.title = `Fullscreen ${cameraName} - ${data.global.title}`;
+        }
+    });
+
   function updateImage() {
     if (cameraName) {
       // Add a cache-busting parameter to the URL.

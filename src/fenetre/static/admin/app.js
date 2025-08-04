@@ -102,6 +102,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
             }
             const config = await response.json();
+            if (config.global && config.global.title) {
+                document.title = `Config - ${config.global.title}`;
+            }
             renderConfigForm(config, configFormContainer, '');
             setStatus('Configuration loaded successfully.', 'success');
             saveConfigBtn.disabled = false;

@@ -170,6 +170,9 @@ function updateAllCameras() {
     fetch('/cameras.json')
         .then(response => response.ok ? response.json() : Promise.reject('Network response was not ok.'))
         .then(data => {
+            if (data.global && data.global.title) {
+                document.title = data.global.title;
+            }
             const cameras = data.cameras;
             cameras.forEach(camera => updateCamera(camera, data));
         })

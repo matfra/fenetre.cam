@@ -6,12 +6,12 @@ import shutil
 
 def generate_index_html(work_dir: str, global_config: dict):
     """Generates the index.html file to redirect to the configured landing page."""
-    ui_config = global_config.get("ui", {})
-    landing_page = ui_config.get("landing_page", "list")
+    ui_config = global_config.ui
+    landing_page = ui_config.landing_page
     redirect_url = f"{landing_page}.html"
 
     if landing_page == "fullscreen":
-        camera_name = ui_config.get("fullscreen_camera")
+        camera_name = ui_config.fullscreen_camera
         if camera_name:
             redirect_url = f"fullscreen.html?camera={camera_name}"
         else:

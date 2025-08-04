@@ -121,6 +121,9 @@
                 .then(data => {
                     const cameras = data.cameras;
                     const globalSettings = data.global;
+                    if (globalSettings && globalSettings.title) {
+                        document.title = `${cameraName} - ${globalSettings.title}`;
+                    }
                     const camera = cameras.find(c => c.title === cameraName);
                     if (!camera) {
                         titleElement.textContent = `Camera "${cameraName}" not found.`;

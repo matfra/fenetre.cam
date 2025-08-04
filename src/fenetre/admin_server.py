@@ -17,6 +17,7 @@ from PIL import Image
 from prometheus_client import REGISTRY, Counter, Gauge, generate_latest
 from werkzeug.exceptions import BadRequest
 
+from fenetre.config import FenetreConfig
 from fenetre.ui_utils import copy_public_html_files
 
 # Create metrics
@@ -198,11 +199,11 @@ def sync_ui():
     try:
         with open(config_file_path, "r") as f:
             config = yaml.safe_load(f)
-        work_dir = config.get("global", {}).get("work_dir")
+        work_dir = config.global_config.work_dir
         if not work_dir:
             return jsonify({"error": "work_dir not set in global config."}), 500
 
-        copy_public_html_files(work_dir, config.get("global", {}))
+        copy_public_html_files(work_dir, config.global_config)
         return jsonify({"message": "UI files synchronized successfully."}), 200
     except Exception as e:
         return jsonify({"error": f"Error synchronizing UI files: {str(e)}"}), 500

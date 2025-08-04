@@ -51,6 +51,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
             const config = await response.json();
 
+            if (config.global && config.global.title) {
+                document.title = `Visual Config - ${config.global.title}`;
+            }
+
             if (config && config.cameras) {
                 for (const camName in config.cameras) {
                     if (config.cameras[camName].url) {

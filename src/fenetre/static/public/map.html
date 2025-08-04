@@ -425,6 +425,10 @@
             fetch('cameras.json')
                 .then(response => response.json())
                 .then(data => {
+                    if (data.global && data.global.title) {
+                        document.title = `Map - ${data.global.title}`;
+                        document.querySelector('h1').textContent = data.global.title;
+                    }
                     cameraData = data;
                     const cameras = data.cameras;
                     markerCluster.clearLayers();
