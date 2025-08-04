@@ -117,7 +117,7 @@ def metrics():
 
 @app.route("/config", methods=["GET"])
 def get_config():
-    config_file_path = app.config.get("FENETRE_CONFIG_FILE")
+    config_file_path = app.config["FENETRE_CONFIG_FILE"]
     if not config_file_path:
         return jsonify({"error": "FENETRE_CONFIG_FILE not set in app config."}), 500
     try:
@@ -135,7 +135,7 @@ def get_config():
 
 @app.route("/config", methods=["PUT"])
 def update_config():
-    config_file_path = app.config.get("FENETRE_CONFIG_FILE")
+    config_file_path = app.config["FENETRE_CONFIG_FILE"]
     if not config_file_path:
         return jsonify({"error": "FENETRE_CONFIG_FILE not set in app config."}), 500
     try:
@@ -193,16 +193,14 @@ def serve_ui_page():
 
 @app.route("/api/sync_ui", methods=["POST"])
 def sync_ui():
-    config_file_path = app.config.get("FENETRE_CONFIG_FILE")
+    config_file_path = app.config["FENETRE_CONFIG_FILE"]
     if not config_file_path:
         return jsonify({"error": "FENETRE_CONFIG_FILE not set in app config."}), 500
     try:
-        with open(config_file_path, "r") as f:
-            config = yaml.safe_load(f)
+        config = FenetreConfig(config_file_path).get_config()
         work_dir = config.global_config.work_dir
         if not work_dir:
-            return jsonify({"error": "work_dir not set in global config."}), 500
-
+            return jsonify({"error": "work_dir not configured"}), 500
         copy_public_html_files(work_dir, config.global_config)
         return jsonify({"message": "UI files synchronized successfully."}), 200
     except Exception as e:
@@ -214,7 +212,7 @@ def sync_ui():
 
 @app.route("/api/camera/<string:camera_name>/capture_for_ui", methods=["POST"])
 def capture_for_ui(camera_name):
-    config_file_path = app.config.get("FENETRE_CONFIG_FILE")
+    config_file_path = app.config["FENETRE_CONFIG_FILE"]
     if not config_file_path:
         return jsonify({"error": "FENETRE_CONFIG_FILE not set in app config."}), 500
 
@@ -238,8 +236,8 @@ def capture_for_ui(camera_name):
             404,
         )
 
-    camera_config = config["cameras"][camera_name]
-    url = camera_config.get("url")
+    camera_config = config.cameras[camera_name]
+    url = camera_config.url
 
     if not url:
         # For V1, only support URL-based cameras for this feature.
@@ -254,14 +252,14 @@ def capture_for_ui(camera_name):
 
     try:
         # Replicate parts of fenetre.py's get_pic_from_url logic
-        global_config = config.get("global", {})
-        ua = global_config.get("user_agent", "Fenetre Config UI/1.0")
+        global_config = config.global_config
+        ua = global_config.user_agent or "Fenetre Config UI/1.0"
         headers = {"Accept": "image/*,*"}
         if ua:
             requests_version = requests.__version__
             headers = {"User-Agent": f"{ua} v{requests_version}"}
 
-        timeout = camera_config.get("timeout_s", 20)
+        timeout = camera_config.timeout_s
 
         r = requests.get(url, timeout=timeout, headers=headers, stream=True)
         r.raise_for_status()
@@ -403,7 +401,7 @@ def reload_config():
     """
     Signals the main fenetre.py process to reload its configuration.
     """
-    fenetre_pid_file_path = app.config.get("FENETRE_PID_FILE_PATH")
+    fenetre_pid_file_path = app.config["FENETRE_PID_FILE_PATH"]
     if not fenetre_pid_file_path:
         return jsonify({"error": "FENETRE_PID_FILE_PATH not set in app config."}), 500
 

@@ -20,6 +20,7 @@ from fenetre.admin_server import (
     metric_picture_white_balance,
     metric_picture_width_pixels,
 )
+from fenetre.config import FenetreConfig
 
 
 # It's not ideal to re-read the config here, but it's the simplest way to get timezone
@@ -27,14 +28,8 @@ from fenetre.admin_server import (
 # Consider refactoring if more global configs are needed here.
 def get_timezone_from_config():
     try:
-        with open("config.yaml", "r") as f:
-            config = yaml.safe_load(f)
-            return config.global_config.timezone
-    except FileNotFoundError:
-        logging.warning(
-            "config.yaml not found, defaulting timezone to UTC for timestamps."
-        )
-        return "UTC"
+        config = FenetreConfig().get_config()
+        return config.global_config.timezone
     except Exception as e:
         logging.error(
             f"Error reading timezone from config.yaml: {e}. Defaulting to UTC."

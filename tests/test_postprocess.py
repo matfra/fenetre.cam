@@ -1,4 +1,14 @@
-from fenetre.postprocess import _parse_color, add_timestamp, postprocess
+from fenetre.config import GlobalConfig, TimestampStep, TextStep
+from fenetre.postprocess import (
+    _add_text_overlay,
+    add_timestamp,
+    auto_white_balance,
+    crop,
+    get_timezone_from_config,
+    postprocess,
+    resize,
+    _parse_color,
+)
 import os
 # Assuming postprocess.py is in the parent directory or PYTHONPATH is set up
 import sys
@@ -184,13 +194,13 @@ class TestPostprocess(unittest.TestCase):
     def test_postprocess_integration_timestamp_enabled(self, mock_add_timestamp):
         img = self.create_test_image()
         postprocessing_steps = [
-            {
-                "type": "timestamp",
-                "enabled": True,
-                "size": 30,
-                "color": "blue",
-                "position": "center",
-            }
+            TimestampStep(
+                type="timestamp",
+                enabled=True,
+                size=30,
+                color="blue",
+                position="center",
+            )
         ]
 
         # Make the mocked add_timestamp return the original image for this test
@@ -213,8 +223,8 @@ class TestPostprocess(unittest.TestCase):
     @patch("fenetre.postprocess.add_timestamp")
     def test_postprocess_integration_timestamp_disabled(self, mock_add_timestamp):
         img = self.create_test_image()
-        postprocessing_steps = [{"type": "timestamp", "enabled": False, "size": 30}]
-
+        postprocessing_steps = [TimestampStep(type="timestamp", enabled=False, size=30)]
+    
         returned_img, _ = postprocess(img, postprocessing_steps)
 
         self.assertEqual(img, returned_img)
@@ -263,9 +273,10 @@ class TestPostprocess(unittest.TestCase):
         # Or, ensure get_timezone_from_config is called where its result is used
         # For this test, we are directly testing get_timezone_from_config
 
-        tz = get_timezone_from_config()
-        self.assertEqual(tz, "America/New_York")
-        mock_open_file.assert_called_with("config.yaml", "r")
+        with patch('fenetre.config.FenetreConfig') as mock_config:
+            mock_config.return_value.get_config.return_value = GlobalConfig(timezone="America/New_York")
+            tz = get_timezone_from_config()
+            self.assertEqual(tz, "America/New_York")
 
     @patch("builtins.open", side_effect=FileNotFoundError)
     @patch("fenetre.postprocess.logging")  # to check for warning
@@ -511,13 +522,11 @@ class TestPostprocess(unittest.TestCase):
         ) as mock_add_timestamp_in_postprocess:  # This mocks the public add_timestamp
             img_for_postproc = self.create_test_image()
             postprocessing_steps = [
-                {
-                    "type": "timestamp",
-                    "enabled": True,
-                    "custom_text": "Test Prefix",
-                    # other params like color, size, position etc. would be passed here
-                    # and checked in kwargs_passed if needed.
-                }
+                TimestampStep(
+                    type="timestamp",
+                    enabled=True,
+                    custom_text="Test Prefix",
+                )
             ]
             postprocess(img_for_postproc, postprocessing_steps)
 
@@ -543,17 +552,17 @@ class TestPostprocess(unittest.TestCase):
         font_p = "Arial.ttf"
 
         postprocessing_steps = [
-            {
-                "type": "text",
-                "enabled": True,
-                "text_content": text_content,
-                "color": text_color,
-                "size": text_size,
-                "position": text_position,
-                "background_color": bg_color,
-                "background_padding": bg_padding,
-                "font_path": font_p,
-            }
+            TextStep(
+                type="text",
+                enabled=True,
+                text_content=text_content,
+                color=text_color,
+                size=text_size,
+                position=text_position,
+                background_color=bg_color,
+                background_padding=bg_padding,
+                font_path=font_p,
+            )
         ]
 
         mock_add_text_overlay.return_value = img  # Ensure the mock returns an image
@@ -584,14 +593,14 @@ class TestPostprocess(unittest.TestCase):
 
         # Test case 1: Step disabled
         postprocessing_steps_disabled = [
-            {"type": "text", "enabled": False, "text_content": "Should not appear"}
+            TextStep(type="text", enabled=False, text_content="Should not appear")
         ]
         postprocess(img, postprocessing_steps_disabled)
         mock_add_text_overlay.assert_not_called()
 
         # Test case 2: Step enabled but no text_content
         postprocessing_steps_no_text = [
-            {"type": "text", "enabled": True}  # Missing text_content
+            TextStep(type="text", enabled=True)  # Missing text_content
         ]
         postprocess(img, postprocessing_steps_no_text)
         mock_add_text_overlay.assert_not_called()

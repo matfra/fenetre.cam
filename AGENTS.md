@@ -7,3 +7,6 @@
 - Do not fix things non-blocking problems unrelated to the current task. Add a TODO instead.
 - Read the README.md to familiarize yourself with the project.
 - The code for this project is in the directory src/fenetre
+- When you change a function arguments, please check if this function is
+ being called elsewhere and update the arguments there too.
+- Run pytest after a change to verify you didn't break anything

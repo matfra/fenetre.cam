@@ -145,6 +145,7 @@ def is_dir_older_than_n_days(daydir, n_days=3):
 def archive_daydir(
     daydir: str,
     global_config: dict,
+    timelapse_config: dict,
     cam: str,
     sky_area: tuple,
     dry_run: bool = True,
@@ -181,12 +182,11 @@ def archive_daydir(
             create_timelapse(
                 dir=daydir,
                 overwrite=True,
-                log_dir=global_config.get("log_dir"),
-                two_pass=timelapse_config.get("ffmpeg_2pass", False),
+                log_dir=global_config.log_dir,
+                two_pass=timelapse_config.daily_timelapse.ffmpeg_2pass,
                 dry_run=dry_run,
-                ffmpeg_options=timelapse_config.get("ffmpeg_options"),
-                file_extension=timelapse_config.get("file_extension")
-
+                ffmpeg_options=timelapse_config.daily_timelapse.ffmpeg_options,
+                file_extension=timelapse_config.daily_timelapse.file_extension
             )
         else:
             logging.warning(f"{daydir} does not contain a timelapse file.")
@@ -212,7 +212,7 @@ def main(argv):
         logging.get_absl_handler().use_absl_log_file("archive", log_dir)
 
     for cam in cameras_config:
-        camera_dir = os.path.join(global_config["pic_dir"], cam)
+        camera_dir = os.path.join(global_config.pic_dir, cam)
         sky_area = cameras_config[cam].sky_area
         if sky_area is None:
             logging.warning(f"No sky area defined for cam {cam}")
@@ -223,6 +223,7 @@ def main(argv):
             archive_daydir(
                 daydir,
                 global_config,
+                timelapse_config,
                 cam,
                 sky_area,
                 FLAGS.dry_run,

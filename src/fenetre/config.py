@@ -24,6 +24,7 @@ class GlobalConfig(BaseModel):
     timezone: str = "America/Los_Angeles"
     sunrise_sunset_interval_s: int = 10
     storage_management: StorageManagementConfig = Field(default_factory=StorageManagementConfig)
+    pic_dir: Optional[str] = None
 
 
 class FrequentTimelapseConfig(BaseModel):

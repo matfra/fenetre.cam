@@ -772,9 +772,11 @@ def main(argv):
     timelapse_config = config.get_config().timelapse
     cameras_config = config.get_config().cameras
 
-    global_config["pic_dir"] = os.path.join(
+    global_config.pic_dir = os.path.join(
         global_config.work_dir, "photos"
     )
+    os.makedirs(global_config.work_dir, exist_ok=True)
+    os.makedirs(global_config.log_dir, exist_ok=True)
 
     global timelapse_queue_file
     timelapse_queue_file = os.path.join(
@@ -806,7 +808,7 @@ def start_services():
     global http_server_thread_global, admin_server_thread_global, flask_app_instance
     global timelapse_thread_global, daylight_thread_global, archive_thread_global, frequent_timelapse_loop_thread_global
 
-    if server_config.get("enabled", False):
+    if server_config.enabled:
         http_server_thread_global = Thread(
             target=server_run, daemon=True, name="http_server"
         )
@@ -821,13 +823,13 @@ def start_services():
         )
         flask_app_instance = None
 
-    if admin_server_config.get("enabled", False) and flask_app_instance:
+    if admin_server_config.enabled and flask_app_instance:
         main_config_file_path = FLAGS.config
         pid_file_path = FENETRE_PID_FILE
         admin_server_thread_global = Thread(
             target=run_admin_server_func,
             args=(
-                admin_server_config.get("listen", "0.0.0.0:8889"),
+                admin_server_config.listen,
                 flask_app_instance,
                 main_config_file_path,
                 pid_file_path,
@@ -1343,7 +1345,12 @@ def archive_loop():
             daydirs = list_unarchived_dirs(camera_dir)
             for daydir in daydirs:
                 archive_daydir(
-                    daydir=daydir, global_config=global_config, cam=camera_name, sky_area=camera_config.sky_area, dry_run=False
+                    daydir=daydir,
+                    global_config=global_config,
+                    timelapse_config=timelapse_config,
+                    cam=camera_name,
+                    sky_area=camera_config.sky_area,
+                    dry_run=False
                 )
         interruptible_sleep(600, exit_event)
 
