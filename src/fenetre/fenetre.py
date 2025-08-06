@@ -408,12 +408,11 @@ def snap(camera_name, camera_config: Dict):
             logging.warning(error_msg)
             log_camera_error(camera_name, error_msg, global_config)
             metric_capture_failures_total.labels(camera_name=camera_name).inc()
-            interruptible_sleep(5, exit_event)
-            continue
+            raise
         new_exif = new_pic.info.get("exif") or b""
         if new_pic is None:
             logging.warning(f"{camera_name}: Could not fetch picture.")
-            continue
+            raise ValueError
         if len(camera_config.get("postprocessing", [])) > 0:
             new_pic, new_exif = postprocess(
                 new_pic, camera_config.get("postprocessing", [])
