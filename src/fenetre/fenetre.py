@@ -1197,13 +1197,10 @@ def timelapse_loop():
     while not exit_event.is_set():
         dir_to_process = None
         with timelapse_queue_lock:
-            with open(timelapse_queue_file, "r+") as f:
+            with open(timelapse_queue_file, "r") as f:
                 lines = f.readlines()
                 if lines:
-                    dir_to_process = lines.pop(0).strip()
-                    f.seek(0)
-                    f.truncate()
-                    f.writelines(lines)
+                    dir_to_process = lines[0].strip()
 
         if dir_to_process:
             try:
@@ -1232,6 +1229,17 @@ def timelapse_loop():
                             if os.path.exists(frequent_timelapse_filepath):
                                 os.remove(frequent_timelapse_filepath)
                                 logging.info(f"Deleted frequent timelapse file: {frequent_timelapse_filepath}")
+                    # We need to re-read the file in case the archival script added more work to the queue.
+                    with timelapse_queue_lock:
+                        with open(timelapse_queue_file, "r+") as f:
+                            lines = f.readlines()
+                            new_lines = []
+                            for line in lines:
+                                if line.strip() != dir_to_process:
+                                    new_lines.append(line)
+                                f.seek(0)
+                                f.truncate()
+                                f.writelines(new_lines)
                 else:
                     logging.error(
                         f"There was an error creating the timelapse for dir: {dir_to_process}"

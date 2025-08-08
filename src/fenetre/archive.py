@@ -213,7 +213,7 @@ def archive_daydir(
                             lines.append(f"{daydir}\n")
                             f.seek(0)
                             f.truncate()
-                            f.writelines(sorted(lines))
+                            f.writelines(sorted(lines, key=lambda p: os.path.basename(p), reverse=True))
                             queue_size += 1
                             logging.info(f"Added the dir {daydir} to the timelapse queue ({queue_size})")
                 return False
