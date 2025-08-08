@@ -531,7 +531,7 @@ def run_admin_server_func(
 
     global admin_server_instance_global
     try:
-        logging.info("Starting admin server")
+        logging.info(f"Starting admin server on {listeners}")
         waitress_serve(flask_app, listen=listeners, threads=4, _quiet=False)
     except SystemExit:
         logging.info("admin server shutting down (SystemExit caught).")
@@ -1380,7 +1380,17 @@ def archive_loop():
             daydirs = list_unarchived_dirs(camera_dir)
             for daydir in daydirs:
                 archive_daydir(
-                    daydir=daydir, global_config=global_config, cam=camera_name, sky_area=camera_config.get("sky_area"), dry_run=False
+                    daydir=daydir,
+                    global_config=global_config,
+                    cam=camera_name,
+                    sky_area=camera_config.get("sky_area"),
+                    dry_run=False,
+                    #TODO: Enable this after making the daylight an external file queue
+                    create_daylight_bands=False,
+                    daylight_bands_queue_file=None,
+                    create_timelapses=True,
+                    timelapse_queue_file=timelapse_queue_file,
+                    timelapse_queue_file_lock=timelapse_queue_lock
                 )
         interruptible_sleep(600, exit_event)
 

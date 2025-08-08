@@ -2,6 +2,7 @@
 
 import glob
 import os
+import threading
 from datetime import datetime
 
 import pytz
@@ -149,8 +150,14 @@ def archive_daydir(
     sky_area: tuple,
     dry_run: bool = True,
     create_daylight_bands: bool = False,
+    daylight_bands_queue_file: str = None,
+    daylight_bands_queue_file_lock: threading.Lock = None,
     create_timelapses: bool = False,
+    timelapse_queue_file: str = None,
+    timelapse_queue_file_lock: threading.Lock = None,
 ):
+    """ When this is called from fenetre main runner, we don't want to create timelapses diretly but add them to a queue instead.
+    """
     today_date = get_today_date(global_config)
     if os.path.basename(daydir) == today_date:
         logging.debug(
@@ -177,17 +184,39 @@ def archive_daydir(
     # Check if the subdirectory contains a file name daylight.png and a file named $year-$month-$day.webm.
     if not check_dir_has_timelapse(daydir):
         if create_timelapses:
-            logging.info(f"Creating timelapse for {daydir}")
-            create_timelapse(
-                dir=daydir,
-                overwrite=True,
-                log_dir=global_config.get("log_dir"),
-                two_pass=timelapse_config.get("ffmpeg_2pass", False),
-                dry_run=dry_run,
-                ffmpeg_options=timelapse_config.get("ffmpeg_options"),
-                file_extension=timelapse_config.get("file_extension")
+            if not timelapse_queue_file:
+                logging.info(f"Creating timelapse for {daydir}")
+                create_timelapse(
+                    dir=daydir,
+                    overwrite=True,
+                    log_dir=global_config.get("log_dir"),
+                    two_pass=timelapse_config.get("ffmpeg_2pass", False),
+                    dry_run=dry_run,
+                    ffmpeg_options=timelapse_config.get("ffmpeg_options"),
+                    file_extension=timelapse_config.get("file_extension")
 
-            )
+                )
+            else:
+                with timelapse_queue_file_lock:
+                    with open(timelapse_queue_file, "r+") as f:
+                        daydir_already_exists=False
+                        lines = f.readlines()
+                        queue_size=len(lines)
+                        position=0
+                        for line in lines:
+                            position += 1
+                            if daydir == line.strip():
+                                daydir_already_exists=True
+                                logging.info("{daydir} was already in the timelapse queue (position {position}/{queue_size}). Not adding it again")
+                                break
+                        if not daydir_already_exists:
+                            lines.append(f"{daydir}\n")
+                            f.seek(0)
+                            f.truncate()
+                            f.writelines(sorted(lines))
+                            queue_size += 1
+                            logging.info(f"Added the dir {daydir} to the timelapse queue ({queue_size})")
+                return False
         else:
             logging.warning(f"{daydir} does not contain a timelapse file.")
             return False
