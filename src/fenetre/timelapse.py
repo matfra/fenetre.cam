@@ -70,7 +70,8 @@ def create_timelapse(
         default_encoder_options = "-c:v h264_v4l2m2m -b:v 5M"
         max_width = 1920
         max_height = 1080
-        framerate = 30
+        if framerate is None:
+            framerate = 30
         two_pass = False  # multi pass encoding not supported with hardware encoder
     else:
         default_encoder_options = "-c:v libvpx-vp9 -b:v 5M"

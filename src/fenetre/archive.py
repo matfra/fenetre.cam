@@ -207,7 +207,7 @@ def archive_daydir(
                             position += 1
                             if daydir == line.strip():
                                 daydir_already_exists=True
-                                logging.info("{daydir} was already in the timelapse queue (position {position}/{queue_size}). Not adding it again")
+                                logging.info(f"{daydir} was already in the timelapse queue (position {position}/{queue_size}). Not adding it again")
                                 break
                         if not daydir_already_exists:
                             lines.append(f"{daydir}\n")
