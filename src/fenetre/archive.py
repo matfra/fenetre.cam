@@ -123,12 +123,13 @@ def list_unarchived_dirs(camera_dir, archived_marker_file="archived"):
 def check_dir_has_timelapse(daydir):
     subdirectory = os.path.basename(daydir)
     for timelapse_video_ext in ["mp4", "webm"]:
-        timelapse_filepath = os.path.join(daydir, f"{subdirectory}.{timelapse_video_ext}")
-        if not os.path.isfile(timelapse_filepath):
-            return False
-        if os.path.getsize(timelapse_filepath) > 1024 * 1024:
-            return True
-        return False
+        timelapse_filepath = os.path.join(
+            daydir, f"{subdirectory}.{timelapse_video_ext}"
+        )
+        if os.path.isfile(timelapse_filepath):
+            if os.path.getsize(timelapse_filepath) > 1024 * 1024:
+                return True
+    return False
 
 
 def check_dir_has_daylight_band(daydir):
