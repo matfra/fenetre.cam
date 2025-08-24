@@ -52,4 +52,9 @@
 
 ### Testing and integration
 - Working Dockerfile and docker-compose
-Testing
+- Add integration test simulating a few days worth of pictures
+
+### Metrics
+- Add version 
+- Add number of timelapses files
+

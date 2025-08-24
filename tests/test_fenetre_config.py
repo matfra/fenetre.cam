@@ -13,16 +13,6 @@ from fenetre.fenetre import load_and_apply_configuration
 
 
 
-# Mock absl.flags and absl.logging for standalone testing
-# as fenetre.py relies on them being initialized.
-
-# No longer need to mock absl.flags globally for FLAGS.config access in load_and_apply_configuration
-
-# Mock only absl.logging at a high level if fenetre.py calls it at module import
-mock_absl_logging_module = MagicMock()
-sys.modules["absl.logging"] = mock_absl_logging_module
-
-
 # Minimal stub for GoProUtilityThread if fenetre.py imports it and it causes issues
 class MockGoProUtilityThread:
     def __init__(self, config, event):
@@ -130,7 +120,7 @@ class FenetreConfigTestCase(unittest.TestCase):
         self.assertEqual(cameras_conf, {})  # Should default to empty dict
         self.assertEqual(admin_server_conf, {})
 
-    @patch("fenetre.config.logging")
+    @patch("fenetre.config.logger")
     def test_config_load_file_not_found(self, mock_config_logging):
         server_conf, cameras_conf, global_conf, admin_server_conf = config_load(
             "non_existent_config.yaml"
@@ -143,7 +133,7 @@ class FenetreConfigTestCase(unittest.TestCase):
             "Configuration file non_existent_config.yaml not found."
         )
 
-    @patch("fenetre.config.logging")
+    @patch("fenetre.config.logger")
     def test_config_load_invalid_yaml(self, mock_config_logging):
         fd, path = tempfile.mkstemp(suffix=".yaml", dir=self.temp_dir.name)
         with os.fdopen(fd, "w") as f:

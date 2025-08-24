@@ -5,6 +5,7 @@ Most of the code here is copied from tutorial modules at https://github.com/gopr
 
 import asyncio
 import enum
+import logging
 import re
 import socket
 import threading
@@ -12,7 +13,6 @@ import time
 from typing import Any, Awaitable, Callable, Dict, Optional, TypeVar
 
 import requests
-from absl import logging
 from bleak import BleakClient, BleakScanner
 from bleak.backends.characteristic import BleakGATTCharacteristic
 from bleak.backends.device import BLEDevice as BleakDevice
@@ -24,6 +24,8 @@ T = TypeVar("T")
 
 GOPRO_BASE_UUID = "b5f9{}-aa8d-11e3-9046-0002a5d5c51b"
 noti_handler_T = Callable[[BleakGATTCharacteristic, bytearray], Awaitable[None]]
+
+logger = logging.getLogger(__name__)
 
 
 def get_human_readable_state(state: Dict) -> Dict:
@@ -99,8 +101,8 @@ def exception_handler(loop: asyncio.AbstractEventLoop, context: dict[str, Any]) 
         context (Dict[str, Any]): exception context
     """
     msg = context.get("exception", context["message"])
-    logging.error(f"Caught exception {str(loop)}: {msg}")
-    logging.critical("This is unexpected and unrecoverable.")
+    logger.error(f"Caught exception {str(loop)}: {msg}")
+    logger.critical("This is unexpected and unrecoverable.")
 
 
 async def connect_ble(
@@ -132,7 +134,7 @@ async def connect_ble(
             devices: dict[str, BleakDevice] = {}
 
             # Scan for devices
-            logging.info("Scanning for bluetooth devices...")
+            logger.info("Scanning for bluetooth devices...")
 
             # Scan callback to also catch nonconnectable scan responses
             # pylint: disable=cell-var-from-loop
@@ -152,45 +154,45 @@ async def connect_ble(
                         devices[device.name] = device
                 # Log every device we discovered
                 for d in devices:
-                    logging.info(f"\tDiscovered: {d}")
+                    logger.info(f"\tDiscovered: {d}")
                 # Now look for our matching device(s)
                 token = re.compile(identifier or r"GoPro [A-Z0-9]{4}")
                 matched_devices = [
                     device for name, device in devices.items() if token.match(name)
                 ]
-                logging.info(f"Found {len(matched_devices)} matching devices.")
+                logger.info(f"Found {len(matched_devices)} matching devices.")
 
             # Connect to first matching Bluetooth device
             device = matched_devices[0]
 
-            logging.info(f"Establishing BLE connection to {device}...")
+            logger.info(f"Establishing BLE connection to {device}...")
             client = BleakClient(device)
             await client.connect(timeout=15)
-            logging.info("BLE Connected!")
+            logger.info("BLE Connected!")
 
             # Try to pair (on some OS's this will expectedly fail)
-            logging.info("Attempting to pair...")
+            logger.info("Attempting to pair...")
             try:
                 await client.pair()
             except NotImplementedError:
                 # This is expected on Mac
                 pass
-            logging.info("Pairing complete!")
+            logger.info("Pairing complete!")
 
             # Enable notifications on all notifiable characteristics
-            logging.info("Enabling notifications...")
+            logger.info("Enabling notifications...")
             for service in client.services:
                 for char in service.characteristics:
                     if "notify" in char.properties:
-                        logging.info(f"Enabling notification on char {char.uuid}")
+                        logger.info(f"Enabling notification on char {char.uuid}")
                         await client.start_notify(char, notification_handler)
-            logging.info("Done enabling notifications")
-            logging.info("BLE Connection is ready for communication.")
+            logger.info("Done enabling notifications")
+            logger.info("BLE Connection is ready for communication.")
 
             return client
         except Exception as exc:  # pylint: disable=broad-exception-caught
-            logging.error(f"Connection establishment failed: {exc}")
-            logging.warning(f"Retrying #{retry}")
+            logger.error(f"Connection establishment failed: {exc}")
+            logger.warning(f"Retrying #{retry}")
 
     raise RuntimeError(f"Couldn't establish BLE connection after {RETRIES} retries")
 
@@ -214,14 +216,14 @@ async def enable_wifi(identifier: str | None = None) -> tuple[str, str, BleakCli
         characteristic: BleakGATTCharacteristic, data: bytearray
     ) -> None:
         uuid = GoProUuid(client.services.characteristics[characteristic.handle].uuid)
-        logging.info(f'Received response at {uuid}: {data.hex(":")}')
+        logger.info(f'Received response at {uuid}: {data.hex(":")}')
 
         # If this is the correct handle and the status is success, the command was a success
         if uuid is GoProUuid.COMMAND_RSP_UUID and data[2] == 0x00:
-            logging.info("Command sent successfully")
+            logger.info("Command sent successfully")
         # Anything else is unexpected. This shouldn't happen
         else:
-            logging.error("Unexpected response")
+            logger.error("Unexpected response")
 
         # Notify the writer
         event.set()
@@ -230,25 +232,25 @@ async def enable_wifi(identifier: str | None = None) -> tuple[str, str, BleakCli
 
     # Read from WiFi AP SSID BleUUID
     ssid_uuid = GoProUuid.WIFI_AP_SSID_UUID
-    logging.info(f"Reading the WiFi AP SSID at {ssid_uuid}")
+    logger.info(f"Reading the WiFi AP SSID at {ssid_uuid}")
     ssid = (await client.read_gatt_char(ssid_uuid.value)).decode()
-    logging.info(f"SSID is {ssid}")
+    logger.info(f"SSID is {ssid}")
 
     # Read from WiFi AP Password BleUUID
     password_uuid = GoProUuid.WIFI_AP_PASSWORD_UUID
-    logging.info(f"Reading the WiFi AP password at {password_uuid}")
+    logger.info(f"Reading the WiFi AP password at {password_uuid}")
     password = (await client.read_gatt_char(password_uuid.value)).decode()
-    logging.info(f"Password is {password}")
+    logger.info(f"Password is {password}")
 
     # Write to the Command Request BleUUID to enable WiFi
-    logging.info("Enabling the WiFi AP")
+    logger.info("Enabling the WiFi AP")
     event.clear()
     request = bytes([0x03, 0x17, 0x01, 0x01])
     command_request_uuid = GoProUuid.COMMAND_REQ_UUID
-    logging.debug(f"Writing to {command_request_uuid}: {request.hex(':')}")
+    logger.debug(f"Writing to {command_request_uuid}: {request.hex(':')}")
     await client.write_gatt_char(command_request_uuid.value, request, response=True)
     await event.wait()  # Wait to receive the notification response
-    logging.info("WiFi AP is enabled")
+    logger.info("WiFi AP is enabled")
 
     return ssid, password, client
 
@@ -274,7 +276,7 @@ def _get_gopro_state(ip_address: str, root_ca: Optional[str] = None) -> Dict:
         response.raise_for_status()
         return response.json()
     except requests.RequestException as e:
-        logging.error(f"Failed to get GoPro state from {ip_address}: {e}")
+        logger.error(f"Failed to get GoPro state from {ip_address}: {e}")
         return {}
 
 
@@ -303,13 +305,13 @@ class GoProUtilityThread(threading.Thread):
         self._ble_client = None  # To store the BleakClient instance
 
     def run(self):
-        logging.info(f"Starting GoPro utility thread for {self.gopro_ip}")
-#        self.gopro.validate_presets()
+        logger.info(f"Starting GoPro utility thread for {self.gopro_ip}")
+        # TODO: Move this further down: self.gopro.validate_presets()
         while not self.exit_event.is_set():
             try:
                 # 1. Verify IP connectivity
                 if not self._check_ip_connectivity():
-                    logging.info(
+                    logger.info(
                         f"No IP connectivity to {self.gopro_ip}. Attempting to enable Wi-Fi AP via Bluetooth..."
                     )
                     asyncio.run(self._enable_wifi_ap())
@@ -322,11 +324,11 @@ class GoProUtilityThread(threading.Thread):
                         and (time.time() - start_time) < self.bluetooth_retry_delay_s
                     ):
                         if self._check_ip_connectivity():
-                            logging.info(
+                            logger.info(
                                 f"IP connectivity to {self.gopro_ip} is now OK."
                             )
                             break  # Exit the polling loop if connected
-                        logging.debug(
+                        logger.debug(
                             f"Still no IP connectivity to {self.gopro_ip}. Retrying check in {self.poll_interval_s}s..."
                         )
                         self.exit_event.wait(self.poll_interval_s)
@@ -334,21 +336,21 @@ class GoProUtilityThread(threading.Thread):
                     if (
                         not self._check_ip_connectivity()
                     ):  # Final check after the polling loop
-                        logging.warning(
+                        logger.warning(
                             f"Failed to establish IP connectivity to {self.gopro_ip} after enabling Wi-Fi AP and polling."
                         )
                     else:
-                        logging.info(f"IP connectivity to {self.gopro_ip} is now OK.")
+                        logger.info(f"IP connectivity to {self.gopro_ip} is now OK.")
                 else:
-                    logging.debug(f"IP connectivity to {self.gopro_ip} is OK.")
+                    logger.debug(f"IP connectivity to {self.gopro_ip} is OK.")
 
                 # 3. Gather the state of the camera and store it
                 self.gopro.update_state()
-                logging.debug(f"GoPro state for {self.gopro_ip}:\n{self.gopro.state}")
+                logger.debug(f"GoPro state for {self.gopro_ip}:\n{self.gopro.state}")
 
                 # Convert to human-readable format and log it
                 human_readable_state = get_human_readable_state(self.gopro.state)
-                logging.debug(
+                logger.debug(
                     f"Human-readable GoPro state for {self.gopro_ip}:\n{human_readable_state}"
                 )
 
@@ -365,18 +367,18 @@ class GoProUtilityThread(threading.Thread):
                             ).set(value)
 
             except Exception as e:
-                logging.error(f"Error in GoPro utility thread for {self.gopro_ip}: {e}")
+                logger.error(f"Error in GoPro utility thread for {self.gopro_ip}: {e}")
 
             self.exit_event.wait(self.poll_interval_s)
-        logging.info(f"GoPro utility thread for {self.gopro_ip} exited.")
+        logger.info(f"GoPro utility thread for {self.gopro_ip} exited.")
 
     async def _enable_wifi_ap(self):
         try:
             ssid, password, client = await enable_wifi()
             self._ble_client = client  # Store client for potential later disconnect
-            logging.info(f"GoPro Wi-Fi AP enabled. SSID: {ssid}, Password: {password}")
+            logger.info(f"GoPro Wi-Fi AP enabled. SSID: {ssid}, Password: {password}")
         except Exception as e:
-            logging.error(f"Failed to enable GoPro Wi-Fi AP via Bluetooth: {e}")
+            logger.error(f"Failed to enable GoPro Wi-Fi AP via Bluetooth: {e}")
 
     def _check_ip_connectivity(self) -> bool:
         try:
@@ -384,10 +386,10 @@ class GoProUtilityThread(threading.Thread):
             with socket.create_connection((self.gopro_ip, 80), timeout=2):
                 return True
         except (socket.timeout, ConnectionRefusedError, OSError) as e:
-            logging.debug(f"TCP connection to {self.gopro_ip}:80 failed: {e}")
+            logger.debug(f"TCP connection to {self.gopro_ip}:80 failed: {e}")
             return False
         except Exception as e:
-            logging.error(
+            logger.error(
                 f"Error checking IP connectivity to {self.gopro_ip} with TCP: {e}"
             )
             return False

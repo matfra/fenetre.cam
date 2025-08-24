@@ -1,5 +1,7 @@
+import logging
 import yaml
-from absl import logging
+
+logger = logging.getLogger(__name__)
 
 
 def config_load(config_file_path: str) -> list[dict]:
@@ -11,8 +13,8 @@ def config_load(config_file_path: str) -> list[dict]:
                 res.append(config.get(section, {}))
             return res
     except FileNotFoundError:
-        logging.error(f"Configuration file {config_file_path} not found.")
+        logger.error(f"Configuration file {config_file_path} not found.")
         return [{}, {}, {}, {}]
     except yaml.YAMLError as e:
-        logging.error(f"Error parsing YAML configuration file {config_file_path}: {e}")
+        logger.error(f"Error parsing YAML configuration file {config_file_path}: {e}")
         return [{}, {}, {}, {}]

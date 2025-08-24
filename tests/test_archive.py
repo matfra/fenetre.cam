@@ -3,8 +3,9 @@ import sys
 import tempfile
 import unittest
 from unittest.mock import patch
+import shutil
 
-from fenetre.archive import archive_daydir, list_unarchived_dirs
+from fenetre.archive import archive_daydir, list_unarchived_dirs, check_dir_has_timelapse
 
 
 
@@ -84,6 +85,55 @@ class TestArchive(unittest.TestCase):
         mock_keep_files.assert_called_once_with(day_dir, dry_run=True)
         mock_run_end_of_day.assert_not_called()
         mock_create_timelapse.assert_not_called()
+
+
+class TestCheckDirHasTimelapse(unittest.TestCase):
+    def setUp(self):
+        self.test_dir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.test_dir)
+
+    def test_no_timelapse(self):
+        daydir = os.path.join(self.test_dir, "2025-08-20")
+        os.makedirs(daydir)
+        self.assertFalse(check_dir_has_timelapse(daydir))
+
+    def test_webm_timelapse_large_enough(self):
+        daydir = os.path.join(self.test_dir, "2025-08-20")
+        os.makedirs(daydir)
+        timelapse_path = os.path.join(daydir, "2025-08-20.webm")
+        with open(timelapse_path, "wb") as f:
+            f.write(b"0" * (1024 * 1024 + 1))
+        self.assertTrue(check_dir_has_timelapse(daydir))
+
+    def test_mp4_timelapse_large_enough(self):
+        daydir = os.path.join(self.test_dir, "2025-08-20")
+        os.makedirs(daydir)
+        timelapse_path = os.path.join(daydir, "2025-08-20.mp4")
+        with open(timelapse_path, "wb") as f:
+            f.write(b"0" * (1024 * 1024 + 1))
+        self.assertTrue(check_dir_has_timelapse(daydir))
+
+    def test_timelapse_too_small(self):
+        daydir = os.path.join(self.test_dir, "2025-08-20")
+        os.makedirs(daydir)
+        timelapse_path = os.path.join(daydir, "2025-08-20.webm")
+        with open(timelapse_path, "wb") as f:
+            f.write(b"0" * (1024 * 1024))
+        self.assertFalse(check_dir_has_timelapse(daydir))
+
+    def test_webm_exists_but_mp4_is_checked_first(self):
+        # This test reproduces the suspected bug.
+        # The function checks for mp4 first, and if it doesn't exist, it returns False
+        # without checking for webm.
+        daydir = os.path.join(self.test_dir, "2025-08-20")
+        os.makedirs(daydir)
+        timelapse_path = os.path.join(daydir, "2025-08-20.webm")
+        with open(timelapse_path, "wb") as f:
+            f.write(b"0" * (1024 * 1024 + 1))
+        # With the buggy code, this will fail.
+        self.assertTrue(check_dir_has_timelapse(daydir))
 
 
 if __name__ == "__main__":

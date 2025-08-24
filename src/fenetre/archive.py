@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 
 import glob
+import logging
 import os
 import threading
 from datetime import datetime
 
 import pytz
-from absl import app, flags, logging
+from absl import app, flags
 
 from fenetre.admin_server import (
     metric_directories_archived_total,
@@ -17,6 +18,9 @@ from fenetre.admin_server import (
 from fenetre.config import config_load
 from fenetre.daylight import run_end_of_day
 from fenetre.timelapse import create_timelapse, add_to_timelapse_queue
+from .logging_utils import apply_module_levels, setup_logging
+
+logger = logging.getLogger(__name__)
 
 
 def scan_and_publish_metrics(camera_name: str, camera_dir: str, global_config: dict):
@@ -67,26 +71,26 @@ def keep_only_a_subset_of_jpeg_files(
     keep_interval = int(num_jpeg_files / files_to_keep)
 
     if keep_interval == 0:
-        logging.warning(
+        logger.warning(
             f"{directory} has only {num_jpeg_files} out of {files_to_keep} pictures to keep. Nothing to do there. Perhaps this is an incomplete day?"
         )
         return
     delete_count = 0
     for i in range(num_jpeg_files):
         if i % keep_interval == 0:
-            logging.debug(f"Keeping {jpeg_files[i]}")
+            logger.debug(f"Keeping {jpeg_files[i]}")
             continue
-        logging.debug(f"Deleting {jpeg_files[i]}")
+        logger.debug(f"Deleting {jpeg_files[i]}")
         if dry_run:
             continue
         os.remove(jpeg_files[i])
         delete_count += 1
-    logging.info(f"Deleted {delete_count}/{num_jpeg_files} files in {directory}.")
+    logger.info(f"Deleted {delete_count}/{num_jpeg_files} files in {directory}.")
     archive_filepath = os.path.join(directory, "archived")
     if dry_run:
         return
     open(archive_filepath, "w").close()
-    logging.info(f"Writing archived file: {archive_filepath}")
+    logger.info(f"Writing archived file: {archive_filepath}")
 
 
 def list_unarchived_dirs(camera_dir, archived_marker_file="archived"):
@@ -107,11 +111,11 @@ def list_unarchived_dirs(camera_dir, archived_marker_file="archived"):
         if os.path.isfile(os.path.join(daydir, archived_marker_file)):
             photos_count = len(glob.glob(os.path.join(daydir, "*.jpg")))
             if photos_count > 95:  # 48 * 2 - 1
-                logging.warning(
+                logger.warning(
                     f"{daydir} is archived but has {photos_count} photos. "
                     "This is unexpected, please check the directory."
                 )
-            logging.debug(f"{daydir} is already archived.")
+            logger.debug(f"{daydir} is already archived.")
             continue
         res.append(daydir)
     return res
@@ -120,12 +124,13 @@ def list_unarchived_dirs(camera_dir, archived_marker_file="archived"):
 def check_dir_has_timelapse(daydir):
     subdirectory = os.path.basename(daydir)
     for timelapse_video_ext in ["mp4", "webm"]:
-        timelapse_filepath = os.path.join(daydir, f"{subdirectory}.{timelapse_video_ext}")
-        if not os.path.isfile(timelapse_filepath):
-            return False
-        if os.path.getsize(timelapse_filepath) > 1024 * 1024:
-            return True
-        return False
+        timelapse_filepath = os.path.join(
+            daydir, f"{subdirectory}.{timelapse_video_ext}"
+        )
+        if os.path.isfile(timelapse_filepath):
+            if os.path.getsize(timelapse_filepath) > 1024 * 1024:
+                return True
+    return False
 
 
 def check_dir_has_daylight_band(daydir):
@@ -160,23 +165,23 @@ def archive_daydir(
     """
     today_date = get_today_date(global_config)
     if os.path.basename(daydir) == today_date:
-        logging.debug(
+        logger.debug(
             f"Not archiving {daydir} as it's today and may still be in progress"
         )
         return False
 
     if not is_dir_older_than_n_days(daydir):
         # TODO(P3): Make the daydir customizable
-        logging.debug(f"Skipping {daydir} as it is not old enough")
+        logger.debug(f"Skipping {daydir} as it is not old enough")
         return False
 
     if not check_dir_has_daylight_band(daydir):
         if create_daylight_bands:
-            logging.info(f"Creating daylight band for {daydir}")
+            logger.info(f"Creating daylight band for {daydir}")
             if not dry_run:
                 run_end_of_day(cam, daydir, sky_area)
 
-        logging.warning(
+        logger.warning(
             f"{daydir} does not contain a daylight file. We are not archiving this."
         )
         return False
@@ -185,7 +190,7 @@ def archive_daydir(
     if not check_dir_has_timelapse(daydir):
         if create_timelapses:
             if not timelapse_queue_file:
-                logging.info(f"Creating timelapse for {daydir}")
+                logger.info(f"Creating timelapse for {daydir}")
                 create_timelapse(
                     dir=daydir,
                     overwrite=True,
@@ -202,10 +207,10 @@ def archive_daydir(
                 )
                 return False
         else:
-            logging.warning(f"{daydir} does not contain a timelapse file.")
+            logger.warning(f"{daydir} does not contain a timelapse file.")
             return False
 
-    logging.info(f"Archiving {daydir}. (dry run: {dry_run})")
+    logger.info(f"Archiving {daydir}. (dry run: {dry_run})")
     # Keep only 48 of the jpeg files in the subdirectory, distributed equally across all the existing files.
     keep_only_a_subset_of_jpeg_files(daydir, dry_run=dry_run)
 
@@ -218,17 +223,16 @@ def main(argv):
     global_config["pic_dir"] = os.path.join(global_config["work_dir"], "photos")
 
     log_dir = global_config.get("log_dir")
-    if log_dir:
-        # Add a file handler to the absl logger
-        logging.get_absl_handler().use_absl_log_file("archive", log_dir)
+    setup_logging(log_dir, global_config.get("logging_level"))
+    apply_module_levels(global_config.get("logging_levels", {}))
 
     for cam in cameras_config:
         camera_dir = os.path.join(global_config["pic_dir"], cam)
         sky_area = cameras_config[cam].get("sky_area", None)
         if sky_area is None:
-            logging.warning(f"No sky area defined for cam {cam}")
+            logger.warning(f"No sky area defined for cam {cam}")
         if not os.path.isdir(camera_dir):
-            logging.warning(f"Could not find directory {camera_dir} for camera: {cam}.")
+            logger.warning(f"Could not find directory {camera_dir} for camera: {cam}.")
             continue
         for daydir in list_unarchived_dirs(camera_dir):
             archive_daydir(

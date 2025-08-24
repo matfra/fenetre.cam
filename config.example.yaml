@@ -1,6 +1,10 @@
 global: #Requires app restart
   work_dir: /Users/fenetre
   log_dir: /Users/fenetre/logs
+  logging_level: INFO
+  logging_levels:
+    fenetre.gopro: DEBUG
+    fenetre.postprocess: WARNING
   timezone: "America/Los_Angeles"
   sunrise_sunset_interval_s: 10
   storage_management:
