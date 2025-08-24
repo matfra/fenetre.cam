@@ -176,7 +176,7 @@ class TestGoProPresetValidation(unittest.TestCase):
         }
 
     @mock.patch("fenetre.gopro.requests.get")
-    @mock.patch("fenetre.gopro.logging")
+    @mock.patch("fenetre.gopro.logger")
     def test_validate_presets_success(self, mock_logging, mock_get):
         """Test that validation passes when configured presets are available."""
         mock_response = mock.Mock()
@@ -193,7 +193,7 @@ class TestGoProPresetValidation(unittest.TestCase):
         mock_logging.error.assert_not_called()
 
     @mock.patch("fenetre.gopro.requests.get")
-    @mock.patch("fenetre.gopro.logging")
+    @mock.patch("fenetre.gopro.logger")
     def test_validate_presets_failure_invalid_id(self, mock_logging, mock_get):
         """Test that validation fails when a configured preset is not available."""
         mock_response = mock.Mock()
@@ -211,7 +211,7 @@ class TestGoProPresetValidation(unittest.TestCase):
         )
 
     @mock.patch("fenetre.gopro.requests.get")
-    @mock.patch("fenetre.gopro.logging")
+    @mock.patch("fenetre.gopro.logger")
     def test_validate_presets_failure_no_presets_retrieved(
         self, mock_logging, mock_get
     ):

@@ -1,16 +1,18 @@
 from datetime import datetime
+import logging
 import os
 import time
 from typing import Optional
 
 import pytz
 import requests
-from absl import logging
 from astral import LocationInfo
 from astral.sun import sun
 
 from fenetre.gopro_state_map import GoProEnums
 from fenetre.platform_utils import rotate_log_file
+
+logger = logging.getLogger(__name__)
 
 log_dir_global = None
 
@@ -127,7 +129,7 @@ class GoPro:
             response.raise_for_status()
             self.state = response.json()
         except requests.RequestException as e:
-            logging.error(f"Failed to get GoPro state from {self.ip_address}: {e}")
+            logger.error(f"Failed to get GoPro state from {self.ip_address}: {e}")
             self.state = {}
 
     def get_presets(self):
@@ -141,7 +143,7 @@ class GoPro:
             response.raise_for_status()
             preset_group_array = response.json().get("presetGroupArray", [])
         except requests.RequestException as e:
-            logging.error(f"Failed to get GoPro presets from {self.ip_address}: {e}")
+            logger.error(f"Failed to get GoPro presets from {self.ip_address}: {e}")
         if len(preset_group_array) > 0:
             for preset_group in preset_group_array:
                 if preset_group.get("id") == "PRESET_GROUP_ID_PHOTO":
@@ -179,7 +181,7 @@ class GoPro:
 
         media_entries = data.get("media") or data.get("results", {}).get("media")
         if not media_entries:
-            logging.debug("No media medias found on GoPro.")
+            logger.debug("No media medias found on GoPro.")
             return None, None
 
         latest_dir_info = media_entries[-1]
@@ -198,7 +200,7 @@ class GoPro:
     def _is_night(self) -> bool:
         """Determines if it is currently night time."""
         if not all([self.latitude, self.longitude, self.timezone]):
-            logging.info("Location not configured for GoPro, assuming daytime.")
+            logger.info("Location not configured for GoPro, assuming daytime.")
             return False
 
         try:
@@ -209,10 +211,10 @@ class GoPro:
 
             # It's night if current time is after dusk or before dawn
             is_night_time = now > s["dusk"] or now < s["dawn"]
-            logging.debug(f"It is {'night' if is_night_time else 'day'}.")
+            logger.debug(f"It is {'night' if is_night_time else 'day'}.")
             return is_night_time
         except Exception as e:
-            logging.error(f"Error calculating sunrise/sunset for GoPro: {e}")
+            logger.error(f"Error calculating sunrise/sunset for GoPro: {e}")
             return False  # Default to day
 
     def validate_presets(self):
@@ -221,15 +223,15 @@ class GoPro:
         """
         available_presets = self.get_presets()
         if not available_presets:
-            logging.error("Could not retrieve available presets from the camera.")
+            logger.error("Could not retrieve available presets from the camera.")
             return
 
-        logging.info(f"Available presets: {[p.get('name') for p in available_presets]}")
+        logger.info(f"Available presets: {[p.get('name') for p in available_presets]}")
 
         available_preset_ids = [p.get("id") for p in available_presets]
 
         if self.preset_day and self.preset_day.get("id") not in available_preset_ids:
-            logging.error(
+            logger.error(
                 f"Configured day preset ID '{self.preset_day.get('id')}' is not available on the camera."
             )
 
@@ -237,7 +239,7 @@ class GoPro:
             self.preset_night
             and self.preset_night.get("id") not in available_preset_ids
         ):
-            logging.error(
+            logger.error(
                 f"Configured night preset ID '{self.preset_night.get('id')}' is not available on the camera."
             )
 
@@ -270,11 +272,11 @@ class GoPro:
                 for setting, value in preset_config["settings"].items():
                     try:
                         setattr(self.settings, setting, value)
-                        logging.info(
+                        logger.info(
                             f"Applied setting '{setting}' with value '{value}'"
                         )
                     except (AttributeError, ValueError) as e:
-                        logging.error(
+                        logger.error(
                             f"Failed to apply setting '{setting}' with value '{value}': {e}"
                         )
 

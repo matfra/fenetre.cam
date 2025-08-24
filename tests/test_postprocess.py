@@ -26,7 +26,7 @@ class TestPostprocess(unittest.TestCase):
         self.assertEqual(_parse_color("( 255, 0, 0 )"), (255, 0, 0))  # With spaces
         self.assertEqual(_parse_color((0, 255, 0)), (0, 255, 0))
         # Test fallback for invalid string
-        with patch("fenetre.postprocess.logging") as mock_logging:
+        with patch("fenetre.postprocess.logger") as mock_logging:
             self.assertEqual(
                 _parse_color("invalid_color_string"), "invalid_color_string"
             )  # Will be passed to PIL
@@ -34,7 +34,7 @@ class TestPostprocess(unittest.TestCase):
                 _parse_color("(123,456)"), (255, 255, 255)
             )  # Invalid tuple string
             mock_logging.warning.assert_called()
-        with patch("fenetre.postprocess.logging") as mock_logging:
+        with patch("fenetre.postprocess.logger") as mock_logging:
             self.assertEqual(_parse_color(123), (255, 255, 255))  # Invalid type
             mock_logging.warning.assert_called()
 
@@ -268,7 +268,7 @@ class TestPostprocess(unittest.TestCase):
         mock_open_file.assert_called_with("config.yaml", "r")
 
     @patch("builtins.open", side_effect=FileNotFoundError)
-    @patch("fenetre.postprocess.logging")  # to check for warning
+    @patch("fenetre.postprocess.logger")  # to check for warning
     def test_get_timezone_from_config_file_not_found(
         self, mock_logging, mock_open_file
     ):
@@ -576,7 +576,7 @@ class TestPostprocess(unittest.TestCase):
         self.assertEqual(kwargs_passed.get("font_path"), font_p)
 
     @patch("fenetre.postprocess._add_text_overlay")
-    @patch("fenetre.postprocess.logging")
+    @patch("fenetre.postprocess.logger")
     def test_postprocess_integration_generic_text_step_disabled_or_no_text(
         self, mock_logging, mock_add_text_overlay
     ):

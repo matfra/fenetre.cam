@@ -1,12 +1,16 @@
 import glob
 import json
+import logging
 import os
 import subprocess
 from typing import Optional
 
 from datetime import datetime
-from absl import app, flags, logging
+from absl import app, flags
 from PIL import Image
+from .logging_utils import setup_logging
+
+logger = logging.getLogger(__name__)
 
 from fenetre.platform_utils import is_raspberry_pi, rotate_log_file
 from io import TextIOWrapper
@@ -18,7 +22,7 @@ def get_image_dimensions(image_path: str):
         with Image.open(image_path) as img:
             return img.size
     except Exception as e:
-        logging.error(f"Error getting dimensions for {image_path}: {e}")
+        logger.error(f"Error getting dimensions for {image_path}: {e}")
         return None
 
 
@@ -40,7 +44,7 @@ def create_timelapse(
     images_count = len(image_files)
     images_count_before = images_count
     if images_count == 0:
-        logging.error(f"No jpg images found in {dir}.")
+        logger.error(f"No jpg images found in {dir}.")
         return
 
     previous_image_size_bytes = 0
@@ -48,18 +52,18 @@ def create_timelapse(
     for image_path in image_files:
         image_size_bytes = os.path.getsize(image_path)
         if image_size_bytes == 0:
-            logging.warning(f"Deleting 0-byte image: {image_path}")
+            logger.warning(f"Deleting 0-byte image: {image_path}")
             os.remove(image_path)
             images_count -= 1
         elif image_size_bytes == previous_image_size_bytes:
-            logging.warning(f"Deleting duplicate image: {image_path}")
+            logger.warning(f"Deleting duplicate image: {image_path}")
             os.remove(image_path)
             images_count -= 1
         previous_image_size_bytes = image_size_bytes
 
-    logging.warning(f"Kept {images_count} out of {images_count_before} in {dir}")
+    logger.warning(f"Kept {images_count} out of {images_count_before} in {dir}")
     if images_count < 1:
-        logging.error(
+        logger.error(
             f"No valid jpg images found in {dir} after removing 0-byte files."
         )
         return
@@ -111,19 +115,19 @@ def create_timelapse(
     timelapse_filename = os.path.basename(dir) + "." + file_extension
     timelapse_filepath = os.path.join(dir, timelapse_filename)
 
-    logging.info(f"Encoding {images_count} images to {timelapse_filepath} at {framerate} fps")
+    logger.info(f"Encoding {images_count} images to {timelapse_filepath} at {framerate} fps")
 
     if log_dir:
         os.makedirs(log_dir, exist_ok=True)
         ffmpeg_log_filepath = os.path.join(log_dir, "ffmpeg.log")
         rotate_log_file(ffmpeg_log_filepath)
         ffmpeg_log_stream = open(ffmpeg_log_filepath, "a")
-        logging.info(f"FFmpeg log file: {ffmpeg_log_filepath}")
+        logger.info(f"FFmpeg log file: {ffmpeg_log_filepath}")
     else:
-        logging.info(f"No log_dir defined in configs. ffmpeg logs will be shown here")
+        logger.info(f"No log_dir defined in configs. ffmpeg logs will be shown here")
         ffmpeg_log_stream = None
 
-    logging.debug(f"timelapse_filepath: {timelapse_filepath}")
+    logger.debug(f"timelapse_filepath: {timelapse_filepath}")
 
     if not os.path.exists(tmp_dir):
         os.makedirs(tmp_dir, exist_ok=True)
@@ -170,7 +174,7 @@ def create_timelapse(
             "null",
             "/dev/null",
         ]
-        logging.info(f"Running ffmpeg first pass: {' '.join(first_pass_cmd)}")
+        logger.info(f"Running ffmpeg first pass: {' '.join(first_pass_cmd)}")
         if not dry_run:
             subprocess.run(
                 first_pass_cmd,
@@ -185,7 +189,7 @@ def create_timelapse(
                 "2",
                 os.path.abspath(timelapse_filepath),
             ]
-            logging.info(f"Running ffmpeg second pass: {' '.join(second_pass_cmd)}")
+            logger.info(f"Running ffmpeg second pass: {' '.join(second_pass_cmd)}")
             if not dry_run:
                 subprocess.run(
                     second_pass_cmd,
@@ -196,7 +200,7 @@ def create_timelapse(
                 )
     else:
         final_cmd = ffmpeg_cmd + [os.path.abspath(timelapse_filepath)]
-        logging.info(f"Running ffmpeg: {' '.join(final_cmd)}")
+        logger.info(f"Running ffmpeg: {' '.join(final_cmd)}")
         if not dry_run:
             subprocess.run(
                 final_cmd,
@@ -232,6 +236,7 @@ def create_timelapse(
 
 def main(argv):
     del argv  # Unused.
+    setup_logging(FLAGS.log_dir)
     create_timelapse(FLAGS.dir, FLAGS.overwrite, FLAGS.two_pass, FLAGS.log_dir)
 
 

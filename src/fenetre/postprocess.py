@@ -6,9 +6,11 @@ import numpy as np
 import pyexiv2
 import pytz  # To get timezone from global_config easily
 import yaml  # For get_timezone_from_config
-from absl import logging
+import logging
 from PIL import Image, ImageDraw, ImageFont
 from skimage import exposure
+
+logger = logging.getLogger(__name__)
 
 from fenetre.admin_server import (
     metric_picture_aperture,
@@ -31,12 +33,12 @@ def get_timezone_from_config():
             config = yaml.safe_load(f)
             return config.get("global", {}).get("timezone", "UTC")
     except FileNotFoundError:
-        logging.warning(
+        logger.warning(
             "config.yaml not found, defaulting timezone to UTC for timestamps."
         )
         return "UTC"
     except Exception as e:
-        logging.error(
+        logger.error(
             f"Error reading timezone from config.yaml: {e}. Defaulting to UTC."
         )
         return "UTC"
@@ -56,19 +58,19 @@ def _parse_color(color_input: Union[str, Tuple[int, int, int]]) -> Tuple[int, in
                 if len(parts) == 3:
                     return tuple(parts)  # type: ignore
                 else:
-                    logging.warning(
+                    logger.warning(
                         f"Invalid RGB tuple string (not 3 parts): {color_input}. Defaulting to white."
                     )
                     return (255, 255, 255)
             except ValueError:
-                logging.warning(
+                logger.warning(
                     f"Invalid RGB tuple string (non-integer parts): {color_input}. Defaulting to white."
                 )
                 return (255, 255, 255)
         # For common color names, PIL/Pillow can often handle them directly.
         # If specific name-to-RGB mapping is needed, expand here.
         return color_input  # type: ignore
-    logging.warning(f"Invalid color type: {color_input}. Defaulting to white.")
+    logger.warning(f"Invalid color type: {color_input}. Defaulting to white.")
     return (255, 255, 255)
 
 
@@ -98,12 +100,12 @@ def _add_text_overlay(
                 try:
                     font = ImageFont.truetype("Arial.ttf", size)
                 except IOError:
-                    logging.warning(
+                    logger.warning(
                         "DejaVuSans.ttf or Arial.ttf not found. Using default PIL font. Text might be small."
                     )
                     font = ImageFont.load_default()
     except Exception as e:
-        logging.error(f"Error loading font: {e}. Using default PIL font.")
+        logger.error(f"Error loading font: {e}. Using default PIL font.")
         font = ImageFont.load_default()
 
     parsed_text_color = _parse_color(color)
@@ -120,7 +122,7 @@ def _add_text_overlay(
             if text_width == 0:
                 text_height = 0
         except AttributeError:
-            logging.warning(
+            logger.warning(
                 "Cannot determine text size accurately with the default font. Text may be misplaced."
             )
             text_width = len(text_to_draw) * 6
@@ -137,7 +139,7 @@ def _add_text_overlay(
             x = int(x_str.strip())
             y = int(y_str.strip())
         except ValueError:
-            logging.warning(
+            logger.warning(
                 f"Invalid coordinate string for position: {position}. Defaulting to bottom_right."
             )
             x = img_width - text_width - padding
@@ -161,7 +163,7 @@ def _add_text_overlay(
         x = (img_width - text_width) // 2
         y = img_height - text_height - padding - (text_bbox[1] if text_bbox else 0)
     else:
-        logging.warning(
+        logger.warning(
             f"Unrecognized position: {position}. Defaulting to bottom_right."
         )
         x = img_width - text_width - padding
@@ -208,7 +210,7 @@ def _add_text_overlay(
                         parsed_bg_color, "RGBA"
                     )
                 except ValueError:
-                    logging.warning(
+                    logger.warning(
                         f"Invalid background color name: {background_color}. Defaulting to semi-transparent black."
                     )
                     bg_color_tuple_with_alpha = (0, 0, 0, 128)
@@ -264,7 +266,7 @@ def add_timestamp(
         else:
             final_text_to_draw = formatted_time
     except Exception as e:
-        logging.error(f"Error formatting timestamp: {e}. Using default format.")
+        logger.error(f"Error formatting timestamp: {e}. Using default format.")
         formatted_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         if custom_text:
             final_text_to_draw = f"{custom_text} {formatted_time}"
@@ -292,19 +294,19 @@ def postprocess(
     exif_data = pic.info.get("exif") or b""
     for step in postprocessing_steps:
         if step["type"] == "crop":
-            logging.debug(f"Cropping image to area: {step['area']}")
+            logger.debug(f"Cropping image to area: {step['area']}")
             pic = crop(pic, step["area"])
         elif step["type"] == "resize":
-            logging.debug(
+            logger.debug(
                 f"Resizing image to width: {step.get('width')}, height: {step.get('height')}"
             )
             pic = resize(pic, step.get("width"), step.get("height"))
         elif step["type"] == "awb":
-            logging.debug("Applying auto white balance to image")
+            logger.debug("Applying auto white balance to image")
             pic = auto_white_balance(pic)
         elif step["type"] == "timestamp":
             if step.get("enabled", False):
-                logging.debug(
+                logger.debug(
                     f"Adding timestamp with config: "
                     f"format={step.get('format', '%Y-%m-%d %H:%M:%S %Z')}, "
                     f"position={step.get('position', 'bottom_right')}, "
@@ -329,7 +331,7 @@ def postprocess(
                 )
         elif step["type"] == "text":
             if step.get("enabled", False) and step.get("text_content"):
-                logging.debug(
+                logger.debug(
                     f"Adding generic text overlay with config: "
                     f"text_content='{step.get('text_content')}', "
                     f"position={step.get('position', 'bottom_right')}, "
@@ -350,7 +352,7 @@ def postprocess(
                     background_padding=step.get("background_padding", 2),
                 )
             elif not step.get("text_content") and step.get("enabled", False):
-                logging.warning(
+                logger.warning(
                     "Generic text step is enabled but no 'text_content' was provided."
                 )
 
@@ -368,7 +370,7 @@ def crop(pic: Image.Image, area: str) -> Image.Image:
         crop_points_list[2],
         crop_points_list[3],
     )
-    logging.debug(f"Cropping picture to {crop_points}")
+    logger.debug(f"Cropping picture to {crop_points}")
     return pic.crop(crop_points)
 
 
@@ -450,7 +452,7 @@ def gather_metrics(image_path: str, camera_name: str):
                         ).set(pil_img.height)
 
             except Exception as e:
-                logging.error(
+                logger.error(
                     f"Error getting file stats or dimensions for {image_path}: {e}"
                 )
 
@@ -484,7 +486,7 @@ def gather_metrics(image_path: str, camera_name: str):
                 get_exif_value("Exif.Photo.WhiteBalance")
             )
 
-            logging.debug(f"Successfully gathered metrics for {image_path}")
+            logger.debug(f"Successfully gathered metrics for {image_path}")
 
     except Exception as e:
-        logging.error(f"Error reading metadata from {image_path} with pyexiv2: {e}")
+        logger.error(f"Error reading metadata from {image_path} with pyexiv2: {e}")
