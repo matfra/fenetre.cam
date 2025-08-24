@@ -36,7 +36,11 @@ class ModuleColorFormatter(logging.Formatter):
         base = super().format(record)
         color = _module_color(record.name)
         if color:
-            return f"{color}{base}{RESET}"
+            parts = base.split("]", 1)
+            if len(parts) == 2:
+                return f"{color}{parts[0]}{RESET}{parts[1]}"
+            else:
+                return f"{color}{base}{RESET}"
         return base
 
 

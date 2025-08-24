@@ -1232,7 +1232,7 @@ def timelapse_loop():
                     camera_name = os.path.basename(
                         os.path.dirname(os.path.normpath(dir_to_process))
                     )
-                    metric_tim_lapses_created_total.labels(
+                    metric_timelapses_created_total.labels(
                         camera_name=camera_name, type="daily"
                     ).inc()
                     # Now we can delete the frequent timelapse file if it exists
