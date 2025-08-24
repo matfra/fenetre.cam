@@ -42,7 +42,12 @@ from fenetre.daylight import run_end_of_day
 from fenetre.gopro_utility import GoProUtilityThread, format_gopro_sd_card
 from fenetre.platform_utils import is_raspberry_pi, rotate_log_file
 from fenetre.postprocess import gather_metrics, postprocess
-from fenetre.timelapse import create_timelapse
+from fenetre.timelapse import (
+    add_to_timelapse_queue,
+    create_timelapse,
+    get_next_from_timelapse_queue,
+    remove_from_timelapse_queue,
+)
 from fenetre.ui_utils import copy_public_html_files
 
 # Define flags at module level
@@ -328,7 +333,7 @@ def snap(camera_name, camera_config: Dict):
     previous_exif = previous_pic.info.get("exif") or b""
     if len(camera_config.get("postprocessing", [])) > 0:
         previous_pic, previous_exif = postprocess(
-            previous_pic, camera_config.get("postprocessing", [])
+            previous_pic, camera_config.get("postprocessing", []), global_config
         )
     fixed_snap_interval = camera_config.get("snap_interval_s", None)
     if camera_name not in sleep_intervals:
@@ -415,7 +420,7 @@ def snap(camera_name, camera_config: Dict):
             raise ValueError
         if len(camera_config.get("postprocessing", [])) > 0:
             new_pic, new_exif = postprocess(
-                new_pic, camera_config.get("postprocessing", [])
+                new_pic, camera_config.get("postprocessing", []), global_config
             )
         if fixed_snap_interval is None:
             ssim = get_ssim_for_area(
@@ -1195,12 +1200,9 @@ def timelapse_loop():
     This prevent overloading the system by creating new daily timelapses for all the cameras at the same time.
     """
     while not exit_event.is_set():
-        dir_to_process = None
-        with timelapse_queue_lock:
-            with open(timelapse_queue_file, "r") as f:
-                lines = f.readlines()
-                if lines:
-                    dir_to_process = lines[0].strip()
+        dir_to_process = get_next_from_timelapse_queue(
+            timelapse_queue_file, timelapse_queue_lock
+        )
 
         if dir_to_process:
             try:
@@ -1209,7 +1211,9 @@ def timelapse_loop():
                     overwrite=True,
                     two_pass=timelapse_config.get("ffmpeg_2pass", True),
                     log_dir=global_config.get("log_dir"),
-                    ffmpeg_options=timelapse_config.get("ffmpeg_options", "-c:v libvpx-vp9 -b:v 0 -crf 30 -deadline best"),
+                    ffmpeg_options=timelapse_config.get(
+                        "ffmpeg_options", "-c:v libvpx-vp9 -b:v 0 -crf 30 -deadline best"
+                    ),
                     file_extension=timelapse_config.get("file_extension", "webm"),
                     framerate=timelapse_config.get("framerate", 60),
                 )
@@ -1221,25 +1225,30 @@ def timelapse_loop():
                         camera_name=camera_name
                     ).inc()
                     # Now we can delete the frequent timelapse file if it exists
-                    frequent_timelapse_config = timelapse_config.get("frequent_timelapse", {})
+                    frequent_timelapse_config = timelapse_config.get(
+                        "frequent_timelapse", {}
+                    )
                     if frequent_timelapse_config:
-                        frequent_timelapse_file_extention = frequent_timelapse_config.get("file_extension", "mp4")
-                        if frequent_timelapse_file_extention != timelapse_config.get("file_extension", "webm"):
-                            frequent_timelapse_filepath = os.path.join(dir_to_process, os.path.basename(dir_to_process) + "." + frequent_timelapse_file_extention)
+                        frequent_timelapse_file_extention = (
+                            frequent_timelapse_config.get("file_extension", "mp4")
+                        )
+                        if frequent_timelapse_file_extention != timelapse_config.get(
+                            "file_extension", "webm"
+                        ):
+                            frequent_timelapse_filepath = os.path.join(
+                                dir_to_process,
+                                os.path.basename(dir_to_process)
+                                + "."
+                                + frequent_timelapse_file_extention,
+                            )
                             if os.path.exists(frequent_timelapse_filepath):
                                 os.remove(frequent_timelapse_filepath)
-                                logging.info(f"Deleted frequent timelapse file: {frequent_timelapse_filepath}")
-                    # We need to re-read the file in case the archival script added more work to the queue.
-                    with timelapse_queue_lock:
-                        with open(timelapse_queue_file, "r+") as f:
-                            lines = f.readlines()
-                            new_lines = []
-                            for line in lines:
-                                if line.strip() != dir_to_process:
-                                    new_lines.append(line)
-                                f.seek(0)
-                                f.truncate()
-                                f.writelines(new_lines)
+                                logging.info(
+                                    f"Deleted frequent timelapse file: {frequent_timelapse_filepath}"
+                                )
+                    remove_from_timelapse_queue(
+                        dir_to_process, timelapse_queue_file, timelapse_queue_lock
+                    )
                 else:
                     logging.error(
                         f"There was an error creating the timelapse for dir: {dir_to_process}"
@@ -1267,9 +1276,9 @@ def daylight_loop():
                 f"Running daylight in {daily_pic_dir} with sky_area {sky_area}"
             )
             run_end_of_day(camera_name, daily_pic_dir, sky_area)
-            with timelapse_queue_lock:
-                with open(timelapse_queue_file, "a") as f:
-                    f.write(f"{daily_pic_dir}\n")
+#            add_to_timelapse_queue(
+#                daily_pic_dir, timelapse_queue_file, timelapse_queue_lock
+#            )
             archive_q.append(daily_pic_dir)
         time.sleep(1)
 

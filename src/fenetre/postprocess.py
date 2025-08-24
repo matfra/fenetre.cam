@@ -1,11 +1,10 @@
 import os
 from datetime import datetime
-from typing import Optional, Tuple, Union
+from typing import Dict, Optional, Tuple, Union
 
 import numpy as np
 import pyexiv2
-import pytz  # To get timezone from global_config easily
-import yaml  # For get_timezone_from_config
+import pytz
 from absl import logging
 from PIL import Image, ImageDraw, ImageFont
 from skimage import exposure
@@ -20,29 +19,6 @@ from fenetre.admin_server import (
     metric_picture_white_balance,
     metric_picture_width_pixels,
 )
-
-
-# It's not ideal to re-read the config here, but it's the simplest way to get timezone
-# without a major refactor of how config is passed down.
-# Consider refactoring if more global configs are needed here.
-def get_timezone_from_config():
-    try:
-        with open("config.yaml", "r") as f:
-            config = yaml.safe_load(f)
-            return config.get("global", {}).get("timezone", "UTC")
-    except FileNotFoundError:
-        logging.warning(
-            "config.yaml not found, defaulting timezone to UTC for timestamps."
-        )
-        return "UTC"
-    except Exception as e:
-        logging.error(
-            f"Error reading timezone from config.yaml: {e}. Defaulting to UTC."
-        )
-        return "UTC"
-
-
-DEFAULT_TIMEZONE = get_timezone_from_config()
 
 
 def _parse_color(color_input: Union[str, Tuple[int, int, int]]) -> Tuple[int, int, int]:
@@ -252,11 +228,11 @@ def add_timestamp(
     background_color: Optional[Union[str, Tuple[int, int, int]]] = None,
     background_padding: int = 2,
     custom_text: Optional[str] = None,
+    timezone: str = "UTC",
 ) -> Image.Image:
     """Adds a timestamp and optional custom text to the image by utilizing _add_text_overlay."""
     try:
-        tz_str = DEFAULT_TIMEZONE
-        tz = pytz.timezone(tz_str)
+        tz = pytz.timezone(timezone)
         now = datetime.now(tz)
         formatted_time = now.strftime(text_format)
         if custom_text:
@@ -284,11 +260,15 @@ def add_timestamp(
 
 
 def postprocess(
-    pic: Image.Image, postprocessing_steps: list
+    pic: Image.Image,
+    postprocessing_steps: list,
+    global_config: Optional[Dict] = None,
 ) -> Tuple[Image.Image, dict]:
     """
     Applies a series of post-processing steps to an image.
     """
+    if global_config is None:
+        global_config = {}
     exif_data = pic.info.get("exif") or b""
     for step in postprocessing_steps:
         if step["type"] == "crop":
@@ -326,6 +306,7 @@ def postprocess(
                     background_color=step.get("background_color", None),
                     background_padding=step.get("background_padding", 2),
                     custom_text=step.get("custom_text", None),
+                    timezone=global_config.get("timezone", "UTC"),
                 )
         elif step["type"] == "text":
             if step.get("enabled", False) and step.get("text_content"):

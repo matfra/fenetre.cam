@@ -2,6 +2,7 @@ import glob
 import json
 import os
 import subprocess
+import threading
 from typing import Optional
 
 from datetime import datetime
@@ -10,6 +11,7 @@ from PIL import Image
 
 from fenetre.platform_utils import is_raspberry_pi, rotate_log_file
 from io import TextIOWrapper
+
 
 
 def get_image_dimensions(image_path: str):
@@ -43,6 +45,7 @@ def create_timelapse(
         logging.error(f"No jpg images found in {dir}.")
         return
 
+    logging.debug(f"Found {images_count} pictures. Looking for duplicates or 0-bytes ones")
     previous_image_size_bytes = 0
     # Delete 0-byte images
     for image_path in image_files:
@@ -229,6 +232,73 @@ def create_timelapse(
                         break
         return True
     return False
+
+
+def add_to_timelapse_queue(
+    daydir: str, timelapse_queue_file: str, lock: threading.Lock
+):
+    """Adds a directory to the timelapse queue file if it's not already there."""
+    with lock:
+        # a+ creates the file if it does not exist and opens it for reading and appending.
+        with open(timelapse_queue_file, "a+") as f:
+            f.seek(0)  # Go to the beginning to read the content
+            lines = f.readlines()
+            daydir_stripped = daydir.strip()
+            # Check if daydir is already in the queue
+            for line in lines:
+                if daydir_stripped == line.strip():
+                    logging.info(
+                        f"{daydir_stripped} was already in the timelapse queue. Not adding it again."
+                    )
+                    return
+
+            # Add the new daydir and sort the queue
+            lines.append(f"{daydir_stripped}\n")
+            # Sort by date descending, so newest are first.
+            lines.sort(key=lambda p: os.path.basename(p.strip()), reverse=True)
+            f.seek(0)
+            f.truncate()
+            f.writelines(lines)
+            logging.info(
+                f"Added {daydir_stripped} to the timelapse queue. Queue size: {len(lines)}"
+            )
+
+
+def get_next_from_timelapse_queue(
+    timelapse_queue_file: str, lock: threading.Lock
+) -> Optional[str]:
+    """Gets the next item from the queue without removing it."""
+    with lock:
+        try:
+            with open(timelapse_queue_file, "r") as f:
+                lines = f.readlines()
+                if not lines:
+                    return None
+                return lines[0].strip()
+        except FileNotFoundError:
+            return None
+
+
+def remove_from_timelapse_queue(
+    daydir: str, timelapse_queue_file: str, lock: threading.Lock
+):
+    """Removes a specific directory from the timelapse queue file."""
+    with lock:
+        try:
+            with open(timelapse_queue_file, "r+") as f:
+                lines = f.readlines()
+                new_lines = [line for line in lines if line.strip() != daydir.strip()]
+                if len(new_lines) < len(lines):
+                    f.seek(0)
+                    f.truncate()
+                    f.writelines(new_lines)
+                    logging.info(f"Removed {daydir.strip()} from timelapse queue.")
+                else:
+                    logging.warning(
+                        f"Tried to remove {daydir.strip()} from timelapse queue, but it was not found."
+                    )
+        except FileNotFoundError:
+            logging.error(f"Timelapse queue file not found at {timelapse_queue_file}")
 
 
 def main(argv):

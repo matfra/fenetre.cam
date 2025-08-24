@@ -304,7 +304,7 @@ class GoProUtilityThread(threading.Thread):
 
     def run(self):
         logging.info(f"Starting GoPro utility thread for {self.gopro_ip}")
-        self.gopro.validate_presets()
+#        self.gopro.validate_presets()
         while not self.exit_event.is_set():
             try:
                 # 1. Verify IP connectivity

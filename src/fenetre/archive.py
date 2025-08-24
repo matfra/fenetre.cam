@@ -16,7 +16,7 @@ from fenetre.admin_server import (
 )
 from fenetre.config import config_load
 from fenetre.daylight import run_end_of_day
-from fenetre.timelapse import create_timelapse
+from fenetre.timelapse import create_timelapse, add_to_timelapse_queue
 
 
 def scan_and_publish_metrics(camera_name: str, camera_dir: str, global_config: dict):
@@ -197,25 +197,9 @@ def archive_daydir(
 
                 )
             else:
-                with timelapse_queue_file_lock:
-                    with open(timelapse_queue_file, "r+") as f:
-                        daydir_already_exists=False
-                        lines = f.readlines()
-                        queue_size=len(lines)
-                        position=0
-                        for line in lines:
-                            position += 1
-                            if daydir == line.strip():
-                                daydir_already_exists=True
-                                logging.info(f"{daydir} was already in the timelapse queue (position {position}/{queue_size}). Not adding it again")
-                                break
-                        if not daydir_already_exists:
-                            lines.append(f"{daydir}\n")
-                            f.seek(0)
-                            f.truncate()
-                            f.writelines(sorted(lines, key=lambda p: os.path.basename(p), reverse=True))
-                            queue_size += 1
-                            logging.info(f"Added the dir {daydir} to the timelapse queue ({queue_size})")
+                add_to_timelapse_queue(
+                    daydir, timelapse_queue_file, timelapse_queue_file_lock
+                )
                 return False
         else:
             logging.warning(f"{daydir} does not contain a timelapse file.")
