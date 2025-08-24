@@ -32,7 +32,9 @@ metric_capture_failures_total = Counter(
     "capture_failures_total", "Total number of capture failures", ["camera_name"]
 )
 metric_timelapses_created_total = Counter(
-    "timelapses_created_total", "Total number of timelapses created", ["camera_name"]
+    "timelapses_created_total",
+    "Total number of timelapses created",
+    ["camera_name", "type"],
 )
 metric_camera_directory_size_bytes = Gauge(
     "camera_directory_size_bytes",

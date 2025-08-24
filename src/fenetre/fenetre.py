@@ -1184,7 +1184,7 @@ def frequent_timelapse_loop():
                     os.path.dirname(os.path.normpath(pic_dir))
                 )
                 metric_timelapses_created_total.labels(
-                    camera_name=camera_name
+                    camera_name=camera_name, type="frequent"
                 ).inc()
             else:
                 logger.error(
@@ -1232,8 +1232,8 @@ def timelapse_loop():
                     camera_name = os.path.basename(
                         os.path.dirname(os.path.normpath(dir_to_process))
                     )
-                    metric_timelapses_created_total.labels(
-                        camera_name=camera_name
+                    metric_tim_lapses_created_total.labels(
+                        camera_name=camera_name, type="daily"
                     ).inc()
                     # Now we can delete the frequent timelapse file if it exists
                     frequent_timelapse_config = timelapse_config.get("frequent_timelapse", {})
