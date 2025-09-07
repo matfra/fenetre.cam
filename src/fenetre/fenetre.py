@@ -48,6 +48,7 @@ from fenetre.timelapse import (
     add_to_timelapse_queue,
     create_timelapse,
     get_next_from_timelapse_queue,
+    get_queue_size_and_set_metric,
     remove_from_timelapse_queue,
 )
 from fenetre.ui_utils import copy_public_html_files
@@ -55,7 +56,8 @@ from fenetre.ui_utils import copy_public_html_files
 logger = logging.getLogger(__name__)
 
 # Define flags at module level
-flags.DEFINE_string("config", "config.yaml", "path to YAML config file")
+if 'config' not in flags.FLAGS:
+    flags.DEFINE_string("config", "config.yaml", "path to YAML config file")
 
 FLAGS = flags.FLAGS
 
@@ -788,6 +790,7 @@ def main(argv):
     )
     if not os.path.exists(timelapse_queue_file):
         open(timelapse_queue_file, "a").close()  # Create the file if it does not exist
+    get_queue_size_and_set_metric(timelapse_queue_file, timelapse_queue_lock)
 
     # These queues are global and should persist across reloads if fenetre.py itself isn't restarted.
     # If reload implies restarting these loops, then re-initialization might be needed in reload_configuration_logic

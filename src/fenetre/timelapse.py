@@ -10,6 +10,7 @@ from datetime import datetime
 from absl import app, flags
 from PIL import Image
 from .logging_utils import setup_logging
+from fenetre.admin_server import metric_timelapse_queue_size
 
 logger = logging.getLogger(__name__)
 
@@ -266,6 +267,20 @@ def add_to_timelapse_queue(
             logging.info(
                 f"Added {daydir_stripped} to the timelapse queue. Queue size: {len(lines)}"
             )
+            metric_timelapse_queue_size.set(len(lines))
+
+
+def get_queue_size_and_set_metric(timelapse_queue_file: str, lock: threading.Lock):
+    """Reads the queue file and sets the initial value for the metric."""
+    with lock:
+        try:
+            with open(timelapse_queue_file, "r") as f:
+                lines = f.readlines()
+                metric_timelapse_queue_size.set(len(lines))
+                logging.info(f"Initial timelapse queue size: {len(lines)}")
+        except FileNotFoundError:
+            metric_timelapse_queue_size.set(0)
+            logging.info("Initial timelapse queue size: 0 (file not found)")
 
 
 def get_next_from_timelapse_queue(
@@ -297,6 +312,7 @@ def remove_from_timelapse_queue(
                     f.truncate()
                     f.writelines(new_lines)
                     logging.info(f"Removed {daydir.strip()} from timelapse queue.")
+                    metric_timelapse_queue_size.set(len(new_lines))
                 else:
                     logging.warning(
                         f"Tried to remove {daydir.strip()} from timelapse queue, but it was not found."

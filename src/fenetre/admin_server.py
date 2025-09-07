@@ -36,6 +36,9 @@ metric_timelapses_created_total = Counter(
     "Total number of timelapses created",
     ["camera_name", "type"],
 )
+metric_timelapse_queue_size = Gauge(
+    "timelapse_queue_size", "Number of timelapses in the queue"
+)
 metric_camera_directory_size_bytes = Gauge(
     "camera_directory_size_bytes",
     "Size of the camera directory in bytes",
