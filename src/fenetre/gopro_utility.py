@@ -6,7 +6,6 @@ Most of the code here is copied from tutorial modules at https://github.com/gopr
 import asyncio
 import enum
 import logging
-import re
 import socket
 import threading
 import time
@@ -106,20 +105,20 @@ def exception_handler(loop: asyncio.AbstractEventLoop, context: dict[str, Any]) 
 
 
 async def connect_ble(
-    notification_handler: noti_handler_T, identifier: str | None = None
+    notification_handler: noti_handler_T,
+    identifier: str | None = None,
+    adapter: str | None = None,
 ) -> BleakClient:
     """Connect to a GoPro, then pair, and enable notifications
 
     If identifier is None, the first discovered GoPro will be connected to.
 
-    Retry 10 times
+    Retry forever
 
     Args:
         notification_handler (noti_handler_T): callback when notification is received
         identifier (str, optional): Last 4 digits of GoPro serial number. Defaults to None.
-
-    Raises:
-        Exception: couldn't establish connection after retrying 10 times
+        adapter (str, optional): bluetooth adapter to use. Defaults to None.
 
     Returns:
         BleakClient: connected client
@@ -127,46 +126,56 @@ async def connect_ble(
 
     asyncio.get_event_loop().set_exception_handler(exception_handler)
 
-    RETRIES = 10
-    for retry in range(RETRIES):
+    retry_count = 0
+    while True:
+        time.sleep(5)
+        retry_count += 1
         try:
-            # Map of discovered devices indexed by name
-            devices: dict[str, BleakDevice] = {}
+            device: BleakDevice | None = None
+            # Scan until we find a device
+            while device is None:
+                devices: dict[str, BleakDevice] = {}
+                logger.info("Scanning for bluetooth devices...")
+                if adapter:
+                    logger.info(f"Using bluetooth adapter: {adapter}")
 
-            # Scan for devices
-            logger.info("Scanning for bluetooth devices...")
+                # Scan callback to also catch nonconnectable scan responses
+                def _scan_callback(scanned_device: BleakDevice, _: Any) -> None:
+                    # Add to the dict if not unknown
+                    if scanned_device.name and scanned_device.name != "Unknown":
+                        devices[scanned_device.name] = scanned_device
 
-            # Scan callback to also catch nonconnectable scan responses
-            # pylint: disable=cell-var-from-loop
-            def _scan_callback(device: BleakDevice, _: Any) -> None:
-                # Add to the dict if not unknown
-                if device.name and device.name != "Unknown":
-                    devices[device.name] = device
+                # Discover devices
+                await BleakScanner.discover(
+                    timeout=5, detection_callback=_scan_callback, adapter=adapter
+                )
 
-            # Scan until we find devices
-            matched_devices: list[BleakDevice] = []
-            while len(matched_devices) == 0:
-                # Now get list of connectable advertisements
-                for device in await BleakScanner.discover(
-                    timeout=5, detection_callback=_scan_callback
-                ):
-                    if device.name and device.name != "Unknown":
-                        devices[device.name] = device
                 # Log every device we discovered
-                for d in devices:
-                    logger.info(f"\tDiscovered: {d}")
-                # Now look for our matching device(s)
-                token = re.compile(identifier or r"GoPro [A-Z0-9]{4}")
-                matched_devices = [
-                    device for name, device in devices.items() if token.match(name)
-                ]
-                logger.info(f"Found {len(matched_devices)} matching devices.")
+                for d_name in devices:
+                    logger.info(f"	Discovered: {d_name}")
 
-            # Connect to first matching Bluetooth device
-            device = matched_devices[0]
+                # Look for a matching device
+                if identifier:
+                    id_str = str(identifier)
+                    for name, found_device in devices.items():
+                        if id_str in name:
+                            device = found_device
+                            logger.info(
+                                f"Found matching device by identifier '{id_str}': {name}"
+                            )
+                            break
+                else:
+                    for name, found_device in devices.items():
+                        if name.startswith("GoPro"):
+                            device = found_device
+                            logger.info(f"Found first available GoPro: {name}")
+                            break
+
+                if not device:
+                    logger.warning("No matching GoPro found. Retrying scan...")
 
             logger.info(f"Establishing BLE connection to {device}...")
-            client = BleakClient(device)
+            client = BleakClient(device, adapter=adapter)
             await client.connect(timeout=15)
             logger.info("BLE Connected!")
 
@@ -192,18 +201,20 @@ async def connect_ble(
             return client
         except Exception as exc:  # pylint: disable=broad-exception-caught
             logger.error(f"Connection establishment failed: {exc}")
-            logger.warning(f"Retrying #{retry}")
-
-    raise RuntimeError(f"Couldn't establish BLE connection after {RETRIES} retries")
+            logger.warning(f"Retrying #{retry_count}")
 
 
-async def enable_wifi(identifier: str | None = None) -> tuple[str, str, BleakClient]:
+async def enable_wifi(
+    identifier: str | None = None,
+    adapter: str | None = None,
+) -> tuple[str, str, BleakClient]:
     """Connect to a GoPro via BLE, find its WiFi AP SSID and password, and enable its WiFI AP
 
     If identifier is None, the first discovered GoPro will be connected to.
 
     Args:
         identifier (str, optional): Last 4 digits of GoPro serial number. Defaults to None.
+        adapter (str, optional): bluetooth adapter to use. Defaults to None.
 
     Returns:
         Tuple[str, str]: ssid, password
@@ -213,7 +224,8 @@ async def enable_wifi(identifier: str | None = None) -> tuple[str, str, BleakCli
     client: BleakClient
 
     async def notification_handler(
-        characteristic: BleakGATTCharacteristic, data: bytearray
+        characteristic: BleakGATTCharacteristic,
+        data: bytearray,
     ) -> None:
         uuid = GoProUuid(client.services.characteristics[characteristic.handle].uuid)
         logger.info(f'Received response at {uuid}: {data.hex(":")}')
@@ -228,7 +240,7 @@ async def enable_wifi(identifier: str | None = None) -> tuple[str, str, BleakCli
         # Notify the writer
         event.set()
 
-    client = await connect_ble(notification_handler, identifier)
+    client = await connect_ble(notification_handler, identifier, adapter)
 
     # Read from WiFi AP SSID BleUUID
     ssid_uuid = GoProUuid.WIFI_AP_SSID_UUID
@@ -277,7 +289,7 @@ def _get_gopro_state(ip_address: str, root_ca: Optional[str] = None) -> Dict:
         return response.json()
     except requests.RequestException as e:
         logger.error(f"Failed to get GoPro state from {ip_address}: {e}")
-        return {}
+        return {{}}
 
 
 class GoProUtilityThread(threading.Thread):
@@ -298,6 +310,7 @@ class GoProUtilityThread(threading.Thread):
         self.exit_event = exit_event
         self.gopro_ip = camera_config.get("gopro_ip")
         self.gopro_ble_identifier = camera_config.get("gopro_ble_identifier")
+        self.bluetooth_adapter = camera_config.get("bluetooth_adapter")
         self.poll_interval_s = camera_config.get("gopro_utility_poll_interval_s", 10)
         self.bluetooth_retry_delay_s = camera_config.get(
             "gopro_bluetooth_retry_delay_s", 180
@@ -374,11 +387,14 @@ class GoProUtilityThread(threading.Thread):
 
     async def _enable_wifi_ap(self):
         try:
-            ssid, password, client = await enable_wifi()
+            ssid, password, client = await enable_wifi(
+                identifier=self.gopro_ble_identifier, adapter=self.bluetooth_adapter
+            )
             self._ble_client = client  # Store client for potential later disconnect
             logger.info(f"GoPro Wi-Fi AP enabled. SSID: {ssid}, Password: {password}")
         except Exception as e:
             logger.error(f"Failed to enable GoPro Wi-Fi AP via Bluetooth: {e}")
+
 
     def _check_ip_connectivity(self) -> bool:
         try:

@@ -60,4 +60,11 @@ You must provide the path to a configuration file using the `--config` flag. A s
 
 The application will start, and based on your configuration, it will begin capturing images.
 
+### GoPro
+
+On the first run:
+- Put the GoPro in Pairing mode (Menu connections wireless Quic)
+- Open bluetoothctl and locate the Mac address of the GoPro (use `scan le` if it's not already showing) then type `trust <MAC_ADDR>` and `pair <MAC_ADDR>`. You can then exit bluetoothctl with `quit`. Remeber to `scan off` if you had to turn ont he scan.
+- In the app logs, you should see the Wi-Fi SSID and the password to connect to the GoPro. You may want to configure your system (netplan, wpa_supplicant ...) to autoconnect to the GoPro.
+
 **By default, the admin server runs on `http://0.0.0.0:8889`.**

@@ -88,6 +88,7 @@ cameras:
   a-gopro-camera:
     gopro_ip: "10.5.5.9"
     gopro_ble_identifier: "XXXX" # Last 4 digits of GoPro serial number
+    bluetooth_adapter: "hci0" # Optional: specify bluetooth adapter (e.g. hci0 or hci1)
     gopro_root_ca: |
       -----BEGIN CERTIFICATE-----
       YOUR-GOPRO-ROOT-CA
