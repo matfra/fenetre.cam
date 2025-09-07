@@ -208,6 +208,7 @@ class TestPostprocess(unittest.TestCase):
             background_color=None,
             background_padding=2,
             custom_text=None,
+            timezone="UTC",
         )
 
     @patch("fenetre.postprocess.add_timestamp")
