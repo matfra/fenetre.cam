@@ -122,7 +122,7 @@ function updateCamera(camera, cameraData) {
 
             thumbImg.src = fullImageUrl;
             detailsImg.src = fullImageUrl;
-            filenameLink.textContent = filename;
+            filenameLink.textContent = "Download: " + filename;
             filenameLink.href = fullImageUrl;
 
             const imageDate = parseTimestampFromFilename(filename);
