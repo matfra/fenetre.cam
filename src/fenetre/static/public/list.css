@@ -115,6 +115,11 @@ body.dark-mode .camera-details {
     margin-bottom: 15px;
     word-wrap: break-word;
 }
+.original-url {
+    font-size: 0.9em;
+    margin-bottom: 15px;
+    word-wrap: break-word;
+}
 body.dark-mode .camera-details .filename {
     color: #ccc;
 }

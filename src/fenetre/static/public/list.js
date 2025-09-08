@@ -66,6 +66,7 @@ function createCameraListItem(camera) {
                 <img src="" alt="Full image for ${camera.title}">
             </a>
             <a class="filename" href="#" download></a>
+            <div class="original-url"></div>
             <div class="links">
                 <a class="link-fullscreen" href="#" target="_blank">Fullscreen</a>
                 <a class="link-today" href="#" target="_blank">Today's Pictures</a>
@@ -103,6 +104,7 @@ function updateCamera(camera, cameraData) {
     const detailsImg = listItem.querySelector('.camera-details img');
     const fullscreenImageLink = listItem.querySelector('.fullscreen-image-link');
     const filenameLink = listItem.querySelector('.camera-details .filename');
+    const originalUrlDiv = listItem.querySelector('.original-url');
     const linkFullscreen = listItem.querySelector('.link-fullscreen');
     const linkToday = listItem.querySelector('.link-today');
     const linkTimelapseToday = listItem.querySelector('.link-timelapse-today');
@@ -163,6 +165,12 @@ function updateCamera(camera, cameraData) {
             linkTimelapse.style.display = 'inline-block';
 
             linkHistory.href = `${photo_dir}/daylight.html`;
+
+            if (camera.original_url) {
+                originalUrlDiv.innerHTML = `Original URL: <a href="${camera.original_url}" target="_blank">${camera.original_url}</a>`;
+            } else {
+                originalUrlDiv.innerHTML = '';
+            }
         })
         .catch(error => {
             lastPictureTime.textContent = 'Error loading metadata';
@@ -171,12 +179,27 @@ function updateCamera(camera, cameraData) {
         });
 }
 
+let initialCameraExpanded = false;
+
 function updateAllCameras() {
     fetch('/cameras.json')
         .then(response => response.ok ? response.json() : Promise.reject('Network response was not ok.'))
         .then(data => {
             const cameras = data.cameras;
             cameras.forEach(camera => updateCamera(camera, data));
+
+            if (!initialCameraExpanded) {
+                const urlParams = new URLSearchParams(window.location.search);
+                const cameraNameToExpand = urlParams.get('camera');
+                if (cameraNameToExpand) {
+                    const listItem = document.querySelector(`li[data-title="${cameraNameToExpand}"]`);
+                    if (listItem) {
+                        const details = listItem.querySelector('.camera-details');
+                        details.classList.add('active');
+                        initialCameraExpanded = true;
+                    }
+                }
+            }
         })
         .catch(error => {
             console.error('Error loading cameras.json:', error);

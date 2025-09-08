@@ -731,7 +731,7 @@ def update_cameras_metadata(cameras_configs: Dict, work_dir: str):
         metadata["title"] = cam
         metadata["url"] = f"map.html?camera={cam}"
         metadata["fullscreen_url"] = f"fullscreen.html?camera={cam}"
-        metadata["livefeed_url"] = cameras_config[cam].get("url") or cameras_config[
+        metadata["original_url"] = cameras_config[cam].get("url") or cameras_config[
             cam
         ].get("local_command")
         metadata["description"] = cameras_config[cam].get("description", "")
