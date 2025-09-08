@@ -62,7 +62,9 @@ function createCameraListItem(camera) {
             <div class="status"></div>
         </div>
         <div class="camera-details">
-            <img src="" alt="Full image for ${camera.title}">
+            <a class="fullscreen-image-link" href="#" target="_blank">
+                <img src="" alt="Full image for ${camera.title}">
+            </a>
             <a class="filename" href="#" download></a>
             <div class="links">
                 <a class="link-fullscreen" href="#" target="_blank">Fullscreen</a>
@@ -99,6 +101,7 @@ function updateCamera(camera, cameraData) {
     const lastPictureTime = listItem.querySelector('.last-picture-time');
     const status = listItem.querySelector('.status');
     const detailsImg = listItem.querySelector('.camera-details img');
+    const fullscreenImageLink = listItem.querySelector('.fullscreen-image-link');
     const filenameLink = listItem.querySelector('.camera-details .filename');
     const linkFullscreen = listItem.querySelector('.link-fullscreen');
     const linkToday = listItem.querySelector('.link-today');
@@ -144,7 +147,9 @@ function updateCamera(camera, cameraData) {
             const frequentTimelapseExtension = cameraData.global.frequent_timelapse_file_extension || 'mp4';
             const photo_dir = `/photos/${camera.title}`;
 
-            linkFullscreen.href = `fullscreen.html?camera=${encodeURIComponent(camera.title)}`;
+            const fullscreenUrl = `fullscreen.html?camera=${encodeURIComponent(camera.title)}`;
+            linkFullscreen.href = fullscreenUrl;
+            fullscreenImageLink.href = fullscreenUrl;
             linkToday.href = `${photo_dir}/${todayStr}/`;
 
             const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
