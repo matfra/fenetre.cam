@@ -39,7 +39,7 @@
       // Add a cache-busting parameter to the URL.
       const imageUrl = `photos/${cameraName}/latest.jpg?t=${Date.now()}`;
       imageElement.src = imageUrl;
-      cameraLink.href = `camera.html?camera=${encodeURIComponent(cameraName)}`;
+      cameraLink.href = 'list.html';
     } else {
       imageElement.alt = "No camera specified. Please add '?camera=CAMERA_NAME' to the URL.";
     }
