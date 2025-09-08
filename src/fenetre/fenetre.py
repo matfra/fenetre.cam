@@ -1162,8 +1162,8 @@ def frequent_timelapse_scheduler_loop():
     """
     interval = timelapse_config.get("frequent_timelapse").get("interval_s", 1200)
     while not exit_event.is_set():
-        logger.info(f"Time to update today's timelapses.")
         for camera_name in cameras_config:
+            logger.info(f"Time to update the frequent timelapse for {camera_name}.")
             pic_dir, _ = get_pic_dir_and_filename(camera_name)
             timelapse_settings_tuple = (pic_dir, timelapse_config.get("frequent_timelapse"))
             frequent_timelapse_q.append(timelapse_settings_tuple)
@@ -1231,6 +1231,7 @@ def timelapse_loop():
                     file_extension=timelapse_config.get("file_extension", "webm"),
                     framerate=timelapse_config.get("framerate", 60),
                 )
+                logging.info(f"ffmpeg ran. Result is {result}")
                 if result:
                     camera_name = os.path.basename(
                         os.path.dirname(os.path.normpath(dir_to_process))

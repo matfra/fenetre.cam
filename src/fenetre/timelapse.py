@@ -302,6 +302,7 @@ def remove_from_timelapse_queue(
     daydir: str, timelapse_queue_file: str, lock: threading.Lock
 ):
     """Removes a specific directory from the timelapse queue file."""
+    logging.info(f"Removing {daydir} from {timelapse_queue_file}.")
     with lock:
         try:
             with open(timelapse_queue_file, "r+") as f:
