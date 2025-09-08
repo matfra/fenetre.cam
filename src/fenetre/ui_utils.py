@@ -5,31 +5,64 @@ import shutil
 
 
 def generate_index_html(work_dir: str, global_config: dict):
-    """Generates the index.html file to redirect to the configured landing page."""
+    """Generates the index.html file by copying the configured landing page."""
+    logger = logging.getLogger(__name__)
     ui_config = global_config.get("ui", {})
-    landing_page = ui_config.get("landing_page", "list")
-    redirect_url = f"{landing_page}.html"
+    landing_page = ui_config.get("landing_page", "list")  # default to list
+
+    dest_path = os.path.join(work_dir, "index.html")
 
     if landing_page == "fullscreen":
         camera_name = ui_config.get("fullscreen_camera")
-        if camera_name:
-            redirect_url = f"fullscreen.html?camera={camera_name}"
+        if not camera_name:
+            logger.warning(
+                "Fullscreen landing page is configured but no camera was selected. Falling back to list.html"
+            )
+            landing_page = "list"  # Fallback to list
         else:
-            redirect_url = "list.html"  # Fallback
+            source_path = os.path.join(work_dir, "fullscreen.html")
+            if not os.path.exists(source_path):
+                logger.error(
+                    f"fullscreen.html not found in '{work_dir}'. Cannot create index.html."
+                )
+                return
 
-    index_content = f"""<!DOCTYPE html>
-<html>
-<head>
-    <title>Fenetre</title>
-    <meta http-equiv="refresh" content="0; url={redirect_url}" />
-</head>
-<body>
-    <p>If you are not redirected automatically, follow this <a href="{redirect_url}">link</a>.</p>
-</body>
-</html>"""
+            with open(source_path, "r") as f:
+                content = f.read()
 
-    with open(os.path.join(work_dir, "index.html"), "w") as f:
-        f.write(index_content)
+            # Hardcode the camera name in the javascript
+            content = content.replace(
+                "const cameraName = urlParams.get('camera');",
+                f"const cameraName = '{camera_name}';",
+            )
+
+            with open(dest_path, "w") as f:
+                f.write(content)
+            logger.info(
+                f"Generated index.html from fullscreen.html for camera '{camera_name}'"
+            )
+            return
+
+    # For map.html, list.html, or fallback from fullscreen
+    source_filename = f"{landing_page}.html"
+    source_path = os.path.join(work_dir, source_filename)
+
+    if not os.path.exists(source_path):
+        logger.error(
+            f"Landing page '{source_filename}' not found in '{work_dir}'. Cannot create index.html."
+        )
+        return
+
+    try:
+        if not os.path.exists(dest_path) or not filecmp.cmp(source_path, dest_path):
+            shutil.copy(source_path, dest_path)
+            logger.info(f"Copied {source_filename} to index.html in {work_dir}")
+        else:
+            logger.debug(
+                f"index.html is already a copy of {source_filename}, skipping copy."
+            )
+    except Exception as e:
+        logger.error(f"Failed to create index.html from {source_filename}: {e}")
 
 
 def copy_public_html_files(work_dir: str, global_config: dict):

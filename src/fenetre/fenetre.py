@@ -866,7 +866,7 @@ def load_and_apply_configuration(initial_load=False, config_file_override=None):
     If initial_load is True, it loads all configs and starts all services.
     If initial_load is False (on SIGHUP), it only reloads camera configs.
     """
-    global server_config, cameras_config
+    global server_config, cameras_config, global_config, admin_server_config, timelapse_config, flask_app_instance
 
     logger.info("Loading and applying configuration...")
 
@@ -887,7 +887,6 @@ def load_and_apply_configuration(initial_load=False, config_file_override=None):
     ) = config_load(config_path_to_load)
 
     if initial_load:
-        global global_config, admin_server_config, flask_app_instance, timelapse_config
         server_config = new_server_config
         global_config = new_global_config
         admin_server_config = new_admin_server_config
@@ -941,6 +940,9 @@ def load_and_apply_configuration(initial_load=False, config_file_override=None):
         ):
             stop_http_server()
         server_config = new_server_config
+        global_config = new_global_config
+        admin_server_config = new_admin_server_config
+        timelapse_config = new_timelapse_config
 
     # Update cameras_config and manage camera threads
     cameras_config = new_cameras_config
