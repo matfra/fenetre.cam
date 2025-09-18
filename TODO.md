@@ -1,9 +1,8 @@
 ### TODO for the project
 
 ### fenetre.cam main website
-- Create an index.html page with
-    - Link to example deployments
-    - Link to repo on github
+- The main site should load a map by default with all the links to public deployments
+- There should be a link to the github
 
 ### Github README.md
 - Installation steps
@@ -16,30 +15,24 @@
 ### Daylight
 - On the daylight.html, there should be a top banner saying: average color of the sky for {camera_name}. Also a link to come back to the camera view
 
+### Config checker
+- config.example.yaml isn't enough. The config.py should document and sanity check the entire config.
+
 ### Views
 - Refine UX. List of view:
-  - index with redirect to selected view
   - fullscreen
     - window title. From config file, otherwise take hostname
-    - favicon
   - map
   - list
     - On the list view, there should be a details button that unfold information about the camera:
-      - Link to original URL
       - Polling frequency
       - The status button should be based on the polling interval for that camera instead o fbeing hardcoded to N minutes.
   - camera details
-    - Add to yesterday timelapse link
-    - Uniformize the behaviour of the camera details page wheter we come from the map view, the list view and the fullscreen view.
-  - daylight year
-  - daylight month
-  - directory browser
-
-- Add a camera details view for deployments with a single camera
-- If multiple cameras, add a link back to list
+  - Uniformize the behaviour of the camera details page wheter we come from the map view, the list view and the fullscreen view.
 
 ### Admin interface.
-- [BUG] Crop preview is broken
+- [BUG] Crop preview is broken (not to scale)
+- ssim and sky area should be defiend on the crop preview since they happen after crop
 
 ### Postprocessing
 - Add an option for small overlay image that shows the progression of the time throughout the as a marker on top of a blue yellow gradient. The gradient will be based on the camera location if setup.
@@ -49,12 +42,9 @@
 - Implement native libcamera python functions instead of relying on libcamera-still
 - Raspberry pi zero deployment
 
-
 ### Testing and integration
 - Working Dockerfile and docker-compose
 - Add integration test simulating a few days worth of pictures
 
 ### Metrics
 - Add version 
-- Add number of timelapses files
-
