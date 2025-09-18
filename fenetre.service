@@ -9,4 +9,4 @@ Environment=TZ=America/Los_Angeles
 
 [Install]
 WantedBy=multi-user.target
-Alias=canaredn.service
+Alias=fenetre.service
