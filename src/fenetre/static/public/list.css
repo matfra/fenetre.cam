@@ -64,8 +64,10 @@ body.dark-mode .camera-item {
     width: 120px;
     height: 67.5px;
     object-fit: cover;
-    margin-right: 15px;
     border-radius: 4px;
+}
+.camera-header a:not(:last-child) img {
+    margin-right: 15px;
 }
 .camera-info {
     flex-grow: 1;

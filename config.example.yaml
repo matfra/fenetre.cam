@@ -103,3 +103,8 @@ cameras:
     gopro_utility_poll_interval_s: 10
     gopro_bluetooth_retry_delay_s: 180
     sky_area: 0,0,1920,500
+  an-external-website:
+    name: "A cool external website"
+    source: external_website
+    url: "https://www.youtube.com/embed/dQw4w9WgXcQ"
+    thumbnail_url: "https://i.ytimg.com/vi/dQw4w9WgXcQ/hq720.jpg"

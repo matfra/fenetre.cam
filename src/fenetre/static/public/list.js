@@ -98,6 +98,22 @@ function updateCamera(camera, cameraData) {
         cameraListElement.appendChild(listItem);
     }
 
+    if (camera.source === 'external_website') {
+        listItem.innerHTML = `
+            <div class="camera-header">
+                <a href="${camera.url}" target="_blank">
+                    <img src="${camera.thumbnail_url}" alt="${camera.title} thumbnail">
+                </a>
+                <div class="camera-info">
+                    <a href="${camera.url}" target="_blank">
+                        <div class="camera-name">${camera.title}</div>
+                    </a>
+                </div>
+            </div>
+        `;
+        return;
+    }
+
     const thumbImg = listItem.querySelector('.camera-header img');
     const lastPictureTime = listItem.querySelector('.last-picture-time');
     const status = listItem.querySelector('.status');
