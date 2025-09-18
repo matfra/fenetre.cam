@@ -58,6 +58,8 @@ logger = logging.getLogger(__name__)
 # Define flags at module level
 if 'config' not in flags.FLAGS:
     flags.DEFINE_string("config", "config.yaml", "path to YAML config file")
+if 'debug' not in flags.FLAGS:
+    flags.DEFINE_boolean("debug", False, "Enable debug logging.")
 
 FLAGS = flags.FLAGS
 
@@ -165,7 +167,7 @@ def get_pic_dir_and_filename(camera_name: str) -> Tuple[str, str]:
     tz = pytz.timezone(global_config["timezone"])
     dt = datetime.now(tz)
     return (
-        os.path.join(global_config["pic_dir"], camera_name, dt.strftime("%Y-%m-%d")),
+        os.path.join(global_config["work_dir"], "photos", camera_name, dt.strftime("%Y-%m-%d")),
         dt.strftime("%Y-%m-%dT%H-%M-%S%Z.jpg"),
     )
 
@@ -265,21 +267,25 @@ def is_sunrise_or_sunset(camera_config: Dict, global_config: Dict) -> bool:
     if not camera_config.get("sunrise_sunset", {}).get("enabled", False):
         return False
 
-    latitude = camera_config.get("latitude")
-    longitude = camera_config.get("longitude")
+    latitude = camera_config.get("lat")
+    longitude = camera_config.get("lon")
     if latitude is None or longitude is None:
         return False
 
     try:
         tz = pytz.timezone(global_config["timezone"])
         now = datetime.now(tz)
-        location = LocationInfo(latitude=latitude, longitude=longitude)
+        location = LocationInfo(
+            latitude=latitude,
+            longitude=longitude,
+            timezone=global_config["timezone"],
+        )
         s = sun(location.observer, date=now.date(), tzinfo=location.timezone)
 
-        sunrise_start = s["sunrise"] - timedelta(minutes=30)
-        sunrise_end = s["sunrise"] + timedelta(minutes=30)
+        sunrise_start = s["sunrise"] - timedelta(minutes=60)
+        sunrise_end = s["sunrise"] + timedelta(minutes=20)
         sunset_start = s["sunset"] - timedelta(minutes=30)
-        sunset_end = s["sunset"] + timedelta(minutes=30)
+        sunset_end = s["sunset"] + timedelta(minutes=60)
 
         return (sunrise_start <= now <= sunrise_end) or (
             sunset_start <= now <= sunset_end
@@ -387,7 +393,7 @@ def snap(camera_name, camera_config: Dict):
 
         current_sleep_interval = sleep_intervals[camera_name]
         if is_sunrise_or_sunset(camera_config, global_config):
-            current_sleep_interval = global_config.get("sunrise_sunset_interval_s", 10)
+            current_sleep_interval = global_config.get("sunrise_sunset_interval_s", 3)
             logger.info(
                 f"{camera_name}: Sunrise/sunset detected, using fast interval: {current_sleep_interval}s"
             )
@@ -437,11 +443,9 @@ def snap(camera_name, camera_config: Dict):
                 sleep_intervals[camera_name] = sleep_intervals[camera_name] * 0.9
             else:
                 sleep_intervals[camera_name] += 0.5
-            if logger.isEnabledFor(logging.DEBUG):
-                logger.debug(
-                    f"{camera_name}: ssim {ssim}, setpoint: {ssim_setpoint}, new sleep interval: {sleep_intervals[camera_name]}s"
-                )
-
+            logger.info(
+                f"{camera_name}: ssim {ssim}, setpoint: {ssim_setpoint}, new sleep interval: {sleep_intervals[camera_name]}s"
+            )
         end_time = time.time()
         metric_processing_time_seconds.labels(camera_name=camera_name).set(
             end_time - start_time
@@ -731,6 +735,16 @@ def update_cameras_metadata(cameras_configs: Dict, work_dir: str):
         metadata["title"] = cam
         metadata["url"] = f"map.html?camera={cam}"
         metadata["fullscreen_url"] = f"fullscreen.html?camera={cam}"
+        if cameras_configs[cam].get("source") == "external_website":
+            metadata["source"] = "external_website"
+            metadata["url"] = cameras_configs[cam].get("url")
+            metadata["thumbnail_url"] = cameras_configs[cam].get("thumbnail_url")
+        else:
+            metadata["original_url"] = cameras_configs[cam].get("url") or cameras_configs[
+                cam
+            ].get("local_command")
+            metadata["dynamic_metadata"] = os.path.join("photos", cam, "metadata.json")
+            metadata["image"] = os.path.join("photos", cam, "latest.jpg")
         metadata["original_url"] = cameras_config[cam].get("url") or cameras_config[
             cam
         ].get("local_command")
@@ -753,10 +767,22 @@ def update_cameras_metadata(cameras_configs: Dict, work_dir: str):
         json.dump(updated_cameras_metadata, json_file, indent=4)
 
 
+timelapse_thread_global = None
+daylight_thread_global = None
+archive_thread_global = None
+frequent_timelapse_loop_thread_global = None
+frequent_timelapse_scheduler_thread_global = None
+disk_management_thread_global = None
+
+
 def main(argv):
     del argv  # Unused.
 
     setup_logging()
+
+    if FLAGS.debug:
+        logging.getLogger().setLevel(logging.DEBUG)
+        logger.info("Debug logging enabled via command line flag.")
 
     # Write PID to file
     try:
@@ -995,7 +1021,7 @@ def manage_camera_threads():
 
     # Start threads for new or enabled cameras
     for cam_name, cam_conf in cameras_config.items():
-        if cam_conf.get("disabled", False):
+        if cam_conf.get("disabled", False) or cam_conf.get("source") == "external_website":
             continue
 
         if (
