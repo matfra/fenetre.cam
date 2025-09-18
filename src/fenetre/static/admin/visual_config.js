@@ -51,9 +51,11 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
             const config = await response.json();
 
-            if (config && config.cameras) {
-                for (const camName in config.cameras) {
-                    if (config.cameras[camName].url) {
+            if (config && config.config && config.config.cameras) {
+                for (const camName in config.config.cameras) {
+                    const camConfig = config.config.cameras[camName];
+                    // Backend only supports preview for url and gopro
+                    if (camConfig.url || camConfig.gopro_ip) {
                         const option = document.createElement('option');
                         option.value = camName;
                         option.textContent = camName;
@@ -330,7 +332,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const fullConfigResponse = await fetch('/config');
                     if (fullConfigResponse.ok) {
                         const fullConfig = await fullConfigResponse.json();
-                        const camConfig = fullConfig.cameras && fullConfig.cameras[cameraName] ? fullConfig.cameras[cameraName] : null;
+                        const camConfig = fullConfig.config.cameras && fullConfig.config.cameras[cameraName] ? fullConfig.config.cameras[cameraName] : null;
 
                         if (camConfig) {
                             if (camConfig.sky_area) {
@@ -515,15 +517,15 @@ document.addEventListener('DOMContentLoaded', () => {
             const currentConfig = await currentConfigResponse.json();
 
             // Ensure the cameras object exists
-            if (!currentConfig.cameras) {
-                currentConfig.cameras = {};
+            if (!currentConfig.config.cameras) {
+                currentConfig.config.cameras = {};
             }
-            if (!currentConfig.cameras[cameraName]) {
-                currentConfig.cameras[cameraName] = {};
+            if (!currentConfig.config.cameras[cameraName]) {
+                currentConfig.config.cameras[cameraName] = {};
             }
 
             // Update only the visual settings for this camera
-            currentConfig.cameras[cameraName].crop = `${naturalAreas.crop.x1},${naturalAreas.crop.y1},${naturalAreas.crop.x2},${naturalAreas.crop.y2}`;
+            currentConfig.config.cameras[cameraName].crop = `${naturalAreas.crop.x1},${naturalAreas.crop.y1},${naturalAreas.crop.x2},${naturalAreas.crop.y2}`;
             
             if (naturalAreas.sky.active) {
                 // Calculate Sky area coordinates relative to the crop area
@@ -540,9 +542,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 const skyRelX2 = Math.round((skyX2Percent / 100) * cropWidth);
                 const skyRelY2 = Math.round((skyY2Percent / 100) * cropHeight);
                 
-                currentConfig.cameras[cameraName].sky_area = `${skyRelX1},${skyRelY1},${skyRelX2},${skyRelY2}`;
+                currentConfig.config.cameras[cameraName].sky_area = `${skyRelX1},${skyRelY1},${skyRelX2},${skyRelY2}`;
             } else {
-                delete currentConfig.cameras[cameraName].sky_area;
+                delete currentConfig.config.cameras[cameraName].sky_area;
             }
             
             if (naturalAreas.ssim.active) {
@@ -560,16 +562,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 const ssimRelX2 = Math.round((ssimX2Percent / 100) * cropWidth);
                 const ssimRelY2 = Math.round((ssimY2Percent / 100) * cropHeight);
                 
-                currentConfig.cameras[cameraName].ssim_area = `${ssimRelX1},${ssimRelY1},${ssimRelX2},${ssimRelY2}`;
+                currentConfig.config.cameras[cameraName].ssim_area = `${ssimRelX1},${ssimRelY1},${ssimRelX2},${ssimRelY2}`;
             } else {
-                delete currentConfig.cameras[cameraName].ssim_area;
+                delete currentConfig.config.cameras[cameraName].ssim_area;
             }
 
             // Save the complete updated configuration
             const response = await fetch('/config', {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(currentConfig)
+                body: JSON.stringify(currentConfig.config)
             });
 
             if (!response.ok) {

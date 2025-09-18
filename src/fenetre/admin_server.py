@@ -17,6 +17,7 @@ from PIL import Image
 from prometheus_client import REGISTRY, Counter, Gauge, generate_latest
 from werkzeug.exceptions import BadRequest
 
+from fenetre.gopro import GoPro
 from fenetre.ui_utils import copy_public_html_files
 
 # Create metrics
@@ -132,7 +133,7 @@ def get_config():
             )
         with open(config_file_path, "r") as f:
             config_data = yaml.safe_load(f)
-        return jsonify(config_data), 200
+        return jsonify(config=config_data), 200
     except Exception as e:
         return jsonify({"error": f"Error reading configuration: {str(e)}"}), 500
 
@@ -244,45 +245,60 @@ def capture_for_ui(camera_name):
 
     camera_config = config["cameras"][camera_name]
     url = camera_config.get("url")
+    gopro_ip = camera_config.get("gopro_ip")
 
-    if not url:
-        # For V1, only support URL-based cameras for this feature.
+    if not url and not gopro_ip:
+        # For now, only support URL and GoPro cameras for this feature.
         return (
             jsonify(
                 {
-                    "error": f"Camera '{camera_name}' does not have a URL configured. Only URL cameras supported for UI capture."
+                    "error": f"Camera '{camera_name}' does not have a URL or gopro_ip configured. Only URL/GoPro cameras are supported for UI capture."
                 }
             ),
             400,
         )
 
     try:
-        # Replicate parts of fenetre.py's get_pic_from_url logic
-        global_config = config.get("global", {})
-        ua = global_config.get("user_agent", "Fenetre Config UI/1.0")
-        headers = {"Accept": "image/*,*"}
-        if ua:
-            requests_version = requests.__version__
-            headers = {"User-Agent": f"{ua} v{requests_version}"}
+        if url:
+            # Replicate parts of fenetre.py's get_pic_from_url logic
+            global_config = config.get("global", {})
+            ua = global_config.get("user_agent", "Fenetre Config UI/1.0")
+            headers = {"Accept": "image/*,*"}
+            if ua:
+                requests_version = requests.__version__
+                headers = {"User-Agent": f"{ua} v{requests_version}"}
 
-        timeout = camera_config.get("timeout_s", 20)
+            timeout = camera_config.get("timeout_s", 20)
 
-        r = requests.get(url, timeout=timeout, headers=headers, stream=True)
-        r.raise_for_status()
+            r = requests.get(url, timeout=timeout, headers=headers, stream=True)
+            r.raise_for_status()
 
-        # Determine content type
-        content_type = r.headers.get("content-type", "application/octet-stream")
-        if not content_type.startswith("image/"):
-            # Try to infer from URL if content-type is generic
-            if ".jpg" in url.lower() or ".jpeg" in url.lower():
-                content_type = "image/jpeg"
-            elif ".png" in url.lower():
-                content_type = "image/png"
+            # Determine content type
+            content_type = r.headers.get("content-type", "application/octet-stream")
+            if not content_type.startswith("image/"):
+                # Try to infer from URL if content-type is generic
+                if ".jpg" in url.lower() or ".jpeg" in url.lower():
+                    content_type = "image/jpeg"
+                elif ".png" in url.lower():
+                    content_type = "image/png"
 
-        img_bytes = BytesIO(r.content)
-        img_bytes.seek(0)
+            img_bytes = BytesIO(r.content)
+            img_bytes.seek(0)
 
-        return send_file(img_bytes, mimetype=content_type)
+            return send_file(img_bytes, mimetype=content_type)
+        
+        elif gopro_ip:
+            gopro = GoPro(ip_address=gopro_ip)
+            # This is a simplified capture, assuming the GoPro is ready.
+            # The main app's GoProUtilityThread handles state management (presets, etc.)
+            # which we don't replicate here for a simple capture.
+            jpeg_bytes = gopro.capture_photo()
+            if not jpeg_bytes:
+                return jsonify({"error": "Failed to capture photo from GoPro. It might be busy or off."}), 500
+            
+            img_bytes = BytesIO(jpeg_bytes)
+            img_bytes.seek(0)
+            return send_file(img_bytes, mimetype="image/jpeg")
 
     except requests.exceptions.RequestException as e:
         return (
