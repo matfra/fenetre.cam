@@ -316,6 +316,7 @@ class GoProUtilityThread(threading.Thread):
             "gopro_bluetooth_retry_delay_s", 180
         )  # Default to 3 minutes
         self._ble_client = None  # To store the BleakClient instance
+        self.usb_control = camera_config.get("usb_control", False)
 
     def run(self):
         logger.info(f"Starting GoPro utility thread for {self.gopro_ip}")
@@ -324,10 +325,16 @@ class GoProUtilityThread(threading.Thread):
             try:
                 # 1. Verify IP connectivity
                 if not self._check_ip_connectivity():
-                    logger.info(
-                        f"No IP connectivity to {self.gopro_ip}. Attempting to enable Wi-Fi AP via Bluetooth..."
-                    )
-                    asyncio.run(self._enable_wifi_ap())
+                    if self.usb_control:
+                        logger.info(
+                            "No IP connectivity. USB control is enabled. Sending BLE keepalive to wake up camera..."
+                        )
+                        asyncio.run(self._send_ble_keepalive())
+                    else:
+                        logger.info(
+                            f"No IP connectivity to {self.gopro_ip}. Attempting to enable Wi-Fi AP via Bluetooth..."
+                        )
+                        asyncio.run(self._enable_wifi_ap())
 
                     # After attempting to enable Wi-Fi AP, poll for connectivity
                     # for the duration of bluetooth_retry_delay_s
@@ -395,6 +402,50 @@ class GoProUtilityThread(threading.Thread):
         except Exception as e:
             logger.error(f"Failed to enable GoPro Wi-Fi AP via Bluetooth: {e}")
 
+
+    async def _send_ble_keepalive(self):
+        try:
+            # Synchronization event to wait until notification response is received
+            event = asyncio.Event()
+            client: BleakClient
+
+            async def notification_handler(
+                characteristic: BleakGATTCharacteristic,
+                data: bytearray,
+            ) -> None:
+                uuid = GoProUuid(
+                    client.services.characteristics[characteristic.handle].uuid
+                )
+                logger.info(f'Received response at {uuid}: {data.hex(":")}')
+
+                # If this is the correct handle and the status is success, the command was a success
+                if uuid is GoProUuid.COMMAND_RSP_UUID and data[2] == 0x00:
+                    logger.info("Command sent successfully")
+                # Anything else is unexpected. This shouldn't happen
+                else:
+                    logger.error("Unexpected response")
+
+                # Notify the writer
+                event.set()
+
+            client = await connect_ble(
+                notification_handler, self.gopro_ble_identifier, self.bluetooth_adapter
+            )
+            self._ble_client = client  # Store client for potential later disconnect
+
+            # Write to the Command Request BleUUID to send keepalive
+            logger.info("Sending BLE keepalive")
+            event.clear()
+            request = bytes([0x03, 0x5B, 0x01, 0x42])
+            command_request_uuid = GoProUuid.COMMAND_REQ_UUID
+            logger.debug(f"Writing to {command_request_uuid}: {request.hex(':')}")
+            await client.write_gatt_char(
+                command_request_uuid.value, request, response=True
+            )
+            await event.wait()  # Wait to receive the notification response
+            logger.info("BLE keepalive sent.")
+        except Exception as e:
+            logger.error(f"Failed to send BLE keepalive: {e}")
 
     def _check_ip_connectivity(self) -> bool:
         try:
