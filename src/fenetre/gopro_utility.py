@@ -316,7 +316,7 @@ class GoProUtilityThread(threading.Thread):
             "gopro_bluetooth_retry_delay_s", 180
         )  # Default to 3 minutes
         self._ble_client = None  # To store the BleakClient instance
-        self.usb_control = camera_config.get("usb_control", False)
+        self.gopro_usb = camera_config.get("gopro_usb", False)
 
     def run(self):
         logger.info(f"Starting GoPro utility thread for {self.gopro_ip}")
@@ -325,9 +325,9 @@ class GoProUtilityThread(threading.Thread):
             try:
                 # 1. Verify IP connectivity
                 if not self._check_ip_connectivity():
-                    if self.usb_control:
+                    if self.gopro_usb:
                         logger.info(
-                            "No IP connectivity. USB control is enabled. Sending BLE keepalive to wake up camera..."
+                            "No IP connectivity. gopro_usb is enabled. Sending BLE keepalive to wake up camera..."
                         )
                         asyncio.run(self._send_ble_keepalive())
                     else:
