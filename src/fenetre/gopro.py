@@ -89,6 +89,7 @@ class GoPro:
         timezone=None,
         preset_day=None,
         preset_night=None,
+        usb_control=False,
     ):
         self.ip_address = ip_address
         self.timeout = timeout
@@ -101,6 +102,7 @@ class GoPro:
         self.timezone = timezone
         self.preset_day = preset_day
         self.preset_night = preset_night
+        self.usb_control = usb_control
 
         if log_dir:
             _set_log_dir(log_dir)
@@ -119,6 +121,8 @@ class GoPro:
     def __del__(self):
         if self.temp_file:
             os.unlink(self.temp_file.name)
+
+
 
     def update_state(self):
         url = f"{self.scheme}://{self.ip_address}/gopro/camera/state"
@@ -246,7 +250,10 @@ class GoPro:
     def capture_photo(self, output_file: Optional[str] = None) -> bytes:
         latest_dir_before, latest_file_before = self._get_latest_file()
 
-        self._make_gopro_request("/gopro/camera/control/set_ui_controller?p=2")
+        if self.usb_control:
+            self._make_gopro_request("/gopro/camera/control/wired_usb?p=1")
+        else:
+            self._make_gopro_request("/gopro/camera/control/set_ui_controller?p=2")
         self.settings.control_mode = "pro"
         self.settings.lcd_brightness = 10
         self.settings.led = "All Off"
