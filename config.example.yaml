@@ -103,6 +103,8 @@ cameras:
     gopro_utility_poll_interval_s: 10
     gopro_bluetooth_retry_delay_s: 180
     sky_area: 0,0,1920,500
+    postprocessing:
+      - type: "auto_rotate"
   an-external-website:
     name: "A cool external website"
     source: external_website

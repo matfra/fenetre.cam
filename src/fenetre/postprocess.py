@@ -298,7 +298,12 @@ def postprocess(
         global_config = {}
     exif_data = pic.info.get("exif") or b""
     for step in postprocessing_steps:
-        if step["type"] == "crop":
+        if step.get("enabled", True) is False:
+            continue
+        if step["type"] == "auto_rotate":
+            logger.debug("Applying auto rotation to image")
+            pic = auto_rotate(pic)
+        elif step["type"] == "crop":
             logger.debug(f"Cropping image to area: {step['area']}")
             pic = crop(pic, step["area"])
         elif step["type"] == "resize":
@@ -363,6 +368,33 @@ def postprocess(
                 )
 
     return pic, exif_data
+
+
+def auto_rotate(pic: Image.Image) -> Image.Image:
+    """
+    Auto-rotates an image based on its EXIF orientation tag.
+    """
+    exif = pic.getexif()
+    orientation = exif.get(0x0112)
+
+    if orientation is None:
+        return pic
+
+    logger.info(f"Rotating image with orientation {orientation}")
+
+    if orientation == 3:
+        pic = pic.rotate(180, expand=True)
+    elif orientation == 6:
+        pic = pic.rotate(270, expand=True)
+    elif orientation == 8:
+        pic = pic.rotate(90, expand=True)
+
+    # Remove the orientation tag from the EXIF data
+    if orientation in [3, 6, 8]:
+        exif[0x0112] = 1
+        pic.info["exif"] = exif.tobytes()
+
+    return pic
 
 
 def crop(pic: Image.Image, area: str) -> Image.Image:

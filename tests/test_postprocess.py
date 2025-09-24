@@ -1,4 +1,4 @@
-from fenetre.postprocess import _parse_color, add_timestamp, postprocess
+from fenetre.postprocess import _parse_color, add_timestamp, postprocess, auto_rotate
 import os
 # Assuming postprocess.py is in the parent directory or PYTHONPATH is set up
 import sys
@@ -599,6 +599,43 @@ class TestPostprocess(unittest.TestCase):
         mock_logging.warning.assert_called_with(
             "Generic text step is enabled but no 'text_content' was provided."
         )
+
+
+    def test_auto_rotate(self):
+        # --- Test Case 1: Orientation 3 (180 degrees) ---
+        img = self.create_test_image(width=100, height=50)
+        exif = Image.Exif()
+        exif[0x0112] = 3
+        img.info["exif"] = exif.tobytes()
+        rotated_img = auto_rotate(img)
+        self.assertEqual(rotated_img.size, (100, 50))
+        new_exif = rotated_img.getexif()
+        self.assertEqual(new_exif.get(0x0112), 1)
+
+        # --- Test Case 2: Orientation 6 (270 degrees) ---
+        img = self.create_test_image(width=100, height=50)
+        exif = Image.Exif()
+        exif[0x0112] = 6
+        img.info["exif"] = exif.tobytes()
+        rotated_img = auto_rotate(img)
+        self.assertEqual(rotated_img.size, (50, 100))
+        new_exif = rotated_img.getexif()
+        self.assertEqual(new_exif.get(0x0112), 1)
+
+        # --- Test Case 3: Orientation 8 (90 degrees) ---
+        img = self.create_test_image(width=100, height=50)
+        exif = Image.Exif()
+        exif[0x0112] = 8
+        img.info["exif"] = exif.tobytes()
+        rotated_img = auto_rotate(img)
+        self.assertEqual(rotated_img.size, (50, 100))
+        new_exif = rotated_img.getexif()
+        self.assertEqual(new_exif.get(0x0112), 1)
+
+        # --- Test Case 4: No orientation tag ---
+        img = self.create_test_image(width=100, height=50)
+        rotated_img = auto_rotate(img)
+        self.assertEqual(rotated_img.size, (100, 50))
 
 
 if __name__ == "__main__":
