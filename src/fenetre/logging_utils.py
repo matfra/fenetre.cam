@@ -1,5 +1,6 @@
 import logging
 import os
+from logging.handlers import RotatingFileHandler
 from typing import Dict, Optional
 
 
@@ -44,7 +45,12 @@ class ModuleColorFormatter(logging.Formatter):
         return base
 
 
-def setup_logging(log_dir: Optional[str] = None, level: Optional[str] = None) -> None:
+def setup_logging(
+    log_dir: Optional[str] = None,
+    level: Optional[str] = None,
+    log_max_bytes: int = 10000000,
+    log_backup_count: int = 5,
+) -> None:
     formatter = ModuleColorFormatter(
         "%(levelname).1s%(asctime)s %(filename)s:%(lineno)d] %(message)s",
         datefmt="%m%d %H:%M:%S",
@@ -56,7 +62,11 @@ def setup_logging(log_dir: Optional[str] = None, level: Optional[str] = None) ->
     root.addHandler(stream_handler)
     if log_dir:
         os.makedirs(log_dir, exist_ok=True)
-        file_handler = logging.FileHandler(os.path.join(log_dir, "fenetre.log"))
+        file_handler = RotatingFileHandler(
+            os.path.join(log_dir, "fenetre.log"),
+            maxBytes=log_max_bytes,
+            backupCount=log_backup_count,
+        )
         file_formatter = logging.Formatter(
             "%(levelname).1s%(asctime)s %(filename)s:%(lineno)d] %(message)s",
             datefmt="%m%d %H:%M:%S",
@@ -74,3 +84,33 @@ def apply_module_levels(levels: Dict[str, str]) -> None:
         level = getattr(logging, str(level_name).upper(), None)
         if isinstance(level, int):
             logging.getLogger(name).setLevel(level)
+
+
+def get_camera_logger(
+    camera_name: str,
+    log_dir: str,
+    log_max_bytes: int = 10000000,
+    log_backup_count: int = 5,
+) -> logging.Logger:
+    """Gets a logger for a specific camera with its own rotating file handler."""
+    logger = logging.getLogger(f"fenetre.camera.{camera_name}")
+
+    # Prevent adding handlers multiple times
+    if logger.hasHandlers() and any(
+        isinstance(h, RotatingFileHandler) for h in logger.handlers
+    ):
+        return logger
+
+    log_file_path = os.path.join(log_dir, f"{camera_name}.log")
+    handler = RotatingFileHandler(
+        log_file_path, maxBytes=log_max_bytes, backupCount=log_backup_count
+    )
+    formatter = logging.Formatter(
+        "%(levelname).1s%(asctime)s %(filename)s:%(lineno)d] %(message)s",
+        datefmt="%m%d %H:%M:%S",
+    )
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+    logger.setLevel(logging.INFO)  # Set a default level
+    logger.propagate = False  # Don't send to root logger
+    return logger

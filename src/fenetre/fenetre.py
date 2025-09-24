@@ -26,7 +26,7 @@ from astral.sun import sun
 from PIL import Image
 from skimage.metrics import structural_similarity
 from waitress import serve as waitress_serve
-from .logging_utils import apply_module_levels, setup_logging
+from .logging_utils import apply_module_levels, setup_logging, get_camera_logger
 
 from fenetre.admin_server import (
     metric_camera_directory_size_bytes,
@@ -42,7 +42,7 @@ from fenetre.archive import archive_daydir, list_unarchived_dirs, scan_and_publi
 from fenetre.config import config_load
 from fenetre.daylight import run_end_of_day
 from fenetre.gopro_utility import GoProUtilityThread, format_gopro_sd_card
-from fenetre.platform_utils import is_raspberry_pi, rotate_log_file
+from fenetre.platform_utils import is_raspberry_pi
 from fenetre.postprocess import gather_metrics, postprocess
 from fenetre.timelapse import (
     add_to_timelapse_queue,
@@ -101,13 +101,13 @@ def log_camera_error(camera_name: str, error_message: str, global_config: Dict):
     if not log_dir:
         return
 
-    os.makedirs(log_dir, exist_ok=True)
-    log_file_path = os.path.join(log_dir, f"{camera_name}.log")
-    rotate_log_file(log_file_path)
-    with open(log_file_path, "a") as f:
-        f.write(f"Timestamp: {datetime.now().isoformat()}\n")
-        f.write(f"ERROR: {error_message}\n")
-        f.write("-" * 20 + "\n")
+    camera_logger = get_camera_logger(
+        camera_name,
+        log_dir,
+        global_config.get("log_max_bytes", 10000000),
+        global_config.get("log_backup_count", 5),
+    )
+    camera_logger.error(error_message)
 
 
 def get_pic_from_url(url: str, timeout: int, ua: str = "", camera_name: str = "", camera_config: Dict = None, global_config: Dict = None) -> Image.Image:
@@ -141,14 +141,13 @@ def get_pic_from_url(url: str, timeout: int, ua: str = "", camera_name: str = ""
 
     log_dir = global_config.get("log_dir")
     if log_dir:
-        os.makedirs(log_dir, exist_ok=True)
-        log_file_name = f"{camera_name}.log" if camera_name else "url_requests.log"
-        log_file_path = os.path.join(log_dir, log_file_name)
-        rotate_log_file(log_file_path)
-        with open(log_file_path, "a") as f:
-            f.write(f"Timestamp: {datetime.now().isoformat()}\n")
-            f.write(log_message + "\n")
-            f.write("-" * 20 + "\n")
+        camera_logger = get_camera_logger(
+            camera_name,
+            log_dir,
+            global_config.get("log_max_bytes", 10000000),
+            global_config.get("log_backup_count", 5),
+        )
+        camera_logger.info(log_message)
 
     if r.status_code != 200:
         raise RuntimeError(
@@ -205,12 +204,20 @@ def get_pic_from_local_command(
 ) -> Image.Image:
     log_dir = global_config.get("log_dir")
     if log_dir:
-        log_file_path = os.path.join(
+        camera_logger = get_camera_logger(
+            camera_name,
             log_dir,
-            f"{camera_name}.log",
+            global_config.get("log_max_bytes", 10000000),
+            global_config.get("log_backup_count", 5),
         )
-        rotate_log_file(log_file_path)
-        with open(log_file_path, "a") as log_file:
+        # Find the handler for the camera's log file
+        log_file_handler = None
+        for handler in camera_logger.handlers:
+            if isinstance(handler, RotatingFileHandler):
+                log_file_handler = handler
+                break
+
+        with open(log_file_handler.baseFilename, "a") as log_file:
             s = subprocess.run(
                 cmd.split(" "),
                 stdout=subprocess.PIPE,
@@ -403,6 +410,9 @@ def snap(camera_name, camera_config: Dict):
         )
         logger.info(f"{camera_name}: Sleeping {current_sleep_interval}s")
         interruptible_sleep(current_sleep_interval, exit_event)
+
+        if exit_event.is_set():
+            return
 
         start_time = time.time()
         new_pic_dir, new_pic_filename = get_pic_dir_and_filename(camera_name)
@@ -923,6 +933,8 @@ def load_and_apply_configuration(initial_load=False, config_file_override=None):
         setup_logging(
             global_config.get("log_dir"),
             global_config.get("logging_level"),
+            log_max_bytes=global_config.get("log_max_bytes", 10000000),
+            log_backup_count=global_config.get("log_backup_count", 5),
         )
         apply_module_levels(global_config.get("logging_levels", {}))
 
@@ -1205,15 +1217,23 @@ def frequent_timelapse_loop():
         timelapse_settings_tuple = frequent_timelapse_q.popleft()
         pic_dir, timelapse_settings = timelapse_settings_tuple
         try:
-            result = create_timelapse(
-                dir=pic_dir,
-                overwrite=True,
-                two_pass=timelapse_settings.get("ffmpeg_2pass", False),
-                log_dir=global_config.get("log_dir"),
-                ffmpeg_options=timelapse_settings.get("ffmpeg_options", ""),
-                file_extension=timelapse_settings.get("file_extension"),
-                framerate=timelapse_settings.get("framerate"),
-            )
+            timelapse_args = {
+                "dir": pic_dir,
+                "overwrite": True,
+                "two_pass": timelapse_settings.get("ffmpeg_2pass", False),
+                "log_dir": global_config.get("log_dir"),
+                "ffmpeg_options": timelapse_settings.get("ffmpeg_options", ""),
+                "log_max_bytes": global_config.get("log_max_bytes", 10000000),
+                "log_backup_count": global_config.get("log_backup_count", 5),
+            }
+            if timelapse_settings.get("file_extension"):
+                timelapse_args["file_extension"] = timelapse_settings.get(
+                    "file_extension"
+                )
+            if timelapse_settings.get("framerate"):
+                timelapse_args["framerate"] = timelapse_settings.get("framerate")
+
+            result = create_timelapse(**timelapse_args)
             if result:
                 camera_name = os.path.basename(
                     os.path.dirname(os.path.normpath(pic_dir))
@@ -1258,6 +1278,8 @@ def timelapse_loop():
                     ),
                     file_extension=timelapse_config.get("file_extension", "webm"),
                     framerate=timelapse_config.get("framerate", 60),
+                    log_max_bytes=global_config.get("log_max_bytes", 10000000),
+                    log_backup_count=global_config.get("log_backup_count", 5),
                 )
                 logging.info(f"ffmpeg ran. Result is {result}")
                 if result:

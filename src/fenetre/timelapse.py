@@ -1,6 +1,7 @@
 import glob
 import json
 import logging
+import logging.handlers
 import os
 import subprocess
 import threading
@@ -14,7 +15,7 @@ from fenetre.admin_server import metric_timelapse_queue_size
 
 logger = logging.getLogger(__name__)
 
-from fenetre.platform_utils import is_raspberry_pi, rotate_log_file
+from fenetre.platform_utils import is_raspberry_pi
 from io import TextIOWrapper
 
 
@@ -39,6 +40,8 @@ def create_timelapse(
     ffmpeg_options: str = None,
     file_extension: Optional[str] = None,
     framerate: Optional[int] = None,
+    log_max_bytes: int = 10000000,
+    log_backup_count: int = 5,
 ) -> bool:
     if not os.path.exists(dir):
         raise FileNotFoundError(dir)
@@ -122,15 +125,31 @@ def create_timelapse(
 
     logger.info(f"Encoding {images_count} images to {timelapse_filepath} at {framerate} fps")
 
-    if log_dir:
-        os.makedirs(log_dir, exist_ok=True)
-        ffmpeg_log_filepath = os.path.join(log_dir, "ffmpeg.log")
-        rotate_log_file(ffmpeg_log_filepath)
-        ffmpeg_log_stream = open(ffmpeg_log_filepath, "a")
-        logger.info(f"FFmpeg log file: {ffmpeg_log_filepath}")
+    ffmpeg_log_stream = subprocess.DEVNULL
+
+    # Only set up file logging if in debug mode and log_dir is provided
+    if log_dir and logging.getLogger().getEffectiveLevel() <= logging.DEBUG:
+        ffmpeg_logger = logging.getLogger("ffmpeg")
+        if not ffmpeg_logger.hasHandlers():
+            log_file_path = os.path.join(log_dir, "ffmpeg.log")
+            handler = logging.handlers.RotatingFileHandler(
+                log_file_path,
+                maxBytes=log_max_bytes,
+                backupCount=log_backup_count,
+            )
+            formatter = logging.Formatter("%(message)s")
+            handler.setFormatter(formatter)
+            ffmpeg_logger.addHandler(handler)
+            ffmpeg_logger.setLevel(logging.DEBUG)
+            ffmpeg_logger.propagate = False
+
+        # Find the handler's stream to redirect subprocess output
+        for handler in ffmpeg_logger.handlers:
+            if isinstance(handler, logging.handlers.RotatingFileHandler):
+                ffmpeg_log_stream = handler.stream
+                break
     else:
-        logger.info(f"No log_dir defined in configs. ffmpeg logs will be shown here")
-        ffmpeg_log_stream = None
+        logger.info("ffmpeg logs will be discarded (enable debug mode to see them).")
 
     logger.debug(f"timelapse_filepath: {timelapse_filepath}")
 

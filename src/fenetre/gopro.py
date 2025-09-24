@@ -3,6 +3,7 @@ import logging
 import os
 import time
 from typing import Optional
+import logging.handlers
 
 import pytz
 import requests
@@ -10,30 +11,8 @@ from astral import LocationInfo
 from astral.sun import sun
 
 from fenetre.gopro_state_map import GoProEnums
-from fenetre.platform_utils import rotate_log_file
 
 logger = logging.getLogger(__name__)
-
-log_dir_global = None
-
-
-def _set_log_dir(log_dir: str):
-    global log_dir_global
-    log_dir_global = log_dir
-
-
-def _log_request_response(url: str, response: requests.Response):
-    if not log_dir_global:
-        return
-    os.makedirs(log_dir_global, exist_ok=True)
-    log_file_path = os.path.join(log_dir_global, "gopro.log")
-    rotate_log_file(log_file_path)
-    with open(log_file_path, "a") as f:
-        f.write(f"Timestamp: {datetime.now().isoformat()}\n")
-        f.write(f"Request URL: {url}\n")
-        f.write(f"Response Code: {response.status_code}\n")
-        f.write(f"Response Text: {response.text}\n")
-        f.write("-" * 20 + "\n")
 
 
 class GoProSettings:
@@ -89,7 +68,7 @@ class GoPro:
         timezone=None,
         preset_day=None,
         preset_night=None,
-        usb_control=False,
+        gopro_usb=False,
     ):
         self.ip_address = ip_address
         self.timeout = timeout
@@ -102,10 +81,8 @@ class GoPro:
         self.timezone = timezone
         self.preset_day = preset_day
         self.preset_night = preset_night
-        self.usb_control = usb_control
-
-        if log_dir:
-            _set_log_dir(log_dir)
+        self.gopro_usb = gopro_usb
+        self.log_dir = log_dir
 
         if self.root_ca:
             import tempfile
@@ -122,7 +99,34 @@ class GoPro:
         if self.temp_file:
             os.unlink(self.temp_file.name)
 
+    def _log_request_response(self, url: str, response: requests.Response):
+        # Only log if the root logger is in DEBUG mode.
+        if logging.getLogger().getEffectiveLevel() > logging.DEBUG:
+            return
 
+        gopro_logger = logging.getLogger("gopro")
+        if self.log_dir and not gopro_logger.hasHandlers():
+            log_file_path = os.path.join(self.log_dir, "gopro.log")
+            handler = logging.handlers.RotatingFileHandler(
+                log_file_path,
+                maxBytes=10000000,  # Default, should be configured from main
+                backupCount=5,
+            )
+            formatter = logging.Formatter(
+                "%(levelname).1s%(asctime)s] %(message)s",
+                datefmt="%m%d %H:%M:%S",
+            )
+            handler.setFormatter(formatter)
+            gopro_logger.addHandler(handler)
+            gopro_logger.setLevel(logging.DEBUG)
+            gopro_logger.propagate = False
+
+        log_message = (
+            f"Request URL: {url}\n"
+            f"Response Code: {response.status_code}\n"
+            f"Response Text: {response.text}"
+        )
+        gopro_logger.debug(log_message)
 
     def update_state(self):
         url = f"{self.scheme}://{self.ip_address}/gopro/camera/state"
@@ -143,7 +147,7 @@ class GoPro:
             response = requests.get(
                 url, timeout=self.timeout, verify=self.root_ca_filepath
             )
-            _log_request_response(url, response)
+            self._log_request_response(url, response)
             response.raise_for_status()
             preset_group_array = response.json().get("presetGroupArray", [])
         except requests.RequestException as e:
@@ -163,7 +167,7 @@ class GoPro:
         """Helper function to make HTTP requests to GoPro with common parameters."""
         url = f"{self.scheme}://{self.ip_address}{url_path}"
         r = requests.get(url, timeout=self.timeout, verify=self.root_ca_filepath)
-        _log_request_response(url, r)
+        self._log_request_response(url, r)
         if r.status_code != expected_response_code:
             raise RuntimeError(
                 f"Expected response code {expected_response_code} but got {r.status_code}. Request URL: {url}"
@@ -179,13 +183,13 @@ class GoPro:
         resp = requests.get(
             media_list_url, timeout=self.timeout, verify=self.root_ca_filepath
         )
-        _log_request_response(media_list_url, resp)
+        self._log_request_response(media_list_url, resp)
         resp.raise_for_status()
         data = resp.json()
 
         media_entries = data.get("media") or data.get("results", {}).get("media")
         if not media_entries:
-            logger.debug("No media medias found on GoPro.")
+            logger.info("No media medias found on GoPro.")
             return None, None
 
         latest_dir_info = media_entries[-1]
@@ -250,7 +254,7 @@ class GoPro:
     def capture_photo(self, output_file: Optional[str] = None) -> bytes:
         latest_dir_before, latest_file_before = self._get_latest_file()
 
-        if self.usb_control:
+        if self.gopro_usb:
             self._make_gopro_request("/gopro/camera/control/wired_usb?p=1")
         else:
             self._make_gopro_request("/gopro/camera/control/set_ui_controller?p=2")
@@ -291,9 +295,15 @@ class GoPro:
         r = requests.get(
             trigger_url, timeout=self.timeout, verify=self.root_ca_filepath
         )
-        _log_request_response(trigger_url, r)
+        self._log_request_response(trigger_url, r)
+
+        start_time = time.time()
+        timeout_seconds = 60  # Wait up to 60 seconds for the new photo
 
         while True:
+            if time.time() - start_time > timeout_seconds:
+                raise RuntimeError("Timeout waiting for new photo to appear on GoPro.")
+
             try:
                 latest_dir_after, latest_file_after = self._get_latest_file()
                 if (
