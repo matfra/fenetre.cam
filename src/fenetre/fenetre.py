@@ -38,7 +38,11 @@ from fenetre.admin_server import (
     metric_timelapses_created_total,
     metric_work_directory_size_bytes,
 )
-from fenetre.archive import archive_daydir, list_unarchived_dirs, scan_and_publish_metrics
+from fenetre.archive import (
+    archive_daydir,
+    list_unarchived_dirs,
+    scan_and_publish_metrics,
+)
 from fenetre.config import config_load
 from fenetre.daylight import run_end_of_day
 from fenetre.gopro_utility import GoProUtilityThread, format_gopro_sd_card
@@ -56,9 +60,9 @@ from fenetre.ui_utils import copy_public_html_files
 logger = logging.getLogger(__name__)
 
 # Define flags at module level
-if 'config' not in flags.FLAGS:
+if "config" not in flags.FLAGS:
     flags.DEFINE_string("config", "config.yaml", "path to YAML config file")
-if 'debug' not in flags.FLAGS:
+if "debug" not in flags.FLAGS:
     flags.DEFINE_boolean("debug", False, "Enable debug logging.")
 
 FLAGS = flags.FLAGS
@@ -78,7 +82,9 @@ timelapse_queue_file = None
 timelapse_queue_lock = threading.Lock()
 
 
-def interruptible_sleep(duration: float, event: threading.Event, check_interval: float = 1.0):
+def interruptible_sleep(
+    duration: float, event: threading.Event, check_interval: float = 1.0
+):
     """Sleeps for a given duration, but checks an event periodically."""
     if duration <= 0:
         return
@@ -110,7 +116,14 @@ def log_camera_error(camera_name: str, error_message: str, global_config: Dict):
     camera_logger.error(error_message)
 
 
-def get_pic_from_url(url: str, timeout: int, ua: str = "", camera_name: str = "", camera_config: Dict = None, global_config: Dict = None) -> Image.Image:
+def get_pic_from_url(
+    url: str,
+    timeout: int,
+    ua: str = "",
+    camera_name: str = "",
+    camera_config: Dict = None,
+    global_config: Dict = None,
+) -> Image.Image:
 
     if camera_config is None:
         camera_config = {}
@@ -131,11 +144,13 @@ def get_pic_from_url(url: str, timeout: int, ua: str = "", camera_name: str = ""
         headers = {"User-Agent": f"{ua} v{requests_version}"}
     r = requests.get(request_url, timeout=timeout, headers=headers)
 
-    log_message = (f"URL fetch for {url}:"
-                   f"\n\tRequest URL: {r.request.url}"
-                   f"\n\tRequest Headers: {r.request.headers}"
-                   f"\n\tResponse Status: {r.status_code}"
-                   f"\n\tResponse Headers: {r.headers}")
+    log_message = (
+        f"URL fetch for {url}:"
+        f"\n\tRequest URL: {r.request.url}"
+        f"\n\tRequest Headers: {r.request.headers}"
+        f"\n\tResponse Status: {r.status_code}"
+        f"\n\tResponse Headers: {r.headers}"
+    )
 
     logger.debug(log_message)
 
@@ -166,7 +181,9 @@ def get_pic_dir_and_filename(camera_name: str) -> Tuple[str, str]:
     tz = pytz.timezone(global_config["timezone"])
     dt = datetime.now(tz)
     return (
-        os.path.join(global_config["work_dir"], "photos", camera_name, dt.strftime("%Y-%m-%d")),
+        os.path.join(
+            global_config["work_dir"], "photos", camera_name, dt.strftime("%Y-%m-%d")
+        ),
         dt.strftime("%Y-%m-%dT%H-%M-%S%Z.jpg"),
     )
 
@@ -313,7 +330,9 @@ def snap(camera_name, camera_config: Dict):
         logger.info(f"{camera_name}: Fetching new picture.")
         if url is not None:
             ua = global_config.get("user_agent", "")
-            return get_pic_from_url(url, timeout, ua, camera_name, camera_config, global_config)
+            return get_pic_from_url(
+                url, timeout, ua, camera_name, camera_config, global_config
+            )
         if local_command is not None:
             return get_pic_from_local_command(
                 local_command, timeout, camera_name, camera_config
@@ -510,7 +529,9 @@ def server_run():
         port = int(port_str)
         server_address = (host, port)
     except ValueError:
-        logger.error(f"Invalid listen address format in http_server config: '{listen_str}'. It should be 'host:port'. Defaulting to 0.0.0.0:8888.")
+        logger.error(
+            f"Invalid listen address format in http_server config: '{listen_str}'. It should be 'host:port'. Defaulting to 0.0.0.0:8888."
+        )
         server_address = ("0.0.0.0", 8888)
 
     logger.info(f"Starting HTTP Server on {server_address}")
@@ -750,9 +771,9 @@ def update_cameras_metadata(cameras_configs: Dict, work_dir: str):
             metadata["url"] = cameras_configs[cam].get("url")
             metadata["thumbnail_url"] = cameras_configs[cam].get("thumbnail_url")
         else:
-            metadata["original_url"] = cameras_configs[cam].get("url") or cameras_configs[
-                cam
-            ].get("local_command")
+            metadata["original_url"] = cameras_configs[cam].get(
+                "url"
+            ) or cameras_configs[cam].get("local_command")
             metadata["dynamic_metadata"] = os.path.join("photos", cam, "metadata.json")
             metadata["image"] = os.path.join("photos", cam, "latest.jpg")
         metadata["original_url"] = cameras_config[cam].get("url") or cameras_config[
@@ -770,7 +791,9 @@ def update_cameras_metadata(cameras_configs: Dict, work_dir: str):
 
     updated_cameras_metadata["global"] = {
         "timelapse_file_extension": timelapse_config.get("file_extension", "webm"),
-        "frequent_timelapse_file_extension": timelapse_config.get("frequent_timelapse", {}).get("file_extension", "mp4")
+        "frequent_timelapse_file_extension": timelapse_config.get(
+            "frequent_timelapse", {}
+        ).get("file_extension", "mp4"),
     }
 
     with open(json_filepath, "w") as json_file:
@@ -810,9 +833,9 @@ def main(argv):
     # Setup signal handling for SIGHUP for config reload and SIGINT/SIGTERM for graceful exit
     signal.signal(signal.SIGHUP, handle_sighup)
     signal.signal(signal.SIGINT, signal_handler_exit)  # Graceful exit on Ctrl+C
-#    signal.signal(
-#        signal.SIGTERM, signal_handler_exit
-#    )  # Graceful exit on kill/systemd stop
+    #    signal.signal(
+    #        signal.SIGTERM, signal_handler_exit
+    #    )  # Graceful exit on kill/systemd stop
 
     # Initialize global sleep_intervals (important for camera threads)
     global sleep_intervals
@@ -873,7 +896,9 @@ def main(argv):
             name="frequent_timelapse_scheduler_loop",
         )
         frequent_timelapse_scheduler_thread_global.start()
-        logger.info(f"Starting thread {frequent_timelapse_scheduler_thread_global.name}")
+        logger.info(
+            f"Starting thread {frequent_timelapse_scheduler_thread_global.name}"
+        )
     else:
         logger.info("Frequent timelapse scheduler is disabled.")
 
@@ -908,9 +933,7 @@ def load_and_apply_configuration(initial_load=False, config_file_override=None):
 
     config_path_to_load = config_file_override if config_file_override else FLAGS.config
     if not config_path_to_load:
-        logger.error(
-            "No configuration file path specified. Cannot load configuration."
-        )
+        logger.error("No configuration file path specified. Cannot load configuration.")
         return
 
     # Load new configuration
@@ -1007,9 +1030,7 @@ def manage_camera_threads():
         if cam_name not in current_camera_names or cameras_config[cam_name].get(
             "disabled", False
         ):
-            logger.info(
-                f"Camera {cam_name} removed or disabled. Stopping its threads."
-            )
+            logger.info(f"Camera {cam_name} removed or disabled. Stopping its threads.")
             if (
                 "watchdog_manager_thread" in thread_info
                 and thread_info["watchdog_manager_thread"].is_alive()
@@ -1033,7 +1054,10 @@ def manage_camera_threads():
 
     # Start threads for new or enabled cameras
     for cam_name, cam_conf in cameras_config.items():
-        if cam_conf.get("disabled", False) or cam_conf.get("source") == "external_website":
+        if (
+            cam_conf.get("disabled", False)
+            or cam_conf.get("source") == "external_website"
+        ):
             continue
 
         if (
@@ -1196,6 +1220,7 @@ def shutdown_application():
     # sys.exit(0) # Explicitly exit. This might be too abrupt if called from signal handler context.
     # Rely on main thread exiting naturally after exit_event is processed.
 
+
 def frequent_timelapse_scheduler_loop():
     """
     This is a loop that schedules timelapse creation for the current day periodically.
@@ -1205,9 +1230,13 @@ def frequent_timelapse_scheduler_loop():
         for camera_name in cameras_config:
             logger.info(f"Time to update the frequent timelapse for {camera_name}.")
             pic_dir, _ = get_pic_dir_and_filename(camera_name)
-            timelapse_settings_tuple = (pic_dir, timelapse_config.get("frequent_timelapse"))
+            timelapse_settings_tuple = (
+                pic_dir,
+                timelapse_config.get("frequent_timelapse"),
+            )
             frequent_timelapse_q.append(timelapse_settings_tuple)
             interruptible_sleep(interval, exit_event)
+
 
 def frequent_timelapse_loop():
     while not exit_event.is_set():
@@ -1246,15 +1275,14 @@ def frequent_timelapse_loop():
                     f"There was an error creating the timelapse for dir: {pic_dir}"
                 )
         except FileExistsError:
-            logger.warning(
-                f"Found an existing timelapse in dir {pic_dir}, Skipping."
-            )
+            logger.warning(f"Found an existing timelapse in dir {pic_dir}, Skipping.")
         except Exception as e:
             logger.error(
                 f"There was an error creating the timelapse for dir: {pic_dir}: {e}",
                 exc_info=True,
             )
         time.sleep(5)
+
 
 def timelapse_loop():
     """
@@ -1274,7 +1302,8 @@ def timelapse_loop():
                     two_pass=timelapse_config.get("ffmpeg_2pass", True),
                     log_dir=global_config.get("log_dir"),
                     ffmpeg_options=timelapse_config.get(
-                        "ffmpeg_options", "-c:v libvpx-vp9 -b:v 0 -crf 30 -deadline best"
+                        "ffmpeg_options",
+                        "-c:v libvpx-vp9 -b:v 0 -crf 30 -deadline best",
                     ),
                     file_extension=timelapse_config.get("file_extension", "webm"),
                     framerate=timelapse_config.get("framerate", 60),
@@ -1337,9 +1366,7 @@ def daylight_loop():
     while not exit_event.is_set():
         if len(daylight_q) > 0:
             camera_name, daily_pic_dir, sky_area = daylight_q.popleft()
-            logger.info(
-                f"Running daylight in {daily_pic_dir} with sky_area {sky_area}"
-            )
+            logger.info(f"Running daylight in {daily_pic_dir} with sky_area {sky_area}")
             run_end_of_day(camera_name, daily_pic_dir, sky_area)
             add_to_timelapse_queue(
                 daily_pic_dir, timelapse_queue_file, timelapse_queue_lock
@@ -1393,7 +1420,13 @@ def disk_management_loop():
                 logger.info(
                     f"Camera {camera_name} is over its limit of {camera_limit_gb} GB. Current size: {current_size_bytes / (1024**3):.2f} GB. Deleting oldest directories."
                 )
-                subdirs = sorted([d.path for d in os.scandir(camera_dir) if d.is_dir() and d.name != "daylight"])
+                subdirs = sorted(
+                    [
+                        d.path
+                        for d in os.scandir(camera_dir)
+                        if d.is_dir() and d.name != "daylight"
+                    ]
+                )
                 for subdir in subdirs:
                     if current_size_bytes <= limit_bytes:
                         break
@@ -1427,7 +1460,11 @@ def disk_management_loop():
                     camera_dir = os.path.join(global_config["pic_dir"], camera_name)
                     if os.path.isdir(camera_dir):
                         all_day_dirs.extend(
-                            [d.path for d in os.scandir(camera_dir) if d.is_dir() and d.name != "daylight"]
+                            [
+                                d.path
+                                for d in os.scandir(camera_dir)
+                                if d.is_dir() and d.name != "daylight"
+                            ]
                         )
 
                 all_day_dirs.sort(key=lambda x: os.path.basename(x))
@@ -1467,12 +1504,12 @@ def archive_loop():
                     cam=camera_name,
                     sky_area=camera_config.get("sky_area"),
                     dry_run=False,
-                    #TODO: Enable this after making the daylight an external file queue
+                    # TODO: Enable this after making the daylight an external file queue
                     create_daylight_bands=False,
                     daylight_bands_queue_file=None,
                     create_timelapses=True,
                     timelapse_queue_file=timelapse_queue_file,
-                    timelapse_queue_file_lock=timelapse_queue_lock
+                    timelapse_queue_file_lock=timelapse_queue_lock,
                 )
         interruptible_sleep(600, exit_event)
 

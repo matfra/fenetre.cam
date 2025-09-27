@@ -19,7 +19,6 @@ from fenetre.platform_utils import is_raspberry_pi
 from io import TextIOWrapper
 
 
-
 def get_image_dimensions(image_path: str):
     """Gets the dimensions of an image."""
     try:
@@ -53,7 +52,9 @@ def create_timelapse(
         logger.error(f"No jpg images found in {dir}.")
         return
 
-    logging.debug(f"Found {images_count} pictures. Looking for duplicates or 0-bytes ones")
+    logging.debug(
+        f"Found {images_count} pictures. Looking for duplicates or 0-bytes ones"
+    )
     previous_image_size_bytes = 0
     # Delete 0-byte images
     for image_path in image_files:
@@ -70,9 +71,7 @@ def create_timelapse(
 
     logger.warning(f"Kept {images_count} out of {images_count_before} in {dir}")
     if images_count < 1:
-        logger.error(
-            f"No valid jpg images found in {dir} after removing 0-byte files."
-        )
+        logger.error(f"No valid jpg images found in {dir} after removing 0-byte files.")
         return
 
     width, height = get_image_dimensions(image_files[0])
@@ -123,7 +122,9 @@ def create_timelapse(
     timelapse_filename = os.path.basename(dir) + "." + file_extension
     timelapse_filepath = os.path.join(dir, timelapse_filename)
 
-    logger.info(f"Encoding {images_count} images to {timelapse_filepath} at {framerate} fps")
+    logger.info(
+        f"Encoding {images_count} images to {timelapse_filepath} at {framerate} fps"
+    )
 
     ffmpeg_log_stream = subprocess.DEVNULL
 

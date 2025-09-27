@@ -1,9 +1,10 @@
 - Do not apologize or try to be polite. Go straight to the point.
 - Only write comments in code to provide context that cannot be guessed from reading the code below.
-- Challenge my idea or suggestions before implementing them.
+- Challenge my idea or suggestions before implementing them. Before implementing anything, pause and ask me if I agree with your plan
 - This project runs on small computers or raspberry pis so we need to keep performance in mind.
 - Always ask for permission before modifying a file that is listed in @.gitignore
-- Use the local python virtualenv, typically in @venv directory
-- Do not fix things non-blocking problems unrelated to the current task. Add a TODO instead.
+- Use the local python virtualenv in the venv directory. Do not use the system's python
+- Do not fix anything not related to the current task. Instead, if you spot something anomalous or sub-optimal, offer me to add a line in the TODO.md instead.
 - Read the README.md to familiarize yourself with the project.
 - The code for this project is in the directory src/fenetre
+- For every edit you make in a python file, please run venv/bin/black on that file afterwards

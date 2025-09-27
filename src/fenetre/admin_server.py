@@ -286,7 +286,7 @@ def capture_for_ui(camera_name):
             img_bytes.seek(0)
 
             return send_file(img_bytes, mimetype=content_type)
-        
+
         elif gopro_ip:
             gopro = GoPro(ip_address=gopro_ip)
             # This is a simplified capture, assuming the GoPro is ready.
@@ -294,8 +294,15 @@ def capture_for_ui(camera_name):
             # which we don't replicate here for a simple capture.
             jpeg_bytes = gopro.capture_photo()
             if not jpeg_bytes:
-                return jsonify({"error": "Failed to capture photo from GoPro. It might be busy or off."}), 500
-            
+                return (
+                    jsonify(
+                        {
+                            "error": "Failed to capture photo from GoPro. It might be busy or off."
+                        }
+                    ),
+                    500,
+                )
+
             img_bytes = BytesIO(jpeg_bytes)
             img_bytes.seek(0)
             return send_file(img_bytes, mimetype="image/jpeg")
@@ -373,8 +380,8 @@ def preview_crop():
         )
 
         if (
-            actual_crop_box[0] >= actual_crop_box[2] or
-            actual_crop_box[1] >= actual_crop_box[3]
+            actual_crop_box[0] >= actual_crop_box[2]
+            or actual_crop_box[1] >= actual_crop_box[3]
         ):
             return (
                 jsonify(

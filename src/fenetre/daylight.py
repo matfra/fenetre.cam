@@ -40,7 +40,7 @@ def get_average_color_of_area(
     """
 
     x, y, width, height = area
-    average_color = np.mean(image[y:y + height, x:x + width], axis=(0, 1))
+    average_color = np.mean(image[y : y + height, x : x + width], axis=(0, 1))
     return average_color.astype(np.uint8)  # Ensure uint8 for image data
 
 

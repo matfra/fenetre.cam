@@ -283,9 +283,7 @@ class GoPro:
                 for setting, value in preset_config["settings"].items():
                     try:
                         setattr(self.settings, setting, value)
-                        logger.info(
-                            f"Applied setting '{setting}' with value '{value}'"
-                        )
+                        logger.info(f"Applied setting '{setting}' with value '{value}'")
                     except (AttributeError, ValueError) as e:
                         logger.error(
                             f"Failed to apply setting '{setting}' with value '{value}': {e}"

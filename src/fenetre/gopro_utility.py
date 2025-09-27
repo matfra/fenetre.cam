@@ -301,6 +301,7 @@ class GoProUtilityThread(threading.Thread):
         exit_event: threading.Event,
     ):
         from fenetre.gopro import GoPro
+
         super().__init__(
             name=f"{camera_config.get('name', 'gopro')}_utility_thread", daemon=True
         )
@@ -401,7 +402,6 @@ class GoProUtilityThread(threading.Thread):
             logger.info(f"GoPro Wi-Fi AP enabled. SSID: {ssid}, Password: {password}")
         except Exception as e:
             logger.error(f"Failed to enable GoPro Wi-Fi AP via Bluetooth: {e}")
-
 
     async def _send_ble_keepalive(self):
         try:

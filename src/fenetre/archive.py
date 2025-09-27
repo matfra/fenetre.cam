@@ -161,8 +161,7 @@ def archive_daydir(
     timelapse_queue_file: str = None,
     timelapse_queue_file_lock: threading.Lock = None,
 ):
-    """ When this is called from fenetre main runner, we don't want to create timelapses diretly but add them to a queue instead.
-    """
+    """When this is called from fenetre main runner, we don't want to create timelapses diretly but add them to a queue instead."""
     today_date = get_today_date(global_config)
     if os.path.basename(daydir) == today_date:
         logger.debug(
@@ -198,8 +197,7 @@ def archive_daydir(
                     two_pass=timelapse_config.get("ffmpeg_2pass", False),
                     dry_run=dry_run,
                     ffmpeg_options=timelapse_config.get("ffmpeg_options"),
-                    file_extension=timelapse_config.get("file_extension")
-
+                    file_extension=timelapse_config.get("file_extension"),
                 )
             else:
                 add_to_timelapse_queue(
