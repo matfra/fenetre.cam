@@ -29,6 +29,10 @@ from fenetre.admin_server import (
 # without a major refactor of how config is passed down.
 # Consider refactoring if more global configs are needed here.
 def get_timezone_from_config():
+    tz_from_env = os.environ.get('TZ')
+    if tz_from_env:
+        logger.info(f"Using timezone {tz_from_env} from ENV")
+        return tz_from_env
     try:
         with open("config.yaml", "r") as f:
             config = yaml.safe_load(f)

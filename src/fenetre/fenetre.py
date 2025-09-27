@@ -65,7 +65,7 @@ FLAGS = flags.FLAGS
 
 
 DEFAULT_SKY_AREA = "100,0,400,50"
-FENETRE_PID_FILE = os.environ.get("FENETRE_PID_FILE", "fenetre.pid")
+FENETRE_PID_FILE = os.environ.get("FENETRE_PID_FILE", "/tmp/fenetre.pid")
 
 # Global dictionary to keep track of active camera threads and related utility threads
 active_camera_threads = {}
