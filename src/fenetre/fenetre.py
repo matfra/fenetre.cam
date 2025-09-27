@@ -309,7 +309,10 @@ def snap(camera_name, camera_config: Dict):
     local_command = camera_config.get("local_command")
     gopro_ip = camera_config.get("gopro_ip")
 
-    def capture() -> Image.Image:
+    def capture(
+        previous_iso: Optional[float] = None,
+        previous_exposure_time_s: Optional[float] = None,
+    ) -> Image.Image:
         logger.info(f"{camera_name}: Fetching new picture.")
         if url is not None:
             ua = global_config.get("user_agent", "")
@@ -324,7 +327,10 @@ def snap(camera_name, camera_config: Dict):
             )
             if not gopro_instance:
                 raise RuntimeError(f"GoPro instance not found for camera {camera_name}")
-            jpeg_bytes = gopro_instance.capture_photo()
+            jpeg_bytes = gopro_instance.capture_photo(
+                previous_iso=previous_iso,
+                previous_exposure_time_s=previous_exposure_time_s,
+            )
             try:
                 # new_pic is only used to check if the image is valid
                 Image.open(BytesIO(jpeg_bytes))
@@ -342,6 +348,8 @@ def snap(camera_name, camera_config: Dict):
     # Initialization before the main loop
     previous_pic_dir, previous_pic_filename = get_pic_dir_and_filename(camera_name)
     previous_pic_fullpath = os.path.join(previous_pic_dir, previous_pic_filename)
+    previous_iso = None
+    previous_exposure_time_s = None
     try:
         previous_pic = capture()
     except Exception as e:
@@ -429,7 +437,7 @@ def snap(camera_name, camera_config: Dict):
             )
 
         try:
-            new_pic = capture()
+            new_pic = capture(previous_iso, previous_exposure_time_s)
         except Exception as e:
             error_msg = f"Could not fetch picture for {camera_name}: {e}"
             logger.warning(error_msg)
@@ -440,6 +448,19 @@ def snap(camera_name, camera_config: Dict):
         if new_pic is None:
             logger.error(f"{camera_name}: Could not fetch picture.")
             raise ValueError
+
+        try:
+            exif_data = new_pic.getexif()
+            if exif_data:
+                # ISOSpeedRatings
+                previous_iso = exif_data.get(34867)
+                # ExposureTime
+                exposure_time_val = exif_data.get(33434)
+                if exposure_time_val:
+                    previous_exposure_time_s = float(exposure_time_val)
+        except Exception as e:
+            logger.warning(f"Could not parse EXIF data for {camera_name}: {e}")
+
         if len(camera_config.get("postprocessing", [])) > 0:
             new_pic, new_exif = postprocess(
                 new_pic, camera_config.get("postprocessing", []), global_config
@@ -1080,6 +1101,10 @@ def manage_camera_threads():
                     timezone=global_config.get("timezone"),
                     preset_day=cam_conf.get("gopro_preset_day"),
                     preset_night=cam_conf.get("gopro_preset_night"),
+                    night_iso_threshold=cam_conf.get("night_iso_threshold", 400),
+                    day_exposure_time_threshold_us=cam_conf.get(
+                        "day_exposure_time_threshold_us", 15000
+                    ),
                 )
                 gopro_utility_thread = GoProUtilityThread(
                     gopro_instance, cam_name, cam_conf, exit_event

@@ -69,6 +69,8 @@ class GoPro:
         preset_day=None,
         preset_night=None,
         gopro_usb=False,
+        night_iso_threshold=400,
+        day_exposure_time_threshold_us=15000,
     ):
         self.ip_address = ip_address
         self.timeout = timeout
@@ -83,6 +85,8 @@ class GoPro:
         self.preset_night = preset_night
         self.gopro_usb = gopro_usb
         self.log_dir = log_dir
+        self.night_iso_threshold = night_iso_threshold
+        self.day_exposure_time_threshold_us = day_exposure_time_threshold_us
 
         if self.root_ca:
             import tempfile
@@ -225,6 +229,40 @@ class GoPro:
             logger.error(f"Error calculating sunrise/sunset for GoPro: {e}")
             return False  # Default to day
 
+    def _should_use_night_preset(
+        self, iso: Optional[float], exposure_time_s: Optional[float]
+    ) -> bool:
+        """
+        Determines whether to use the night preset based on the previous photo's
+        ISO and exposure time.
+        """
+        if iso is not None and exposure_time_s is not None:
+            day_exposure_threshold_s = self.day_exposure_time_threshold_us / 1_000_000
+            if exposure_time_s <= day_exposure_threshold_s:
+                logger.info(
+                    f"Last photo exposure time ({exposure_time_s:.4f}s) is less than "
+                    f"threshold ({day_exposure_threshold_s:.4f}s). Using day preset."
+                )
+                return False
+            if iso > self.night_iso_threshold:
+                logger.info(
+                    f"Last photo ISO ({iso}) is greater than threshold ({self.night_iso_threshold}). "
+                    "Using night preset."
+                )
+                return True
+
+            logger.info(
+                f"Last photo ISO ({iso}) and exposure time ({exposure_time_s:.4f}s) "
+                "are within day thresholds. Using day preset."
+            )
+            return False
+
+        logger.warning(
+            "Could not determine ISO or exposure time from previous photo. "
+            "Falling back to time-based night detection."
+        )
+        return self._is_night()
+
     def validate_presets(self):
         """
         Validates that the configured day and night presets are available on the camera.
@@ -251,7 +289,12 @@ class GoPro:
                 f"Configured night preset ID '{self.preset_night.get('id')}' is not available on the camera."
             )
 
-    def capture_photo(self, output_file: Optional[str] = None) -> bytes:
+    def capture_photo(
+        self,
+        output_file: Optional[str] = None,
+        previous_iso: Optional[float] = None,
+        previous_exposure_time_s: Optional[float] = None,
+    ) -> bytes:
         latest_dir_before, latest_file_before = self._get_latest_file()
 
         if self.gopro_usb:
@@ -265,7 +308,7 @@ class GoPro:
         self.settings.auto_power_down = "30 Min"
 
         preset_config = None
-        if self._is_night():
+        if self._should_use_night_preset(previous_iso, previous_exposure_time_s):
             if self.preset_night:
                 preset_config = self.preset_night
         else:

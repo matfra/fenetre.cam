@@ -30,9 +30,12 @@
   - camera details
   - Uniformize the behaviour of the camera details page wheter we come from the map view, the list view and the fullscreen view.
 
+- Add a hall of fame
+
 ### Admin interface.
 - [BUG] Crop preview is broken (not to scale)
 - ssim and sky area should be defiend on the crop preview since they happen after crop
+- Add the ability to pin a picture to a hall of fame
 
 ### Postprocessing
 - Add an option for small overlay image that shows the progression of the time throughout the as a marker on top of a blue yellow gradient. The gradient will be based on the camera location if setup.
