@@ -133,7 +133,7 @@ def get_config():
             )
         with open(config_file_path, "r") as f:
             config_data = yaml.safe_load(f)
-        return jsonify(config=config_data), 200
+        return jsonify(config_data), 200
     except Exception as e:
         return jsonify({"error": f"Error reading configuration: {str(e)}"}), 500
 

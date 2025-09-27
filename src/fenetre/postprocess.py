@@ -5,7 +5,6 @@ from typing import Dict, Optional, Tuple, Union
 import numpy as np
 import pyexiv2
 import pytz  # To get timezone from global_config easily
-import yaml  # For get_timezone_from_config
 import logging
 from PIL import Image, ImageDraw, ImageFont
 from skimage import exposure
@@ -22,34 +21,6 @@ from fenetre.admin_server import (
     metric_picture_white_balance,
     metric_picture_width_pixels,
 )
-
-
-# TODO Pass down the config
-# It's not ideal to re-read the config here, but it's the simplest way to get timezone
-# without a major refactor of how config is passed down.
-# Consider refactoring if more global configs are needed here.
-def get_timezone_from_config():
-    tz_from_env = os.environ.get('TZ')
-    if tz_from_env:
-        logger.info(f"Using timezone {tz_from_env} from ENV")
-        return tz_from_env
-    try:
-        with open("config.yaml", "r") as f:
-            config = yaml.safe_load(f)
-            return config.get("global", {}).get("timezone", "UTC")
-    except FileNotFoundError:
-        logger.warning(
-            "config.yaml not found, defaulting timezone to UTC for timestamps."
-        )
-        return "UTC"
-    except Exception as e:
-        logger.error(
-            f"Error reading timezone from config.yaml: {e}. Defaulting to UTC."
-        )
-        return "UTC"
-
-
-DEFAULT_TIMEZONE = get_timezone_from_config()
 
 
 def _parse_color(color_input: Union[str, Tuple[int, int, int]]) -> Tuple[int, int, int]:

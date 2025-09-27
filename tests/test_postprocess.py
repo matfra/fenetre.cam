@@ -1,16 +1,10 @@
 from fenetre.postprocess import _parse_color, add_timestamp, postprocess
-import os
-# Assuming postprocess.py is in the parent directory or PYTHONPATH is set up
-import sys
 import unittest
 from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
 import pytz
 
 from PIL import Image
-
-# Add the parent directory to sys.path to allow imports from postprocess
-
 
 
 class TestPostprocess(unittest.TestCase):
@@ -64,8 +58,13 @@ class TestPostprocess(unittest.TestCase):
         expected_text = "2023-01-01 12:00:00 UTC"
         # If DEFAULT_TIMEZONE in postprocess.py is something else, adjust this
         # Forcing it for the test for predictability:
-        with patch("fenetre.postprocess.DEFAULT_TIMEZONE", "UTC"):
-            add_timestamp(mock_image, size=12, color="yellow", position="bottom_right")
+        add_timestamp(
+            mock_image,
+            size=12,
+            color="yellow",
+            position="bottom_right",
+            timezone="UTC",
+        )
 
         mock_pytz.timezone.assert_called_with("UTC")
         mock_datetime.now.assert_called_with(mock_tz)
@@ -114,14 +113,14 @@ class TestPostprocess(unittest.TestCase):
         custom_format = "%H:%M %d/%m/%Y"
         expected_text = "08:30 10/05/2024"
 
-        with patch("fenetre.postprocess.DEFAULT_TIMEZONE", "UTC"):
-            add_timestamp(
-                mock_image,
-                text_format=custom_format,
-                size=20,
-                color="(0,255,0)",
-                position="top_left",
-            )
+        add_timestamp(
+            mock_image,
+            text_format=custom_format,
+            size=20,
+            color="(0,255,0)",
+            position="top_left",
+            timezone="UTC",
+        )
 
         mock_truetype.assert_called_with("DejaVuSans.ttf", 20)
         mock_draw_instance.text.assert_called_once()
@@ -168,8 +167,7 @@ class TestPostprocess(unittest.TestCase):
         mock_default_font = MagicMock()
         mock_load_default.return_value = mock_default_font
 
-        with patch("fenetre.postprocess.DEFAULT_TIMEZONE", "UTC"):
-            add_timestamp(mock_image, size=15)
+        add_timestamp(mock_image, size=15, timezone="UTC")
 
         # Check that truetype was attempted for DejaVuSans and Arial, then load_default was called
         self.assertEqual(mock_truetype_fail.call_count, 2)  # DejaVuSans and Arial
@@ -242,8 +240,7 @@ class TestPostprocess(unittest.TestCase):
         # Mock textbbox return value
         mock_draw_instance.textbbox.return_value = (0, 0, 100, 20)  # l, t, r, b
 
-        with patch("fenetre.postprocess.DEFAULT_TIMEZONE", "UTC"):
-            add_timestamp(mock_image, position="50,75", size=10, color="red")
+        add_timestamp(mock_image, position="50,75", size=10, color="red", timezone="UTC")
 
         mock_draw_instance.text.assert_called_once()
         args, kwargs = mock_draw_instance.text.call_args
@@ -251,35 +248,6 @@ class TestPostprocess(unittest.TestCase):
         # Position should be exactly (50,75)
         self.assertEqual(args[0], (50, 75))
         self.assertEqual(kwargs["fill"], "red")
-
-    # Test for get_timezone_from_config - this is a bit tricky as it reads a file
-    @patch("builtins.open", new_callable=unittest.mock.mock_open)
-    @patch("yaml.safe_load")
-    def test_get_timezone_from_config_success(self, mock_safe_load, mock_open_file):
-        from fenetre.postprocess import get_timezone_from_config
-
-        mock_safe_load.return_value = {"global": {"timezone": "America/New_York"}}
-
-        # Temporarily modify DEFAULT_TIMEZONE for this test scope if it's a global
-        # Or, ensure get_timezone_from_config is called where its result is used
-        # For this test, we are directly testing get_timezone_from_config
-
-        tz = get_timezone_from_config()
-        self.assertEqual(tz, "America/New_York")
-        mock_open_file.assert_called_with("config.yaml", "r")
-
-    @patch("builtins.open", side_effect=FileNotFoundError)
-    @patch("fenetre.postprocess.logger")  # to check for warning
-    def test_get_timezone_from_config_file_not_found(
-        self, mock_logging, mock_open_file
-    ):
-        from fenetre.postprocess import get_timezone_from_config  # re-import
-
-        tz = get_timezone_from_config()
-        self.assertEqual(tz, "UTC")  # Fallback
-        mock_logging.warning.assert_called_with(
-            "config.yaml not found, defaulting timezone to UTC for timestamps."
-        )
 
     @patch("fenetre.postprocess.ImageDraw.Draw")
     @patch("fenetre.postprocess.ImageFont.truetype")
@@ -322,10 +290,13 @@ class TestPostprocess(unittest.TestCase):
         }
 
         for position_name, expected_coords in positions_to_test.items():
-            with patch("fenetre.postprocess.DEFAULT_TIMEZONE", "UTC"):
-                add_timestamp(
-                    mock_image, position=position_name, size=10, color="green"
-                )
+            add_timestamp(
+                mock_image,
+                position=position_name,
+                size=10,
+                color="green",
+                timezone="UTC",
+            )
 
             args, _ = mock_draw_instance.text.call_args
             # final_x = expected_coords[0] - example_text_bbox[0]
@@ -376,14 +347,14 @@ class TestPostprocess(unittest.TestCase):
         # Mock what ImageColor.getcolor would return for "gray" in RGBA
         mock_pil_imagecolor_getcolor.return_value = (128, 128, 128, 255)  # Opaque gray
 
-        with patch("fenetre.postprocess.DEFAULT_TIMEZONE", "UTC"):
-            add_timestamp(
-                mock_image,
-                color="black",
-                background_color=background_color_string,
-                background_padding=5,
-                position="bottom_left",
-            )
+        add_timestamp(
+            mock_image,
+            color="black",
+            background_color=background_color_string,
+            background_padding=5,
+            position="bottom_left",
+            timezone="UTC",
+        )
 
         # Check that draw.rectangle was called for the background
         mock_draw_instance.rectangle.assert_called_once()
@@ -444,14 +415,14 @@ class TestPostprocess(unittest.TestCase):
         # Or ensure the side_effect handles this state change
         # For simplicity, the previous check for RGBA mode on Draw init covers the general case.
 
-        with patch("fenetre.postprocess.DEFAULT_TIMEZONE", "UTC"):
-            add_timestamp(
-                mock_image,
-                color="white",
-                background_color=background_color_to_test,
-                background_padding=3,
-                position="top_right",
-            )
+        add_timestamp(
+            mock_image,
+            color="white",
+            background_color=background_color_to_test,
+            background_padding=3,
+            position="top_right",
+            timezone="UTC",
+        )
 
         mock_draw_instance.rectangle.assert_called_once()
         rect_args_transparent, rect_kwargs_transparent = (
@@ -487,8 +458,7 @@ class TestPostprocess(unittest.TestCase):
         expected_time_part = "2024-07-15 10:30:00 UTC"
         expected_full_text = f"{custom_text_to_add} {expected_time_part}"
 
-        with patch("fenetre.postprocess.DEFAULT_TIMEZONE", "UTC"):
-            add_timestamp(mock_image, custom_text=custom_text_to_add)
+        add_timestamp(mock_image, custom_text=custom_text_to_add, timezone="UTC")
 
         # Verify that draw.text was called with the combined custom text and timestamp
         mock_draw_instance.text.assert_called_once()
