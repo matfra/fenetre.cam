@@ -384,25 +384,15 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        const x1 = parseInt(cropX1Input.value);
-        const y1 = parseInt(cropY1Input.value);
-        const x2 = parseInt(cropX2Input.value);
-        const y2 = parseInt(cropY2Input.value);
+        const naturalCropX = Math.min(naturalAreas.crop.x1, naturalAreas.crop.x2);
+        const naturalCropY = Math.min(naturalAreas.crop.y1, naturalAreas.crop.y2);
+        const naturalCropWidth = Math.abs(naturalAreas.crop.x2 - naturalAreas.crop.x1);
+        const naturalCropHeight = Math.abs(naturalAreas.crop.y2 - naturalAreas.crop.y1);
 
-        const uiCropX = Math.min(x1, x2);
-        const uiCropY = Math.min(y1, y2);
-        const uiCropWidth = Math.abs(x2 - x1);
-        const uiCropHeight = Math.abs(y2 - y1);
-
-        if (uiCropWidth === 0 || uiCropHeight === 0) {
+        if (naturalCropWidth === 0 || naturalCropHeight === 0) {
             setStatus('Invalid crop dimensions (width or height is zero).', 'error');
             return;
         }
-
-        const naturalCropX = Math.round(uiCropX * scaleFactors.x);
-        const naturalCropY = Math.round(uiCropY * scaleFactors.y);
-        const naturalCropWidth = Math.round(uiCropWidth * scaleFactors.x);
-        const naturalCropHeight = Math.round(uiCropHeight * scaleFactors.y);
 
         setStatus('Generating crop preview...', 'info');
         croppedPreviewImage.src = '';
