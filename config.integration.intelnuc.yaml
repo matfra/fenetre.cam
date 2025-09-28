@@ -51,8 +51,8 @@ cameras:
     ssim_area: "0.0,0.08,1.0,0.7"
     ssim_setpoint: 0.93
     timeout_s: 20 # Default value is not specified
-    latitude: 37.7749
-    longitude: -122.4194
+    lat: 37.7749
+    lon: -122.4194
     postprocessing:
       - type: "timestamp"
         enabled: true

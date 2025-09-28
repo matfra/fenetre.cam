@@ -236,8 +236,8 @@ def _add_sun_path_overlay(
     Generates and overlays the sun path SVG onto the image.
     """
     # Prioritize getting coordinates from the camera_config, fallback to global
-    lat = camera_config.get("latitude") or global_config.get("latitude")
-    lon = camera_config.get("longitude") or global_config.get("longitude")
+    lat = camera_config.get("lat")
+    lon = camera_config.get("lon")
     tz_str = camera_config.get("timezone") or global_config.get("timezone", "UTC")
 
     if not lat or not lon:

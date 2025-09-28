@@ -31,6 +31,24 @@ cameras:
       type: resize
     - enabled: true
       type: gather_metrics
+    - type: sun_path
+      enabled: true
+      overlay_width: 800  # Width of the overlay in pixels
+      position: "top_center" # e.g., top_left, bottom_right, etc.
+      padding: 5 # Optional padding from the edge
+      # Bar thickness options still work
+      major_bar_width: 2
+      minor_bar_width: 1
+      overlay_bar_width: 4
+      overlay_rect_width: 15
+      overlay_border_width: 4
+      overlay_border_color: "white"
+      major_bar_color: "grey"
+      minor_bar_color: "#333333" # Can be hex code
+      overlay_bar_color: "rgba(255, 0, 0, 0.5)" # Can be RGBA for transparency
+      overlay_rect_height_ratio: 1.0
+      background_color: "rgba(255, 255, 255, 0.3)"
+      sun_arc_color: "rgba(255, 165, 0, 0.6)"
     sky_area: 0.000,0.000,0.986,0.500
     ssim_area: 0.000,0.000,0.997,0.500
     ssim_setpoint: 0.89
