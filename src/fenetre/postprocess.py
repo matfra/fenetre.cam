@@ -223,8 +223,11 @@ def _add_text_overlay(
     draw.text((final_x, final_y), text_to_draw, font=font, fill=parsed_text_color)
     return pic
 
-# Simple in-memory cache for the daily sun path SVG
-_sun_path_cache = {}
+
+# Simple in-memory cache for the daily sun path SVG. One entry per camera, reset daily.
+_sun_path_cache: Dict[str, str] = {}
+_cache_date: Optional[datetime.date] = None
+
 
 def _add_sun_path_overlay(
     pic: Image.Image,
@@ -234,7 +237,10 @@ def _add_sun_path_overlay(
 ) -> Image.Image:
     """
     Generates and overlays the sun path SVG onto the image.
+    The SVG is cached daily on a per-camera basis.
     """
+    global _sun_path_cache, _cache_date
+
     # Prioritize getting coordinates from the camera_config, fallback to global
     lat = camera_config.get("lat")
     lon = camera_config.get("lon")
@@ -250,10 +256,19 @@ def _add_sun_path_overlay(
     now = datetime.now(pytz.timezone(tz_str))
     today = now.date()
 
+    # If the date has changed, clear the cache
+    if _cache_date != today:
+        logger.info(f"New day ({today}), clearing sun path cache.")
+        _sun_path_cache.clear()
+        _cache_date = today
+
+    # Use camera name from config, fallback to lat,lon for a unique key
+    camera_key = camera_config.get("name", f"{lat},{lon}")
+
     # Use cache if available
-    if today not in _sun_path_cache:
-        logger.info(f"Generating new sun path SVG for {today}")
-        _sun_path_cache[today] = create_sun_path_svg(
+    if camera_key not in _sun_path_cache:
+        logger.info(f"Generating new sun path SVG for '{camera_key}' on {today}")
+        _sun_path_cache[camera_key] = create_sun_path_svg(
             date=today,
             latitude=lat,
             longitude=lon,
@@ -265,9 +280,9 @@ def _add_sun_path_overlay(
             sun_arc_color=step_config.get("sun_arc_color", "rgba(255, 255, 0, 0.5)"),
             timezone=tz_str,
         )
-    
-    base_svg = _sun_path_cache[today]
-    
+
+    base_svg = _sun_path_cache[camera_key]
+
     final_svg = overlay_time_bar(
         svg_content=base_svg,
         time_to_overlay=now,
@@ -305,20 +320,21 @@ def _add_sun_path_overlay(
         elif position == "bottom_center":
             x, y = (img_width - ov_width) // 2, img_height - ov_height - padding
         else:
-            logger.warning(f"Unrecognized position for sun_path: {position}. Defaulting to top_left.")
+            logger.warning(
+                f"Unrecognized position for sun_path: {position}. Defaulting to top_left."
+            )
             x, y = padding, padding
 
         # Paste the overlay onto the main image
         if pic.mode != "RGBA":
             pic = pic.convert("RGBA")
-        
+
         pic.paste(overlay_img, (x, y), overlay_img)
 
     except Exception as e:
         logger.error(f"Failed to create or overlay sun path SVG: {e}")
 
     return pic
-
 
 
 def add_timestamp(
@@ -376,7 +392,7 @@ def postprocess(
     if camera_config is None:
         camera_config = {}
     exif_data = pic.info.get("exif") or b""
-    
+
     # Correct orientation based on EXIF data before any processing
     pic = ImageOps.exif_transpose(pic)
 
