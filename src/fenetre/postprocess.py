@@ -1,13 +1,17 @@
+import logging
 import os
 from datetime import datetime
 from typing import Dict, Optional, Tuple, Union
+import io
 
+import cairosvg
 import numpy as np
 import pyexiv2
 import pytz  # To get timezone from global_config easily
-import logging
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 from skimage import exposure
+
+from .sun_path_svg import create_sun_path_svg, overlay_time_bar
 
 logger = logging.getLogger(__name__)
 
@@ -219,6 +223,103 @@ def _add_text_overlay(
     draw.text((final_x, final_y), text_to_draw, font=font, fill=parsed_text_color)
     return pic
 
+# Simple in-memory cache for the daily sun path SVG
+_sun_path_cache = {}
+
+def _add_sun_path_overlay(
+    pic: Image.Image,
+    global_config: Dict,
+    camera_config: Dict,
+    step_config: Dict,
+) -> Image.Image:
+    """
+    Generates and overlays the sun path SVG onto the image.
+    """
+    # Prioritize getting coordinates from the camera_config, fallback to global
+    lat = camera_config.get("latitude") or global_config.get("latitude")
+    lon = camera_config.get("longitude") or global_config.get("longitude")
+    tz_str = camera_config.get("timezone") or global_config.get("timezone", "UTC")
+
+    if not lat or not lon:
+        logger.error(
+            "sun_path overlay enabled, but 'latitude' and 'longitude' not found "
+            "in the camera's configuration or the global configuration. Skipping."
+        )
+        return pic
+
+    now = datetime.now(pytz.timezone(tz_str))
+    today = now.date()
+
+    # Use cache if available
+    if today not in _sun_path_cache:
+        logger.info(f"Generating new sun path SVG for {today}")
+        _sun_path_cache[today] = create_sun_path_svg(
+            date=today,
+            latitude=lat,
+            longitude=lon,
+            major_bar_width=step_config.get("major_bar_width", 1),
+            minor_bar_width=step_config.get("minor_bar_width", 1),
+            major_bar_color=step_config.get("major_bar_color", "darkgrey"),
+            minor_bar_color=step_config.get("minor_bar_color", "lightgrey"),
+            background_color=step_config.get("background_color", "transparent"),
+            sun_arc_color=step_config.get("sun_arc_color", "rgba(255, 255, 0, 0.5)"),
+            timezone=tz_str,
+        )
+    
+    base_svg = _sun_path_cache[today]
+    
+    final_svg = overlay_time_bar(
+        svg_content=base_svg,
+        time_to_overlay=now,
+        overlay_rect_width=step_config.get("overlay_rect_width", 5),
+        overlay_border_width=step_config.get("overlay_border_width", 2),
+        overlay_border_color=step_config.get("overlay_border_color", "white"),
+        overlay_rect_height_ratio=step_config.get("overlay_rect_height_ratio", 1.0),
+    )
+
+    try:
+        overlay_width = step_config.get("overlay_width", pic.width)
+        position = step_config.get("position", "top_left")
+        padding = step_config.get("padding", 10)
+
+        # Convert SVG to PNG in memory, scaled to the desired width
+        png_data = cairosvg.svg2png(
+            bytestring=final_svg.encode("utf-8"), output_width=overlay_width
+        )
+        overlay_img = Image.open(io.BytesIO(png_data))
+
+        # Calculate position
+        img_width, img_height = pic.size
+        ov_width, ov_height = overlay_img.size
+
+        if position == "top_left":
+            x, y = padding, padding
+        elif position == "top_right":
+            x, y = img_width - ov_width - padding, padding
+        elif position == "bottom_left":
+            x, y = padding, img_height - ov_height - padding
+        elif position == "bottom_right":
+            x, y = img_width - ov_width - padding, img_height - ov_height - padding
+        elif position == "top_center":
+            x, y = (img_width - ov_width) // 2, padding
+        elif position == "bottom_center":
+            x, y = (img_width - ov_width) // 2, img_height - ov_height - padding
+        else:
+            logger.warning(f"Unrecognized position for sun_path: {position}. Defaulting to top_left.")
+            x, y = padding, padding
+
+        # Paste the overlay onto the main image
+        if pic.mode != "RGBA":
+            pic = pic.convert("RGBA")
+        
+        pic.paste(overlay_img, (x, y), overlay_img)
+
+    except Exception as e:
+        logger.error(f"Failed to create or overlay sun path SVG: {e}")
+
+    return pic
+
+
 
 def add_timestamp(
     pic: Image.Image,
@@ -265,12 +366,15 @@ def postprocess(
     pic: Image.Image,
     postprocessing_steps: list,
     global_config: Optional[Dict] = None,
+    camera_config: Optional[Dict] = None,
 ) -> Tuple[Image.Image, dict]:
     """
     Applies a series of post-processing steps to an image.
     """
     if global_config is None:
         global_config = {}
+    if camera_config is None:
+        camera_config = {}
     exif_data = pic.info.get("exif") or b""
     
     # Correct orientation based on EXIF data before any processing
@@ -344,6 +448,10 @@ def postprocess(
                 logger.warning(
                     "Generic text step is enabled but no 'text_content' was provided."
                 )
+        elif step["type"] == "sun_path":
+            if step.get("enabled", False):
+                logger.debug("Adding sun path overlay")
+                pic = _add_sun_path_overlay(pic, global_config, camera_config, step)
 
     return pic, exif_data
 

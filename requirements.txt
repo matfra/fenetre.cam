@@ -4,6 +4,7 @@ pyyaml
 absl-py
 logzero
 numpy
+cairosvg
 # python-daemon
 
 ## Optional

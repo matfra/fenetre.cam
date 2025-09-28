@@ -1,6 +1,10 @@
-global:
-  work_dir: /srv/fenetre/data
-  log_dir: /srv/fenetre/logs
+global: #Requires app restart
+  work_dir: /Users/fenetre
+  log_dir: /Users/fenetre/logs
+  logging_level: INFO
+  logging_levels:
+    fenetre.gopro: DEBUG
+    fenetre.postprocess: WARNING
   timezone: "America/Los_Angeles"
   sunrise_sunset_interval_s: 10
   storage_management:
@@ -10,45 +14,58 @@ global:
     work_dir_max_size_GB: 10
 
 timelapse:
-  ffmpeg_options: "-framerate 30 -c:v libvpx-vp9 -b:v 3M" #default to "-framerate 30"
-  ffmpeg_2pass: True #default to False
-  file_extension: "webm"
+  frequent_timelapse:
+    ffmpeg_2pass: false
+    # Recommended for Intel
+    ffmpeg_options: -extbrc 1 -look_ahead 1 -look_ahead_depth 60 -g 120 -bf 3 -preset
+      veryslow -c:v hevc_qsv -b:v 4M -maxrate 5M -bufsize 8M -profile:v main -movflags
+      +faststart
+    file_extension: mp4  
+    enabled: true
+  daily_timelapse:
+    # https://trac.ffmpeg.org/wiki/Encode/VP9#twopass
+    enabled: true
+    framerate: 60 # 60 fps if more than 1000 pictures in the day, 30 otherwise
+    ffmpeg_options: -c:v libvpx-vp9 -b:v 0 -crf 30 -deadline best
+    ffmpeg_2pass: True
+    file_extension: webm
 http_server:
-  port: 8888
-  host: 0.0.0.0
-  enabled: True
+  enabled: true
+  listen: "0.0.0.0:8888 [::]:8888"
 admin_server:
-  enabled: true       # Enable the web UI for configuration
-  host: "0.0.0.0"     # Host for the config server
-  port: 8889          # Port for the config server
+  enabled: true
+  # Waitress args https://docs.pylonsproject.org/projects/waitress/en/stable/arguments.html#arguments
+  listen: "0.0.0.0:8889 [::]:8889"
 ui:
   landing_page: "list" # list, map, camera, fullscreen
   fullscreen_camera: "a-cool-http-cam-with-clouds"
 cameras:
   a-cool-http-cam-with-clouds:
     url: "https://isitfoggy.com/photos/latest.jpg"
-    sky_area: 0,80,1920,400
+    # sky_area and ssim_area are defined as ratios of the cropped image: "x1,y1,x2,y2"
+    sky_area: "0.0,0.08,1.0,0.4"
     work_dir_max_size_GB: 5
     # In order to fast forward the boring days and capture the beautiful sky motion,
     # we can calculate a dynamic interval based on the difference between the last 2 pictures.
     # try to grab the biggest area containing things not susceptible to the wind like shaking tree.
-    ssim_area: 0,80,700,300
+    ssim_area: "0.0,0.08,1.0,0.7"
     ssim_setpoint: 0.93
     timeout_s: 20 # Default value is not specified
     latitude: 37.7749
     longitude: -122.4194
-    sunrise_sunset:
-      enabled: True
     postprocessing:
-      - type: "crop"
-        area: "0,0,1920,1080"
-      - type: "resize"
-        width: 1280
-        height: 720
-      - type: "awb"
       - type: "timestamp"
         enabled: true
         position: "bottom_right" # Options: "top_left", "top_right", "bottom_left", or "x,y" coordinates
         size: 24
         color: "white" # common color names or RGB tuple e.g., "(255, 255, 255)"
         format: "%Y-%m-%d %H:%M:%S %Z"
+      - type: sun_path
+        enabled: true
+        overlay_width: 800  # Width of the overlay in pixels
+        position: "top_center" # e.g., top_left, bottom_right, etc.
+        padding: 20 # Optional padding from the edge
+        # Bar thickness options still work
+        major_bar_width: 2
+        minor_bar_width: 1
+        overlay_bar_width: 4

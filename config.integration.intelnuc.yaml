@@ -1,6 +1,6 @@
 global: #Requires app restart
-  work_dir: /Users/fenetre
-  log_dir: /Users/fenetre/logs
+  work_dir: /srv/fenetre/data
+  log_dir: /srv/fenetre/logs
   logging_level: INFO
   logging_levels:
     fenetre.gopro: DEBUG
@@ -21,7 +21,7 @@ timelapse:
       veryslow -c:v hevc_qsv -b:v 4M -maxrate 5M -bufsize 8M -profile:v main -movflags
       +faststart
     file_extension: mp4  
-    enabled: true
+    enabled: false
   daily_timelapse:
     # https://trac.ffmpeg.org/wiki/Encode/VP9#twopass
     enabled: true
@@ -64,8 +64,17 @@ cameras:
         enabled: true
         overlay_width: 800  # Width of the overlay in pixels
         position: "top_center" # e.g., top_left, bottom_right, etc.
-        padding: 20 # Optional padding from the edge
+        padding: 5 # Optional padding from the edge
         # Bar thickness options still work
         major_bar_width: 2
         minor_bar_width: 1
         overlay_bar_width: 4
+        overlay_rect_width: 15
+        overlay_border_width: 4
+        overlay_border_color: "white"
+        major_bar_color: "grey"
+        minor_bar_color: "#333333" # Can be hex code
+        overlay_bar_color: "rgba(255, 0, 0, 0.5)" # Can be RGBA for transparency
+        overlay_rect_height_ratio: 1.0
+        background_color: "rgba(255, 255, 255, 0.3)"
+        sun_arc_color: "rgba(255, 165, 0, 0.6)"

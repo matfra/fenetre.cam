@@ -204,7 +204,7 @@ def write_pic_to_disk(
         with open(pic_path, "wb") as output_file:
             output_file.write(optimized_jpeg_bytes)
     else:
-        pic.save(pic_path, exif=exif_data)
+        pic.convert("RGB").save(pic_path, exif=exif_data)
 
 
 def update_latest_link(pic_path: str):
@@ -371,7 +371,10 @@ def snap(camera_name, camera_config: Dict):
     previous_exif = previous_pic.info.get("exif") or b""
     if len(camera_config.get("postprocessing", [])) > 0:
         previous_pic, previous_exif = postprocess(
-            previous_pic, camera_config.get("postprocessing", []), global_config
+            previous_pic,
+            camera_config.get("postprocessing", []),
+            global_config,
+            camera_config,
         )
     fixed_snap_interval = camera_config.get("snap_interval_s", None)
     if camera_name not in sleep_intervals:
@@ -461,7 +464,10 @@ def snap(camera_name, camera_config: Dict):
             raise ValueError
         if len(camera_config.get("postprocessing", [])) > 0:
             new_pic, new_exif = postprocess(
-                new_pic, camera_config.get("postprocessing", []), global_config
+                new_pic,
+                camera_config.get("postprocessing", []),
+                global_config,
+                camera_config,
             )
         if fixed_snap_interval is None:
             ssim = get_ssim_for_area(
