@@ -6,7 +6,7 @@ import numpy as np
 import pyexiv2
 import pytz  # To get timezone from global_config easily
 import logging
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageOps
 from skimage import exposure
 
 logger = logging.getLogger(__name__)
@@ -272,6 +272,10 @@ def postprocess(
     if global_config is None:
         global_config = {}
     exif_data = pic.info.get("exif") or b""
+    
+    # Correct orientation based on EXIF data before any processing
+    pic = ImageOps.exif_transpose(pic)
+
     for step in postprocessing_steps:
         if step["type"] == "crop":
             logger.debug(f"Cropping image to area: {step['area']}")
@@ -281,6 +285,10 @@ def postprocess(
                 f"Resizing image to width: {step.get('width')}, height: {step.get('height')}"
             )
             pic = resize(pic, step.get("width"), step.get("height"))
+        elif step["type"] == "rotate":
+            if "angle" in step:
+                logger.debug(f"Rotating image by {step['angle']} degrees")
+                pic = rotate(pic, step["angle"])
         elif step["type"] == "awb":
             logger.debug("Applying auto white balance to image")
             pic = auto_white_balance(pic)
@@ -353,6 +361,13 @@ def crop(pic: Image.Image, area: str) -> Image.Image:
     )
     logger.debug(f"Cropping picture to {crop_points}")
     return pic.crop(crop_points)
+
+
+def rotate(pic: Image.Image, angle: int) -> Image.Image:
+    """
+    Rotates an image by a specified angle.
+    """
+    return pic.rotate(angle, expand=True)
 
 
 # If only one dimension is provided, the other will be calculated based on the aspect ratio of the original image or the cropped area.

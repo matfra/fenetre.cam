@@ -13,7 +13,7 @@ from flask import (
     send_file,
     send_from_directory,
 )
-from PIL import Image
+from PIL import Image, ImageOps
 from prometheus_client import REGISTRY, Counter, Gauge, generate_latest
 from werkzeug.exceptions import BadRequest
 
@@ -133,7 +133,7 @@ def get_config():
             )
         with open(config_file_path, "r") as f:
             config_data = yaml.safe_load(f)
-        return jsonify(config_data), 200
+        return jsonify({"config": config_data}), 200
     except Exception as e:
         return jsonify({"error": f"Error reading configuration: {str(e)}"}), 500
 
@@ -366,6 +366,7 @@ def preview_crop():
 
     try:
         img = Image.open(file.stream)
+        img = ImageOps.exif_transpose(img)
 
         # Crop box is (left, upper, right, lower)
         crop_box = (x, y, x + width, y + height)

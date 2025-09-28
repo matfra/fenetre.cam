@@ -61,7 +61,33 @@ def run_end_of_day(camera_name, day_dir_path, sky_area):
     """Runs the end of day processing for a given camera and day directory. Typically it creates the daily band and updates the monthly image, regenerate all HTML files."""
     if sky_area is None:
         sky_area = DEFAULT_SKY_AREA
-    create_daily_band(day_dir_path, parse_sky_area(sky_area))
+
+    # Determine sky_coords once using the first available image
+    sky_coords = None
+    first_image_path = None
+    image_files = sorted([f for f in os.listdir(day_dir_path) if f.lower().endswith(".jpg")])
+
+    if image_files:
+        first_image_path = os.path.join(day_dir_path, image_files[0])
+        try:
+            with Image.open(first_image_path) as img:
+                sky_coords = parse_sky_area(sky_area, img.size)
+        except Exception as e:
+            logger.error(f"Failed to open first image {first_image_path} to determine sky_coords: {e}")
+
+    if not sky_coords:
+        logger.warning(f"Could not determine sky_coords for {day_dir_path}. Using default color for daily band.")
+        # Create a band with default color if sky_coords can't be determined
+        daily_band_image = Image.new("RGB", (1, DAILY_BAND_HEIGHT), DEFAULT_SKY_COLOR)
+        band_save_path = os.path.join(day_dir_path, "daylight.png")
+        try:
+            daily_band_image.save(band_save_path)
+            logger.info(f"Saved daily band with default color to {band_save_path}")
+        except Exception as e:
+            logger.error(f"Error saving default daily band {band_save_path}: {e}")
+        return
+
+    create_daily_band(day_dir_path, sky_coords)
     year, month, _ = os.path.split(day_dir_path)[-1].split("-")
     camera_dir = os.path.join(day_dir_path, os.path.pardir)
     create_monthly_image(f"{year}-{month}", camera_dir)
@@ -79,7 +105,7 @@ def get_avg_color(image, crop_box):
         return DEFAULT_SKY_COLOR
 
 
-def create_daily_band(day_dir_path, sky_coords):
+def create_daily_band(day_dir_path: str, sky_coords: Optional[Tuple[int, int, int, int]]):
     """
     Processes images in a daily directory to create a 1x1440 pixel band.
     If no image for a minute, repeats the previous minute's color.
@@ -247,25 +273,28 @@ def create_monthly_image(year_month_str: str, camera_data_path: str):
         return None
 
 
-def parse_sky_area(sky_area_str):
-    """Parses 'left,top,right,bottom' string into (int, int, int, int) tuple."""
+def parse_sky_area(sky_area_str: str, image_size: Tuple[int, int]) -> Optional[Tuple[int, int, int, int]]:
+    """Parses 'left,top,right,bottom' string into an absolute pixel tuple."""
     if not sky_area_str:
         return None
     try:
-        parts = [int(p.strip()) for p in sky_area_str.split(",")]
+        parts = [float(p.strip()) for p in sky_area_str.split(",")]
         if len(parts) == 4:
-            # Ensure left < right and top < bottom if necessary, though Pillow handles it
-            # For simplicity, assume valid coordinates are provided
-            return tuple(parts)  # (left, upper, right, lower)
+            # If all values are <= 1.0, treat them as ratios
+            if all(v <= 1.0 for v in parts):
+                img_width, img_height = image_size
+                x1 = int(img_width * parts[0])
+                y1 = int(img_height * parts[1])
+                x2 = int(img_width * parts[2])
+                y2 = int(img_height * parts[3])
+                return (x1, y1, x2, y2)
+            else: # Otherwise, treat as absolute pixel values (legacy)
+                return tuple(int(p) for p in parts)
         else:
-            print(
-                f"      Warning: sky_area string '{sky_area_str}' must have 4 parts (left,top,right,bottom)."
-            )
+            logger.warning(f"sky_area string '{sky_area_str}' must have 4 parts.")
             return None
     except ValueError:
-        print(
-            f"      Warning: Could not parse sky_area string '{sky_area_str}' into integers."
-        )
+        logger.warning(f"Could not parse sky_area string '{sky_area_str}'.")
         return None
 
 

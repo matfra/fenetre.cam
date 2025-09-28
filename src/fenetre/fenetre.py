@@ -499,15 +499,25 @@ def get_ssim_for_area(
 
     # Compute SSIM on the full image.
     if area:
-        # Prevents the linter from complaining about the type of crop_points.
         crop_points_list = [float(i) for i in area.split(",")]
-        crop_points = (
-            crop_points_list[0],
-            crop_points_list[1],
-            crop_points_list[2],
-            crop_points_list[3],
-        )
-        logger.debug(f"{crop_points}")
+        
+        # If all values are <= 1.0, treat them as ratios
+        if all(v <= 1.0 for v in crop_points_list):
+            img_width, img_height = image1.size
+            x1 = int(img_width * crop_points_list[0])
+            y1 = int(img_height * crop_points_list[1])
+            x2 = int(img_width * crop_points_list[2])
+            y2 = int(img_height * crop_points_list[3])
+            crop_points = (x1, y1, x2, y2)
+        else: # Otherwise, treat as absolute pixel values (legacy)
+            crop_points = (
+                int(crop_points_list[0]),
+                int(crop_points_list[1]),
+                int(crop_points_list[2]),
+                int(crop_points_list[3]),
+            )
+
+        logger.debug(f"SSIM crop points: {crop_points}")
         target_image1 = image1.resize((50, 50), box=crop_points)
         target_image2 = image2.resize((50, 50), box=crop_points)
 

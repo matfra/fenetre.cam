@@ -42,12 +42,13 @@ ui:
 cameras:
   a-cool-http-cam-with-clouds:
     url: "https://isitfoggy.com/photos/latest.jpg"
-    sky_area: 0,80,1920,400
+    # sky_area and ssim_area are defined as ratios of the cropped image: "x1,y1,x2,y2"
+    sky_area: "0.0,0.08,1.0,0.4"
     work_dir_max_size_GB: 5
     # In order to fast forward the boring days and capture the beautiful sky motion,
     # we can calculate a dynamic interval based on the difference between the last 2 pictures.
     # try to grab the biggest area containing things not susceptible to the wind like shaking tree.
-    ssim_area: 0,80,1920,700
+    ssim_area: "0.0,0.08,1.0,0.7"
     ssim_setpoint: 0.93
     timeout_s: 20 # Default value is not specified
     latitude: 37.7749
@@ -57,6 +58,8 @@ cameras:
     postprocessing:
       - type: "crop"
         area: "0,0,1920,1080"
+      - type: "rotate"
+        angle: 180
       - type: "resize"
         width: 1280
         height: 720

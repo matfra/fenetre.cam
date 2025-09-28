@@ -315,11 +315,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 cropCanvas.width = imageDimensions.displayWidth;
                 cropCanvas.height = imageDimensions.displayHeight;
 
-                cropX1Input.value = 0;
-                cropY1Input.value = 0;
-                cropX2Input.value = imageDimensions.displayWidth;
-                cropY2Input.value = imageDimensions.displayHeight;
-
+                // Default to full image size
                 naturalAreas.crop = {
                     x1: 0, y1: 0,
                     x2: imageDimensions.naturalWidth, y2: imageDimensions.naturalHeight,
@@ -335,21 +331,75 @@ document.addEventListener('DOMContentLoaded', () => {
                         const camConfig = fullConfig.config.cameras && fullConfig.config.cameras[cameraName] ? fullConfig.config.cameras[cameraName] : null;
 
                         if (camConfig) {
+                            let cropAreaString = null;
+                            // Prioritize postprocessing crop step
+                            if (camConfig.postprocessing) {
+                                const cropStep = camConfig.postprocessing.find(step => step.type === 'crop');
+                                if (cropStep && cropStep.area) {
+                                    cropAreaString = cropStep.area;
+                                }
+                            }
+                            // Fallback to legacy crop property
+                            if (!cropAreaString && camConfig.crop) {
+                                cropAreaString = camConfig.crop;
+                            }
+
+                            if (cropAreaString) {
+                                const [x1, y1, x2, y2] = cropAreaString.split(',').map(Number);
+                                if (!isNaN(x1) && !isNaN(y1) && !isNaN(x2) && !isNaN(y2)) {
+                                    naturalAreas.crop = { x1, y1, x2, y2, active: true };
+                                }
+                            }
+
+                            // Handle sky_area: can be absolute pixels (legacy) or ratios
                             if (camConfig.sky_area) {
-                                const [l, t, r, b] = camConfig.sky_area.split(',').map(Number);
-                                naturalAreas.sky = { x1: l, y1: t, x2: r, y2: b, active: true };
-                                enableSkyAreaCheckbox.checked = true;
-                                skyAreaControlsDiv.style.display = 'block';
+                                const values = camConfig.sky_area.split(',').map(Number);
+                                if (values.length === 4 && !values.some(isNaN)) {
+                                    // If max value > 1.0, assume it's legacy pixels
+                                    if (Math.max(...values) > 1.0) {
+                                        naturalAreas.sky = { x1: values[0], y1: values[1], x2: values[2], y2: values[3], active: true };
+                                    } else {
+                                        // New format: ratios relative to crop area
+                                        const cropWidth = naturalAreas.crop.x2 - naturalAreas.crop.x1;
+                                        const cropHeight = naturalAreas.crop.y2 - naturalAreas.crop.y1;
+                                        naturalAreas.sky = {
+                                            x1: naturalAreas.crop.x1 + values[0] * cropWidth,
+                                            y1: naturalAreas.crop.y1 + values[1] * cropHeight,
+                                            x2: naturalAreas.crop.x1 + values[2] * cropWidth,
+                                            y2: naturalAreas.crop.y1 + values[3] * cropHeight,
+                                            active: true
+                                        };
+                                    }
+                                    enableSkyAreaCheckbox.checked = true;
+                                    skyAreaControlsDiv.style.display = 'block';
+                                }
                             } else {
                                 enableSkyAreaCheckbox.checked = false;
                                 skyAreaControlsDiv.style.display = 'none';
                             }
 
+                            // Handle ssim_area: can be absolute pixels (legacy) or ratios
                             if (camConfig.ssim_area) {
-                                const [l, t, r, b] = camConfig.ssim_area.split(',').map(Number);
-                                naturalAreas.ssim = { x1: l, y1: t, x2: r, y2: b, active: true };
-                                enableSsimAreaCheckbox.checked = true;
-                                ssimAreaControlsDiv.style.display = 'block';
+                                const values = camConfig.ssim_area.split(',').map(Number);
+                                if (values.length === 4 && !values.some(isNaN)) {
+                                    // If max value > 1.0, assume it's legacy pixels
+                                    if (Math.max(...values) > 1.0) {
+                                        naturalAreas.ssim = { x1: values[0], y1: values[1], x2: values[2], y2: values[3], active: true };
+                                    } else {
+                                        // New format: ratios relative to crop area
+                                        const cropWidth = naturalAreas.crop.x2 - naturalAreas.crop.x1;
+                                        const cropHeight = naturalAreas.crop.y2 - naturalAreas.crop.y1;
+                                        naturalAreas.ssim = {
+                                            x1: naturalAreas.crop.x1 + values[0] * cropWidth,
+                                            y1: naturalAreas.crop.y1 + values[1] * cropHeight,
+                                            x2: naturalAreas.crop.x1 + values[2] * cropWidth,
+                                            y2: naturalAreas.crop.y1 + values[3] * cropHeight,
+                                            active: true
+                                        };
+                                    }
+                                    enableSsimAreaCheckbox.checked = true;
+                                    ssimAreaControlsDiv.style.display = 'block';
+                                }
                             } else {
                                 enableSsimAreaCheckbox.checked = false;
                                 ssimAreaControlsDiv.style.display = 'none';
@@ -358,7 +408,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
                     }
                 } catch (e) {
-                    console.error("Error fetching full config to populate sky/ssim areas:", e);
+                    console.error("Error fetching full config to populate areas:", e);
                 }
 
                 drawAllRectangles();
@@ -514,47 +564,45 @@ document.addEventListener('DOMContentLoaded', () => {
                 currentConfig.config.cameras[cameraName] = {};
             }
 
-            // Update only the visual settings for this camera
-            currentConfig.config.cameras[cameraName].crop = `${naturalAreas.crop.x1},${naturalAreas.crop.y1},${naturalAreas.crop.x2},${naturalAreas.crop.y2}`;
+            const camConfig = currentConfig.config.cameras[cameraName];
+
+            // Remove legacy crop property if it exists
+            delete camConfig.crop;
+
+            // Ensure postprocessing array exists
+            if (!camConfig.postprocessing) {
+                camConfig.postprocessing = [];
+            }
+
+            const cropArea = `${naturalAreas.crop.x1},${naturalAreas.crop.y1},${naturalAreas.crop.x2},${naturalAreas.crop.y2}`;
+            const cropStepIndex = camConfig.postprocessing.findIndex(step => step.type === 'crop');
+
+            if (cropStepIndex > -1) {
+                // Update existing crop step
+                camConfig.postprocessing[cropStepIndex].area = cropArea;
+            } else {
+                // Add new crop step to the beginning of the array
+                camConfig.postprocessing.unshift({ type: 'crop', area: cropArea });
+            }
             
             if (naturalAreas.sky.active) {
-                // Calculate Sky area coordinates relative to the crop area
-                const skyX1Percent = parseFloat(skyX1Input.value) || 0;
-                const skyY1Percent = parseFloat(skyY1Input.value) || 0;
-                const skyX2Percent = parseFloat(skyX2Input.value) || 0;
-                const skyY2Percent = parseFloat(skyY2Input.value) || 0;
-                
-                const cropWidth = naturalAreas.crop.x2 - naturalAreas.crop.x1;
-                const cropHeight = naturalAreas.crop.y2 - naturalAreas.crop.y1;
-                
-                const skyRelX1 = Math.round((skyX1Percent / 100) * cropWidth);
-                const skyRelY1 = Math.round((skyY1Percent / 100) * cropHeight);
-                const skyRelX2 = Math.round((skyX2Percent / 100) * cropWidth);
-                const skyRelY2 = Math.round((skyY2Percent / 100) * cropHeight);
-                
-                currentConfig.config.cameras[cameraName].sky_area = `${skyRelX1},${skyRelY1},${skyRelX2},${skyRelY2}`;
+                const skyX1Ratio = (parseFloat(skyX1Input.value) / 100).toFixed(3);
+                const skyY1Ratio = (parseFloat(skyY1Input.value) / 100).toFixed(3);
+                const skyX2Ratio = (parseFloat(skyX2Input.value) / 100).toFixed(3);
+                const skyY2Ratio = (parseFloat(skyY2Input.value) / 100).toFixed(3);
+                camConfig.sky_area = `${skyX1Ratio},${skyY1Ratio},${skyX2Ratio},${skyY2Ratio}`;
             } else {
-                delete currentConfig.config.cameras[cameraName].sky_area;
+                delete camConfig.sky_area;
             }
             
             if (naturalAreas.ssim.active) {
-                // Calculate SSIM area coordinates relative to the crop area
-                const ssimX1Percent = parseFloat(ssimX1Input.value) || 0;
-                const ssimY1Percent = parseFloat(ssimY1Input.value) || 0;
-                const ssimX2Percent = parseFloat(ssimX2Input.value) || 0;
-                const ssimY2Percent = parseFloat(ssimY2Input.value) || 0;
-                
-                const cropWidth = naturalAreas.crop.x2 - naturalAreas.crop.x1;
-                const cropHeight = naturalAreas.crop.y2 - naturalAreas.crop.y1;
-                
-                const ssimRelX1 = Math.round((ssimX1Percent / 100) * cropWidth);
-                const ssimRelY1 = Math.round((ssimY1Percent / 100) * cropHeight);
-                const ssimRelX2 = Math.round((ssimX2Percent / 100) * cropWidth);
-                const ssimRelY2 = Math.round((ssimY2Percent / 100) * cropHeight);
-                
-                currentConfig.config.cameras[cameraName].ssim_area = `${ssimRelX1},${ssimRelY1},${ssimRelX2},${ssimRelY2}`;
+                const ssimX1Ratio = (parseFloat(ssimX1Input.value) / 100).toFixed(3);
+                const ssimY1Ratio = (parseFloat(ssimY1Input.value) / 100).toFixed(3);
+                const ssimX2Ratio = (parseFloat(ssimX2Input.value) / 100).toFixed(3);
+                const ssimY2Ratio = (parseFloat(ssimY2Input.value) / 100).toFixed(3);
+                camConfig.ssim_area = `${ssimX1Ratio},${ssimY1Ratio},${ssimX2Ratio},${ssimY2Ratio}`;
             } else {
-                delete currentConfig.config.cameras[cameraName].ssim_area;
+                delete camConfig.ssim_area;
             }
 
             // Save the complete updated configuration
