@@ -5,7 +5,7 @@ import os
 import re
 from collections import defaultdict
 from datetime import datetime, timedelta
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 import numpy as np
 from absl import app, flags
