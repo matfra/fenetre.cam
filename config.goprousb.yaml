@@ -1,0 +1,64 @@
+admin_server:
+  enabled: true
+  listen: 0.0.0.0:8889 [::]:8889
+cameras:
+  gopro-hero-11:
+    gopro_ble_identifier: 9756
+    gopro_day_settings:
+      profile_id: 65536
+      settings:
+        '125': 3
+      trigger_exposure_time_ms: 4
+    gopro_ip: 172.27.156.51
+    gopro_night_settings:
+      profile_id: 65539
+      trigger_iso: 400
+    gopro_usb: true
+    lat: 37.75676
+    lon: -122.44577
+    postprocessing:
+    - area: 139,892,5568,3254
+      type: crop
+    - background_color: "(100, 100, 100)"
+      color: white
+      enabled: true
+      position: top_left
+      size: 36
+      type: timestamp
+    - angle: 180
+      type: rotate
+    - width: 3840
+      type: resize
+    - enabled: true
+      type: gather_metrics
+    sky_area: 0.000,0.000,0.986,0.500
+    ssim_area: 0.000,0.000,0.997,0.500
+    ssim_setpoint: 0.89
+    sunrise_sunset:
+      enabled: true
+global:
+  log_dir: /srv/fenetre/logs
+  storage_management:
+    check_interval_s: 60
+    dry_run: false
+    enabled: true
+    work_dir_max_size_GB: 400
+  sunrise_sunset_interval_s: 10
+  timezone: America/Los_Angeles
+  ui:
+    fullscreen_camera: gopro-hero-11
+    landing_page: fullscreen
+  work_dir: /srv/fenetre/data
+http_server:
+  enabled: false
+  host: 0.0.0.0
+  port: 8888
+timelapse:
+  ffmpeg_2pass: true
+  ffmpeg_options: -c:v libvpx-vp9 -b:v 7M
+  file_extension: webm
+  framerate: 60
+  frequent_timelapse:
+    ffmpeg_2pass: false
+    framerate: 30
+    interval_s: 1200
