@@ -506,7 +506,7 @@ def get_ssim_for_area(
     # Compute SSIM on the full image.
     if area:
         crop_points_list = [float(i) for i in area.split(",")]
-        
+
         # If all values are <= 1.0, treat them as ratios
         if all(v <= 1.0 for v in crop_points_list):
             img_width, img_height = image1.size
@@ -515,7 +515,7 @@ def get_ssim_for_area(
             x2 = int(img_width * crop_points_list[2])
             y2 = int(img_height * crop_points_list[3])
             crop_points = (x1, y1, x2, y2)
-        else: # Otherwise, treat as absolute pixel values (legacy)
+        else:  # Otherwise, treat as absolute pixel values (legacy)
             crop_points = (
                 int(crop_points_list[0]),
                 int(crop_points_list[1]),
@@ -1244,14 +1244,23 @@ def frequent_timelapse_scheduler_loop():
     interval = timelapse_config.get("frequent_timelapse").get("interval_s", 1200)
     while not exit_event.is_set():
         for camera_name in cameras_config:
-            logger.info(f"Time to update the frequent timelapse for {camera_name}.")
-            pic_dir, _ = get_pic_dir_and_filename(camera_name)
-            timelapse_settings_tuple = (
-                pic_dir,
-                timelapse_config.get("frequent_timelapse"),
-            )
-            frequent_timelapse_q.append(timelapse_settings_tuple)
-            interruptible_sleep(interval, exit_event)
+            try:
+                logger.info(f"Time to update the frequent timelapse for {camera_name}.")
+                pic_dir, _ = get_pic_dir_and_filename(camera_name)
+                timelapse_settings_tuple = (
+                    pic_dir,
+                    timelapse_config.get("frequent_timelapse"),
+                )
+                frequent_timelapse_q.append(timelapse_settings_tuple)
+            except Exception as e:
+                logger.warning(
+                    f"Error in frequent timelapse scheduler loop for camera {camera_name}: {e}"
+                )
+                logger.error(
+                    f"Error in frequent timelapse scheduler loop for camera {camera_name}",
+                    exc_info=True,
+                )
+        interruptible_sleep(interval, exit_event)
 
 
 def frequent_timelapse_loop():
@@ -1302,8 +1311,8 @@ def frequent_timelapse_loop():
 
 def timelapse_loop():
     """
-    This is a loop with a blocking Thread to create high quality timelapses one at a time.
-    This prevent overloading the system by creating new daily timelapses for all the cameras at the same time.
+    This is a loop to create the high quality daily timelapse. Typically these run at 60 fps, use v9 CPU encoding with a slow preset and 2 pass.
+    This prevent overloading the system by creating new daily timelapses for all the cameras at the same time, this is a blocking thread to create them one at a time. Each timelapse can take several hours.
     """
     while not exit_event.is_set():
         dir_to_process = get_next_from_timelapse_queue(
@@ -1372,7 +1381,7 @@ def timelapse_loop():
                     f"There was an error creating the timelapse for dir: {dir_to_process}: {e}",
                     exc_info=True,
                 )
-        time.sleep(1)
+        time.sleep(5)
 
 
 def daylight_loop():
@@ -1382,12 +1391,20 @@ def daylight_loop():
     while not exit_event.is_set():
         if len(daylight_q) > 0:
             camera_name, daily_pic_dir, sky_area = daylight_q.popleft()
-            logger.info(f"Running daylight in {daily_pic_dir} with sky_area {sky_area}")
-            run_end_of_day(camera_name, daily_pic_dir, sky_area)
-            add_to_timelapse_queue(
-                daily_pic_dir, timelapse_queue_file, timelapse_queue_lock
-            )
-            archive_q.append(daily_pic_dir)
+            try:
+                logger.info(
+                    f"Running daylight in {daily_pic_dir} with sky_area {sky_area}"
+                )
+                run_end_of_day(camera_name, daily_pic_dir, sky_area)
+                add_to_timelapse_queue(
+                    daily_pic_dir, timelapse_queue_file, timelapse_queue_lock
+                )
+                archive_q.append(daily_pic_dir)
+            except Exception as e:
+                logger.warning(f"Could not process daylight for {daily_pic_dir}: {e}")
+                logger.error(
+                    f"Error processing daylight for {daily_pic_dir}", exc_info=True
+                )
         time.sleep(1)
 
 
@@ -1417,88 +1434,103 @@ def disk_management_loop():
     while not exit_event.is_set():
         # Manage per-camera limits
         for camera_name, camera_config in cameras_config.items():
-            camera_limit_gb = camera_config.get("work_dir_max_size_GB")
-            if camera_limit_gb is None:
-                continue
+            try:
+                camera_limit_gb = camera_config.get("work_dir_max_size_GB")
+                if camera_limit_gb is None:
+                    continue
 
-            camera_dir = os.path.join(global_config["pic_dir"], camera_name)
-            if not os.path.isdir(camera_dir):
-                continue
+                camera_dir = os.path.join(global_config["pic_dir"], camera_name)
+                if not os.path.isdir(camera_dir):
+                    continue
 
-            current_size_bytes = get_dir_size(camera_dir)
-            metric_camera_directory_size_bytes.labels(camera_name=camera_name).set(
-                current_size_bytes
-            )
-
-            limit_bytes = camera_limit_gb * (1024**3)
-
-            if current_size_bytes > limit_bytes:
-                logger.info(
-                    f"Camera {camera_name} is over its limit of {camera_limit_gb} GB. Current size: {current_size_bytes / (1024**3):.2f} GB. Deleting oldest directories."
+                current_size_bytes = get_dir_size(camera_dir)
+                metric_camera_directory_size_bytes.labels(camera_name=camera_name).set(
+                    current_size_bytes
                 )
-                subdirs = sorted(
-                    [
-                        d.path
-                        for d in os.scandir(camera_dir)
-                        if d.is_dir() and d.name != "daylight"
-                    ]
+
+                limit_bytes = camera_limit_gb * (1024**3)
+
+                if current_size_bytes > limit_bytes:
+                    logger.info(
+                        f"Camera {camera_name} is over its limit of {camera_limit_gb} GB. Current size: {current_size_bytes / (1024**3):.2f} GB. Deleting oldest directories."
+                    )
+                    subdirs = sorted(
+                        [
+                            d.path
+                            for d in os.scandir(camera_dir)
+                            if d.is_dir() and d.name != "daylight"
+                        ]
+                    )
+                    for subdir in subdirs:
+                        if current_size_bytes <= limit_bytes:
+                            break
+                        dir_to_delete_size = get_dir_size(subdir)
+                        if dry_run:
+                            logger.info(
+                                f"[DRY RUN] Would delete {subdir} to free up {dir_to_delete_size / (1024**2):.2f} MB"
+                            )
+                        else:
+                            logger.info(
+                                f"Deleting {subdir} to free up {dir_to_delete_size / (1024**2):.2f} MB"
+                            )
+                            shutil.rmtree(subdir)
+                        current_size_bytes -= dir_to_delete_size
+            except Exception as e:
+                logger.warning(
+                    f"Error in disk management loop for camera {camera_name}: {e}"
                 )
-                for subdir in subdirs:
-                    if current_size_bytes <= limit_bytes:
-                        break
-                    dir_to_delete_size = get_dir_size(subdir)
-                    if dry_run:
-                        logger.info(
-                            f"[DRY RUN] Would delete {subdir} to free up {dir_to_delete_size / (1024**2):.2f} MB"
-                        )
-                    else:
-                        logger.info(
-                            f"Deleting {subdir} to free up {dir_to_delete_size / (1024**2):.2f} MB"
-                        )
-                        shutil.rmtree(subdir)
-                    current_size_bytes -= dir_to_delete_size
+                logger.error(
+                    f"Error in disk management loop for camera {camera_name}",
+                    exc_info=True,
+                )
 
         # Manage global limit
-        global_limit_gb = storage_management_config.get("work_dir_max_size_GB")
-        if global_limit_gb is not None:
-            work_dir = global_config.get("work_dir")
-            current_work_dir_size = get_dir_size(work_dir)
-            metric_work_directory_size_bytes.set(current_work_dir_size)
-            global_limit_bytes = global_limit_gb * (1024**3)
+        try:
+            global_limit_gb = storage_management_config.get("work_dir_max_size_GB")
+            if global_limit_gb is not None:
+                work_dir = global_config.get("work_dir")
+                current_work_dir_size = get_dir_size(work_dir)
+                metric_work_directory_size_bytes.set(current_work_dir_size)
+                global_limit_bytes = global_limit_gb * (1024**3)
 
-            if current_work_dir_size > global_limit_bytes:
-                logger.info(
-                    f"Global work_dir is over its limit of {global_limit_gb} GB. Current size: {current_work_dir_size / (1024**3):.2f} GB. Deleting oldest directories across all cameras."
-                )
+                if current_work_dir_size > global_limit_bytes:
+                    logger.info(
+                        f"Global work_dir is over its limit of {global_limit_gb} GB. Current size: {current_work_dir_size / (1024**3):.2f} GB. Deleting oldest directories across all cameras."
+                    )
 
-                all_day_dirs = []
-                for camera_name in cameras_config:
-                    camera_dir = os.path.join(global_config["pic_dir"], camera_name)
-                    if os.path.isdir(camera_dir):
-                        all_day_dirs.extend(
-                            [
-                                d.path
-                                for d in os.scandir(camera_dir)
-                                if d.is_dir() and d.name != "daylight"
-                            ]
-                        )
+                    all_day_dirs = []
+                    for camera_name in cameras_config:
+                        camera_dir = os.path.join(global_config["pic_dir"], camera_name)
+                        if os.path.isdir(camera_dir):
+                            all_day_dirs.extend(
+                                [
+                                    d.path
+                                    for d in os.scandir(camera_dir)
+                                    if d.is_dir() and d.name != "daylight"
+                                ]
+                            )
 
-                all_day_dirs.sort(key=lambda x: os.path.basename(x))
+                    all_day_dirs.sort(key=lambda x: os.path.basename(x))
 
-                for day_dir in all_day_dirs:
-                    if current_work_dir_size <= global_limit_bytes:
-                        break
-                    dir_to_delete_size = get_dir_size(day_dir)
-                    if dry_run:
-                        logger.info(
-                            f"[DRY RUN] Would delete {day_dir} to free up {dir_to_delete_size / (1024**2):.2f} MB"
-                        )
-                    else:
-                        logger.info(
-                            f"Deleting {day_dir} to free up {dir_to_delete_size / (1024**2):.2f} MB"
-                        )
-                        shutil.rmtree(day_dir)
-                    current_work_dir_size -= dir_to_delete_size
+                    for day_dir in all_day_dirs:
+                        if current_work_dir_size <= global_limit_bytes:
+                            break
+                        dir_to_delete_size = get_dir_size(day_dir)
+                        if dry_run:
+                            logger.info(
+                                f"[DRY RUN] Would delete {day_dir} to free up {dir_to_delete_size / (1024**2):.2f} MB"
+                            )
+                        else:
+                            logger.info(
+                                f"Deleting {day_dir} to free up {dir_to_delete_size / (1024**2):.2f} MB"
+                            )
+                            shutil.rmtree(day_dir)
+                        current_work_dir_size -= dir_to_delete_size
+        except Exception as e:
+            logger.warning(f"Error in disk management loop for global limit: {e}")
+            logger.error(
+                "Error in disk management loop for global limit", exc_info=True
+            )
 
         logger.debug(f"Disk management sleeping for {interval} seconds.")
         interruptible_sleep(interval, exit_event)
@@ -1510,22 +1542,28 @@ def archive_loop():
     """
     while not exit_event.is_set():
         for camera_name, camera_config in cameras_config.items():
-            camera_dir = os.path.join(global_config["pic_dir"], camera_name)
-            scan_and_publish_metrics(camera_name, camera_dir, global_config)
-            daydirs = list_unarchived_dirs(camera_dir)
-            for daydir in daydirs:
-                archive_daydir(
-                    daydir=daydir,
-                    global_config=global_config,
-                    cam=camera_name,
-                    sky_area=camera_config.get("sky_area"),
-                    dry_run=False,
-                    # TODO: Enable this after making the daylight an external file queue
-                    create_daylight_bands=False,
-                    daylight_bands_queue_file=None,
-                    create_timelapses=True,
-                    timelapse_queue_file=timelapse_queue_file,
-                    timelapse_queue_file_lock=timelapse_queue_lock,
+            try:
+                camera_dir = os.path.join(global_config["pic_dir"], camera_name)
+                scan_and_publish_metrics(camera_name, camera_dir, global_config)
+                daydirs = list_unarchived_dirs(camera_dir)
+                for daydir in daydirs:
+                    archive_daydir(
+                        daydir=daydir,
+                        global_config=global_config,
+                        cam=camera_name,
+                        sky_area=camera_config.get("sky_area"),
+                        dry_run=False,
+                        # TODO: Enable this after making the daylight an external file queue
+                        create_daylight_bands=False,
+                        daylight_bands_queue_file=None,
+                        create_timelapses=True,
+                        timelapse_queue_file=timelapse_queue_file,
+                        timelapse_queue_file_lock=timelapse_queue_lock,
+                    )
+            except Exception as e:
+                logger.warning(f"Error in archive loop for camera {camera_name}: {e}")
+                logger.error(
+                    f"Error in archive loop for camera {camera_name}", exc_info=True
                 )
         interruptible_sleep(600, exit_event)
 
