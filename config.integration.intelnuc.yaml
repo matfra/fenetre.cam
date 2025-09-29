@@ -22,13 +22,10 @@ timelapse:
       +faststart
     file_extension: mp4  
     enabled: false
-  daily_timelapse:
-    # https://trac.ffmpeg.org/wiki/Encode/VP9#twopass
-    enabled: true
-    framerate: 60 # 60 fps if more than 1000 pictures in the day, 30 otherwise
-    ffmpeg_options: -c:v libvpx-vp9 -b:v 0 -crf 30 -deadline best
-    ffmpeg_2pass: True
-    file_extension: webm
+  framerate: 48 # 60 fps if more than 1000 pictures in the day, 30 otherwise
+  ffmpeg_options: -c:v libvpx-vp9 -b:v 0 -crf 12 # -deadline best
+  ffmpeg_2pass: True
+  file_extension: webm
 http_server:
   enabled: true
   listen: "0.0.0.0:8888 [::]:8888"

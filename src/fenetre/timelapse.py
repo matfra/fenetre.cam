@@ -8,15 +8,14 @@ import threading
 from typing import Optional
 
 from datetime import datetime
-from absl import app, flags
+
 from PIL import Image
-from .logging_utils import setup_logging
+
 from fenetre.admin_server import metric_timelapse_queue_size
-
-logger = logging.getLogger(__name__)
-
 from fenetre.platform_utils import is_raspberry_pi
 from io import TextIOWrapper
+
+logger = logging.getLogger(__name__)
 
 
 def get_image_dimensions(image_path: str):
@@ -340,22 +339,3 @@ def remove_from_timelapse_queue(
                     )
         except FileNotFoundError:
             logging.error(f"Timelapse queue file not found at {timelapse_queue_file}")
-
-
-def main(argv):
-    del argv  # Unused.
-    setup_logging(FLAGS.log_dir)
-    create_timelapse(FLAGS.dir, FLAGS.overwrite, FLAGS.two_pass, FLAGS.log_dir)
-
-
-if __name__ == "__main__":
-    FLAGS = flags.FLAGS
-
-    flags.DEFINE_string("dir", None, "directory to build a timelapse from")
-    flags.DEFINE_string("log_dir", None, "directory to store logs")
-    flags.DEFINE_bool("overwrite", False, "Overwrite existing timelapse")
-    flags.DEFINE_bool(
-        "two_pass", False, "Tell ffmpeg to do 2 pass encoding. Recommended for VP9"
-    )
-    flags.mark_flag_as_required("dir")
-    app.run(main)
