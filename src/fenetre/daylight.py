@@ -8,18 +8,11 @@ from datetime import datetime, timedelta
 from typing import List, Optional, Tuple
 
 import numpy as np
-from absl import app, flags
 from PIL import Image, ImageDraw
 
 logger = logging.getLogger(__name__)
 
 # --- Configuration ---
-# TODO: Set this to the base directory containing all individual camera subdirectories
-ALL_CAMERAS_BASE_DIR = "data/photos"
-
-# TODO: Set this to the path of your YAML configuration file
-CONFIG_FILE_PATH = "config.yaml"  # Assumes config.yaml is in the same dir as the script or ALL_CAMERAS_BASE_DIR
-
 DEFAULT_SKY_COLOR = (10, 10, 20)  # Dark blue-grey for missing minutes or errors
 DEFAULT_SKY_AREA = (0, 50, 600, 150)  # Default crop area for the sky in the pictures
 DAILY_BAND_HEIGHT = 1440  # 24 hours * 60 minutes
@@ -65,7 +58,9 @@ def run_end_of_day(camera_name, day_dir_path, sky_area):
     # Determine sky_coords once using the first available image
     sky_coords = None
     first_image_path = None
-    image_files = sorted([f for f in os.listdir(day_dir_path) if f.lower().endswith(".jpg")])
+    image_files = sorted(
+        [f for f in os.listdir(day_dir_path) if f.lower().endswith(".jpg")]
+    )
 
     if image_files:
         first_image_path = os.path.join(day_dir_path, image_files[0])
@@ -73,10 +68,14 @@ def run_end_of_day(camera_name, day_dir_path, sky_area):
             with Image.open(first_image_path) as img:
                 sky_coords = parse_sky_area(sky_area, img.size)
         except Exception as e:
-            logger.error(f"Failed to open first image {first_image_path} to determine sky_coords: {e}")
+            logger.error(
+                f"Failed to open first image {first_image_path} to determine sky_coords: {e}"
+            )
 
     if not sky_coords:
-        logger.warning(f"Could not determine sky_coords for {day_dir_path}. Using default color for daily band.")
+        logger.warning(
+            f"Could not determine sky_coords for {day_dir_path}. Using default color for daily band."
+        )
         # Create a band with default color if sky_coords can't be determined
         daily_band_image = Image.new("RGB", (1, DAILY_BAND_HEIGHT), DEFAULT_SKY_COLOR)
         band_save_path = os.path.join(day_dir_path, "daylight.png")
@@ -105,7 +104,9 @@ def get_avg_color(image, crop_box):
         return DEFAULT_SKY_COLOR
 
 
-def create_daily_band(day_dir_path: str, sky_coords: Optional[Tuple[int, int, int, int]]):
+def create_daily_band(
+    day_dir_path: str, sky_coords: Optional[Tuple[int, int, int, int]]
+):
     """
     Processes images in a daily directory to create a 1x1440 pixel band.
     If no image for a minute, repeats the previous minute's color.
@@ -273,7 +274,9 @@ def create_monthly_image(year_month_str: str, camera_data_path: str):
         return None
 
 
-def parse_sky_area(sky_area_str: str, image_size: Tuple[int, int]) -> Optional[Tuple[int, int, int, int]]:
+def parse_sky_area(
+    sky_area_str: str, image_size: Tuple[int, int]
+) -> Optional[Tuple[int, int, int, int]]:
     """Parses 'left,top,right,bottom' string into an absolute pixel tuple."""
     if not sky_area_str:
         return None
@@ -288,7 +291,7 @@ def parse_sky_area(sky_area_str: str, image_size: Tuple[int, int]) -> Optional[T
                 x2 = int(img_width * parts[2])
                 y2 = int(img_height * parts[3])
                 return (x1, y1, x2, y2)
-            else: # Otherwise, treat as absolute pixel values (legacy)
+            else:  # Otherwise, treat as absolute pixel values (legacy)
                 return tuple(int(p) for p in parts)
         else:
             logger.warning(f"sky_area string '{sky_area_str}' must have 4 parts.")
@@ -314,10 +317,37 @@ def generate_bands_for_time_range(
         sky_area_str: A string representing the crop area (left, upper, right lower) of the picture representing the sky.
         overwrite: Whether to overwrite existing daybands.
     """
-    current_day = start_day  # .replace(tzinfo=ZoneInfo("America/Los_Angeles"))
-    end_day = end_day  # .replace(tzinfo=ZoneInfo("America/Los_Angeles"))
-    # Localize the current_day using the timezone in the config file
-    created_daybands_for_yearmonths = set()  # Use set for unique yearmonths
+    current_day = start_day
+    created_daybands_for_yearmonths = set()
+
+    # Determine sky_coords once using the first available image in the range
+    sky_coords = None
+    day_to_check = start_day
+    while day_to_check <= end_day:
+        pic_dir = os.path.join(camera_dir, day_to_check.strftime("%Y-%m-%d"))
+        if os.path.exists(pic_dir):
+            image_files = sorted(
+                [f for f in os.listdir(pic_dir) if f.lower().endswith(".jpg")]
+            )
+            if image_files:
+                first_image_path = os.path.join(pic_dir, image_files[0])
+                try:
+                    with Image.open(first_image_path) as img:
+                        sky_coords = parse_sky_area(sky_area_str, img.size)
+                        break  # Found an image, got coords, exit loop
+                except Exception as e:
+                    logger.error(
+                        f"Failed to open first image {first_image_path} to determine sky_coords: {e}"
+                    )
+                    # Continue to next day if this one fails
+        day_to_check += timedelta(days=1)
+
+    if not sky_coords:
+        logger.warning(
+            f"Could not determine sky_coords for the date range in {camera_dir}. No images found. Skipping band generation."
+        )
+        return
+
     while current_day <= end_day:
         current_yearmonth = current_day.strftime("%Y-%m")
         pic_dir = os.path.join(camera_dir, current_day.strftime("%Y-%m-%d"))
@@ -335,7 +365,7 @@ def generate_bands_for_time_range(
             or overwrite is True
         ):
             logger.info(f"{current_day.strftime('%Y-%m-%d')}: Creating dayband.")
-            create_daily_band(pic_dir, parse_sky_area(sky_area_str))
+            create_daily_band(pic_dir, sky_coords)
         else:
             logger.info(f"Not overwriting " + os.path.join(pic_dir, "daylight.png"))
 
@@ -608,206 +638,3 @@ def list_valid_days_directories(d: str) -> List[str]:
         if re.match(r"\d{4}-\d{2}-\d{2}", subdir):
             valid_days.append(subdir)
     return sorted(valid_days)
-
-
-def main(argv):
-    """For ad-hoc execution."""
-    del argv  # Unused.
-
-    # Load YAML configuration
-    import yaml  # For reading YAML config
-
-    try:
-        with open(FLAGS.config_file, "r") as f:
-            config_data = yaml.safe_load(f)
-        if not config_data or "cameras" not in config_data:
-            print(
-                f"Error: 'cameras' key not found in {FLAGS.config_file} or file is empty."
-            )
-            return
-    except FileNotFoundError:
-        print(f"Error: Configuration file not found at {FLAGS.config_file}")
-        return
-    except yaml.YAMLError as e:
-        print(f"Error parsing YAML configuration file {FLAGS.config_file}: {e}")
-        return
-
-    work_dir = config_data.get("global", {}).get("work_dir")
-    if not work_dir:
-        logger.error("work_dir not found in config file")
-        return
-
-    base_dir_for_cameras = os.path.join(work_dir, "photos")
-
-    if not FLAGS.camera:  # Check if FLAGS.camera is empty list or None
-        camera_names = []
-        if os.path.exists(base_dir_for_cameras):
-            for item in os.listdir(base_dir_for_cameras):
-                if os.path.isdir(os.path.join(base_dir_for_cameras, item)):
-                    camera_names.append(item)
-        if not camera_names:
-            logger.warning(
-                f"No camera subdirectories found in {base_dir_for_cameras}. Exiting."
-            )
-            return
-    else:
-        camera_names = FLAGS.camera
-
-    logger.info(f"Processing camera directories: {camera_names}")
-    for camera_name in camera_names:
-        camera_config = config_data["cameras"].get(camera_name)
-        if not camera_config:
-            print(
-                f"  No configuration found for camera '{camera_name}' in {FLAGS.config_file}. Skipping."
-            )
-            continue
-
-        sky_area_str_from_config = camera_config.get(
-            "sky_area"
-        )  # Renamed to avoid conflict with flag
-
-        # Prioritize flag sky_area if provided, otherwise use config
-        sky_area_to_use = FLAGS.sky_area if FLAGS.sky_area else sky_area_str_from_config
-
-        if not sky_area_to_use:
-            print(
-                f"  'sky_area' not defined for camera '{camera_name}' in config or via flag. Skipping."
-            )
-            continue
-
-        camera_dir = os.path.join(base_dir_for_cameras, camera_name)
-        logger.info(f"Processing camera directory: {camera_dir}")
-
-        if not os.path.exists(camera_dir):
-            logger.error(
-                f"Camera directory {camera_dir} does not exist. Skipping camera."
-            )
-            continue
-
-        available_days = list_valid_days_directories(camera_dir)
-        if (
-            not available_days and not FLAGS.html_only
-        ):  # If no days and not just doing HTML, nothing to process
-            logger.warning(
-                f"No valid day directories found in {camera_dir}. Skipping band generation."
-            )
-            # Still generate HTML if requested, as it might show empty state or rely on pre-existing files
-            if FLAGS.html_only:
-                generate_html(camera_dir=camera_dir)
-            continue
-
-        if not FLAGS.html_only:
-            if FLAGS.from_date:
-                try:
-                    start_day = iso_day_to_dt(FLAGS.from_date)
-                except ValueError:
-                    logger.error(
-                        f"Invalid from_date format: {FLAGS.from_date}. Expected YYYY-MM-DD."
-                    )
-                    return
-            elif available_days:  # Only if available_days is not empty
-                start_day = iso_day_to_dt(available_days[0])
-            else:  # No available days and no from_date specified
-                logger.warning(
-                    f"No start date specified and no data found for camera {camera_name}. Skipping band generation."
-                )
-                if (
-                    FLAGS.html_only
-                ):  # Fall through to generate HTML if that's all that's asked
-                    generate_html(camera_dir=camera_dir)
-                continue
-
-            if FLAGS.to_date:
-                try:
-                    end_day = iso_day_to_dt(FLAGS.to_date)
-                except ValueError:
-                    logger.error(
-                        f"Invalid to_date format: {FLAGS.to_date}. Expected YYYY-MM-DD."
-                    )
-                    return
-            elif available_days:  # Only if available_days is not empty
-                end_day = iso_day_to_dt(available_days[-1])
-            else:  # No available days and no to_date specified
-                logger.warning(
-                    f"No end date specified and no data found for camera {camera_name}. Skipping band generation."
-                )
-                if FLAGS.html_only:
-                    generate_html(camera_dir=camera_dir)
-                continue
-
-            if start_day > end_day:
-                logger.error(
-                    f"Start date {start_day.strftime('%Y-%m-%d')} is after end date {end_day.strftime('%Y-%m-%d')}. Skipping."
-                )
-                continue
-
-            # Cheap integration test for run_end_of_day (only if a single specific day is processed)
-            # This logic seems a bit off if generate_bands_for_time_range is the main processor.
-            # Consider if run_end_of_day is still needed here or if its logic is covered by generate_bands_for_time_range.
-            # For now, keeping it as per original logic but it might be redundant if range includes single day.
-            if FLAGS.from_date and FLAGS.to_date and FLAGS.from_date == FLAGS.to_date:
-                day_dir_path = os.path.join(camera_dir, start_day.strftime("%Y-%m-%d"))
-                if os.path.exists(
-                    day_dir_path
-                ):  # Check if the specific day directory exists
-                    logger.info(
-                        f"Running end of day for single specified day: {start_day.strftime('%Y-%m-%d')}"
-                    )
-                    run_end_of_day(  # This will create daily and then monthly for that day's month.
-                        camera_name,
-                        day_dir_path,
-                        sky_area_to_use,  # Use the determined sky_area
-                    )
-                else:
-                    logger.warning(
-                        f"Directory for single specified day {day_dir_path} does not exist. Skipping run_end_of_day."
-                    )
-            # Always run generate_bands_for_time_range if not html_only
-            # This will create daily bands and then call create_monthly_image for each relevant month.
-            generate_bands_for_time_range(
-                start_day, end_day, camera_dir, sky_area_to_use, FLAGS.overwrite
-            )
-
-        # Always generate HTML after processing bands or if html_only
-        generate_html(camera_dir=camera_dir)
-
-
-if __name__ == "__main__":
-    FLAGS = flags.FLAGS
-
-    flags.DEFINE_string(
-        "from_date",
-        None,
-        "Start date for the range in YYYY-MM-DD format. If not specified, the script will look for the earliest pictures available.",
-    )
-    flags.DEFINE_string(
-        "to_date",
-        None,
-        "End date for the range in YYYY-MM-DD format. If not specified, the script will look for the latest pictures available.",
-    )
-    flags.DEFINE_bool(
-        "overwrite",
-        False,
-        "Overwrite existing daylight bands. Default to False which skips days with existing bands.",
-    )
-    flags.DEFINE_string(
-        "sky_area",
-        None,  # Default to None, so config is used if this isn't set
-        "Crop area of the picture representing the sky. Eg. 0,0,1000,300. Overrides config if set.",
-    )
-    flags.DEFINE_bool(
-        "html_only",
-        False,
-        "If true, only generate the HTML files and not the daylight bands.",
-    )
-    flags.DEFINE_multi_string(  # 'camera' can be specified multiple times
-        "camera",
-        [],  # Default to empty list
-        "Name of the camera. Used to find pictures in the subdirectory of the --dir argument and to looking the sky_area in the config. If not specified, all cameras in the directory are processed.",
-    )
-    # It's good practice to also define a flag for the config file path if it's not hardcoded
-    flags.DEFINE_string(
-        "config_file", CONFIG_FILE_PATH, "Path to the YAML configuration file."
-    )
-
-    app.run(main)

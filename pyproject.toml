@@ -24,6 +24,7 @@ dependencies = [
 
 [project.scripts]
 fenetre = "fenetre.fenetre:run"
+daylight-tool = "fenetre.daylight_tool:run"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

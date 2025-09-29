@@ -248,11 +248,29 @@ class TestDaylightProcessor(unittest.TestCase):
             daylight.iso_day_to_dt("2023/10/27")
 
     def test_parse_sky_area(self):
-        self.assertEqual(daylight.parse_sky_area("0,50,600,150"), (0, 50, 600, 150))
-        self.assertIsNone(daylight.parse_sky_area("0,50,600"))
-        self.assertIsNone(daylight.parse_sky_area("0,50,600,abc"))
-        self.assertIsNone(daylight.parse_sky_area(None))
-        self.assertIsNone(daylight.parse_sky_area(""))
+        image_size = (1000, 800)  # Dummy image size for testing
+
+        # Test with absolute pixel values (legacy)
+        self.assertEqual(
+            daylight.parse_sky_area("10, 20, 300, 400", image_size), (10, 20, 300, 400)
+        )
+
+        # Test with ratio values
+        self.assertEqual(
+            daylight.parse_sky_area("0.1, 0.25, 0.5, 0.75", image_size),
+            (100, 200, 500, 600),
+        )
+
+        # Test with mixed values (should be treated as absolute)
+        self.assertEqual(
+            daylight.parse_sky_area("0.1, 0.2, 300, 400", image_size), (0, 0, 300, 400)
+        )
+
+        # Test invalid formats
+        self.assertIsNone(daylight.parse_sky_area("0,50,600", image_size))
+        self.assertIsNone(daylight.parse_sky_area("0,50,600,abc", image_size))
+        self.assertIsNone(daylight.parse_sky_area(None, image_size))
+        self.assertIsNone(daylight.parse_sky_area("", image_size))
 
     def test_get_month_pretty_name_html(self):
         self.assertEqual(daylight.get_month_pretty_name_html("2023-10"), "Oct<br>2023")
