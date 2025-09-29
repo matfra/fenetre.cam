@@ -469,7 +469,7 @@ def snap(camera_name, camera_config: Dict):
                 global_config,
                 camera_config,
             )
-        if fixed_snap_interval is None:
+        if not (is_sunrise_or_sunset or fixed_snap_interval):
             ssim = get_ssim_for_area(
                 previous_pic, new_pic, camera_config.get("ssim_area", None)
             )
