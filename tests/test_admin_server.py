@@ -45,7 +45,8 @@ class ConfigServerTestCase(unittest.TestCase):
     def test_get_config_success(self):
         response = self.app.get("/config")
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json, self.test_config_data)
+        # The config is returned under a 'config' key
+        self.assertEqual(response.json["config"], self.test_config_data)
 
     def test_get_config_not_found(self):
         flask_app.config["FENETRE_CONFIG_FILE"] = "/tmp/non_existent_config.yaml"
