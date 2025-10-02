@@ -1,77 +1,71 @@
-global: #Requires app restart
-  work_dir: /srv/fenetre/data
+admin_server:
+  enabled: true
+  listen: 0.0.0.0:8889 [::]:8889
+cameras:
+  a-cool-http-cam-with-clouds:
+    lat: 37.7749
+    lon: -122.4194
+    postprocessing:
+    - area: 217,0,2777,1562
+      type: crop
+    - color: white
+      enabled: true
+      format: '%Y-%m-%d %H:%M:%S %Z'
+      position: bottom_right
+      size: 24
+      type: timestamp
+    - background_color: rgba(255, 255, 255, 0.3)
+      enabled: true
+      major_bar_color: grey
+      major_bar_width: 2
+      minor_bar_color: '#333333'
+      minor_bar_width: 1
+      overlay_bar_color: rgba(255, 0, 0, 0.5)
+      overlay_bar_width: 4
+      overlay_border_color: white
+      overlay_border_width: 4
+      overlay_rect_height_ratio: 1
+      overlay_rect_width: 15
+      overlay_width: 800
+      padding: 5
+      position: top_center
+      sun_arc_color: rgba(255, 165, 0, 0.6)
+      type: sun_path
+    sky_area: 0.112,0.025,1.000,0.137
+    ssim_area: 0.109,0.118,0.249,0.800
+    ssim_setpoint: 0.93
+    timeout_s: 20
+    url: https://isitfoggy.com/photos/latest.jpg
+    work_dir_max_size_GB: 5
+global:
   log_dir: /srv/fenetre/logs
   logging_level: INFO
   logging_levels:
     fenetre.gopro: DEBUG
     fenetre.postprocess: WARNING
-  timezone: "America/Los_Angeles"
-  sunrise_sunset_interval_s: 10
   storage_management:
-    enabled: true
-    dry_run: true
     check_interval_s: 300
+    dry_run: true
+    enabled: true
     work_dir_max_size_GB: 10
-
+  sunrise_sunset_interval_s: 10
+  timezone: America/Los_Angeles
+  work_dir: /srv/fenetre/data
+http_server:
+  enabled: true
+  listen: 0.0.0.0:8888 [::]:8888
 timelapse:
+  ffmpeg_2pass: true
+  ffmpeg_options: -c:v libvpx-vp9 -b:v 0 -crf 12
+  file_extension: webm
+  framerate: 48
   frequent_timelapse:
+    enabled: false
     ffmpeg_2pass: false
-    # Recommended for Intel
     ffmpeg_options: -extbrc 1 -look_ahead 1 -look_ahead_depth 60 -g 120 -bf 3 -preset
       veryslow -c:v hevc_qsv -b:v 4M -maxrate 5M -bufsize 8M -profile:v main -movflags
       +faststart
-    file_extension: mp4  
-    enabled: false
-  framerate: 48 # 60 fps if more than 1000 pictures in the day, 30 otherwise
-  ffmpeg_options: -c:v libvpx-vp9 -b:v 0 -crf 12 # -deadline best
-  ffmpeg_2pass: True
-  file_extension: webm
-http_server:
-  enabled: true
-  listen: "0.0.0.0:8888 [::]:8888"
-admin_server:
-  enabled: true
-  # Waitress args https://docs.pylonsproject.org/projects/waitress/en/stable/arguments.html#arguments
-  listen: "0.0.0.0:8889 [::]:8889"
+    file_extension: mp4
 ui:
-  landing_page: "list" # list, map, camera, fullscreen
-  fullscreen_camera: "a-cool-http-cam-with-clouds"
-cameras:
-  a-cool-http-cam-with-clouds:
-    url: "https://isitfoggy.com/photos/latest.jpg"
-    # sky_area and ssim_area are defined as ratios of the cropped image: "x1,y1,x2,y2"
-    sky_area: "0.0,0.08,1.0,0.4"
-    work_dir_max_size_GB: 5
-    # In order to fast forward the boring days and capture the beautiful sky motion,
-    # we can calculate a dynamic interval based on the difference between the last 2 pictures.
-    # try to grab the biggest area containing things not susceptible to the wind like shaking tree.
-    ssim_area: "0.0,0.08,1.0,0.7"
-    ssim_setpoint: 0.93
-    timeout_s: 20 # Default value is not specified
-    lat: 37.7749
-    lon: -122.4194
-    postprocessing:
-      - type: "timestamp"
-        enabled: true
-        position: "bottom_right" # Options: "top_left", "top_right", "bottom_left", or "x,y" coordinates
-        size: 24
-        color: "white" # common color names or RGB tuple e.g., "(255, 255, 255)"
-        format: "%Y-%m-%d %H:%M:%S %Z"
-      - type: sun_path
-        enabled: true
-        overlay_width: 800  # Width of the overlay in pixels
-        position: "top_center" # e.g., top_left, bottom_right, etc.
-        padding: 5 # Optional padding from the edge
-        # Bar thickness options still work
-        major_bar_width: 2
-        minor_bar_width: 1
-        overlay_bar_width: 4
-        overlay_rect_width: 15
-        overlay_border_width: 4
-        overlay_border_color: "white"
-        major_bar_color: "grey"
-        minor_bar_color: "#333333" # Can be hex code
-        overlay_bar_color: "rgba(255, 0, 0, 0.5)" # Can be RGBA for transparency
-        overlay_rect_height_ratio: 1.0
-        background_color: "rgba(255, 255, 255, 0.3)"
-        sun_arc_color: "rgba(255, 165, 0, 0.6)"
+  fullscreen_camera: a-cool-http-cam-with-clouds
+  landing_page: list
