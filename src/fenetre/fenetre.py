@@ -23,7 +23,7 @@ import requests
 from absl import app, flags
 from astral import LocationInfo
 from astral.sun import sun
-from PIL import Image, ImageDraw
+from PIL import Image
 from skimage.metrics import structural_similarity
 from waitress import serve as waitress_serve
 from .logging_utils import apply_module_levels, setup_logging, get_camera_logger
@@ -447,7 +447,6 @@ def snap(camera_name, camera_config: Dict):
                     camera_name,
                     previous_pic_dir,
                     camera_config.get("sky_area", DEFAULT_SKY_AREA),
-                    FLAGS.debug,
                 )
             )
 
@@ -471,14 +470,8 @@ def snap(camera_name, camera_config: Dict):
                 camera_config,
             )
         if fixed_snap_interval is None:
-            debug_path_prefix = None
-            if FLAGS.debug:
-                debug_path_prefix = os.path.splitext(new_pic_fullpath)[0]
             ssim = get_ssim_for_area(
-                previous_pic,
-                new_pic,
-                camera_config.get("ssim_area", None),
-                debug_path_prefix=debug_path_prefix,
+                previous_pic, new_pic, camera_config.get("ssim_area", None)
             )
             ssim_setpoint = camera_config.get("ssim_setpoint", 0.85)
             if ssim < ssim_setpoint:
@@ -499,10 +492,7 @@ def snap(camera_name, camera_config: Dict):
 
 
 def get_ssim_for_area(
-    image1: Image.Image,
-    image2: Image.Image,
-    area: Optional[str],
-    debug_path_prefix: Optional[str] = None,
+    image1: Image.Image, image2: Image.Image, area: Optional[str]
 ) -> float:
     if image1.size != image2.size:
         logger.error(
@@ -512,7 +502,6 @@ def get_ssim_for_area(
 
     target_image1 = image1
     target_image2 = image2
-    crop_points = None
 
     # Compute SSIM on the full image.
     if area:
@@ -537,26 +526,6 @@ def get_ssim_for_area(
         logger.debug(f"SSIM crop points: {crop_points}")
         target_image1 = image1.crop(crop_points).resize((50, 50))
         target_image2 = image2.crop(crop_points).resize((50, 50))
-
-    if debug_path_prefix:
-        try:
-            os.makedirs(os.path.dirname(debug_path_prefix), exist_ok=True)
-            if crop_points:
-                # Draw rectangle on the original image
-                debug_img1 = image1.copy().convert("RGB")
-                draw = ImageDraw.Draw(debug_img1)
-                draw.rectangle(crop_points, outline="red", width=3)
-                debug_img1.save(f"{debug_path_prefix}.ssim_area_viz_prev.jpg")
-
-                debug_img2 = image2.copy().convert("RGB")
-                draw = ImageDraw.Draw(debug_img2)
-                draw.rectangle(crop_points, outline="red", width=3)
-                debug_img2.save(f"{debug_path_prefix}.ssim_area_viz_curr.jpg")
-
-            target_image1.convert("RGB").save(f"{debug_path_prefix}.ssim_prev.jpg")
-            target_image2.convert("RGB").save(f"{debug_path_prefix}.ssim_curr.jpg")
-        except Exception as e:
-            logger.error(f"Failed to save SSIM debug images: {e}")
 
     image1_np = np.array(target_image1.convert("L"))
     image2_np = np.array(target_image2.convert("L"))
@@ -1412,11 +1381,9 @@ def daylight_loop():
     """
     while not exit_event.is_set():
         if len(daylight_q) > 0:
-            daylight_q_item = daylight_q.popleft()
-            camera_name, daily_pic_dir, sky_area = daylight_q_item[:3]
-            debug_mode = daylight_q_item[3] if len(daylight_q_item) > 3 else False
+            camera_name, daily_pic_dir, sky_area = daylight_q.popleft()
             logger.info(f"Running daylight in {daily_pic_dir} with sky_area {sky_area}")
-            run_end_of_day(camera_name, daily_pic_dir, sky_area, debug_mode)
+            run_end_of_day(camera_name, daily_pic_dir, sky_area)
             add_to_timelapse_queue(
                 daily_pic_dir, timelapse_queue_file, timelapse_queue_lock
             )

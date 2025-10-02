@@ -50,7 +50,7 @@ def iso_day_to_dt(d: str) -> datetime:
     return datetime(*list(map(int, d.split("-"))))
 
 
-def run_end_of_day(camera_name, day_dir_path, sky_area, debug=False):
+def run_end_of_day(camera_name, day_dir_path, sky_area):
     """Runs the end of day processing for a given camera and day directory. Typically it creates the daily band and updates the monthly image, regenerate all HTML files."""
     if sky_area is None:
         sky_area = DEFAULT_SKY_AREA
@@ -86,25 +86,17 @@ def run_end_of_day(camera_name, day_dir_path, sky_area, debug=False):
             logger.error(f"Error saving default daily band {band_save_path}: {e}")
         return
 
-    create_daily_band(day_dir_path, sky_coords, debug=debug)
+    create_daily_band(day_dir_path, sky_coords)
     year, month, _ = os.path.split(day_dir_path)[-1].split("-")
     camera_dir = os.path.join(day_dir_path, os.path.pardir)
     create_monthly_image(f"{year}-{month}", camera_dir)
     generate_html(camera_dir=camera_dir)
 
 
-def get_avg_color(image, crop_box, debug=False, image_path=None):
+def get_avg_color(image, crop_box):
     """Crops image to crop_box and returns average RGB color."""
     try:
         sky_region = image.crop(crop_box)
-        if debug and image_path:
-            debug_path_prefix = os.path.splitext(image_path)[0]
-            sky_region.convert("RGB").save(f"{debug_path_prefix}.sky_area.jpg")
-
-            debug_img = image.copy().convert("RGB")
-            draw = ImageDraw.Draw(debug_img)
-            draw.rectangle(crop_box, outline="green", width=3)
-            debug_img.save(f"{debug_path_prefix}.sky_area_viz.jpg")
         avg_color_tuple = np.array(sky_region).mean(axis=(0, 1))
         return tuple(int(c) for c in avg_color_tuple)
     except Exception as e:
@@ -113,7 +105,7 @@ def get_avg_color(image, crop_box, debug=False, image_path=None):
 
 
 def create_daily_band(
-    day_dir_path: str, sky_coords: Optional[Tuple[int, int, int, int]], debug=False
+    day_dir_path: str, sky_coords: Optional[Tuple[int, int, int, int]]
 ):
     """
     Processes images in a daily directory to create a 1x1440 pixel band.
@@ -155,9 +147,7 @@ def create_daily_band(
                 image_path = os.path.join(day_dir_path, filename)
                 with Image.open(image_path) as img:
                     img_rgb = img.convert("RGB")
-                    avg_color = get_avg_color(
-                        img_rgb, sky_coords, debug=debug, image_path=image_path
-                    )
+                    avg_color = get_avg_color(img_rgb, sky_coords)
                     if avg_color:
                         minute_colors_accumulator[minute_of_day].append(avg_color)
             except ValueError as ve:
