@@ -291,17 +291,17 @@ def is_sunrise_or_sunset(camera_config: Dict, global_config: Dict) -> bool:
     if not camera_config.get("sunrise_sunset", {}).get("enabled", False):
         return False
 
-    latitude = camera_config.get("lat")
-    longitude = camera_config.get("lon")
-    if latitude is None or longitude is None:
+    lat = camera_config.get("lat")
+    lon = camera_config.get("lon")
+    if lat is None or lon is None:
         return False
 
     try:
         tz = pytz.timezone(global_config["timezone"])
         now = datetime.now(tz)
         location = LocationInfo(
-            latitude=latitude,
-            longitude=longitude,
+            latitude=lat,
+            longitude=lon,
             timezone=global_config["timezone"],
         )
         s = sun(location.observer, date=now.date(), tzinfo=location.timezone)
@@ -506,7 +506,7 @@ def get_ssim_for_area(
     # Compute SSIM on the full image.
     if area:
         crop_points_list = [float(i) for i in area.split(",")]
-        
+
         # If all values are <= 1.0, treat them as ratios
         if all(v <= 1.0 for v in crop_points_list):
             img_width, img_height = image1.size
@@ -515,7 +515,7 @@ def get_ssim_for_area(
             x2 = int(img_width * crop_points_list[2])
             y2 = int(img_height * crop_points_list[3])
             crop_points = (x1, y1, x2, y2)
-        else: # Otherwise, treat as absolute pixel values (legacy)
+        else:  # Otherwise, treat as absolute pixel values (legacy)
             crop_points = (
                 int(crop_points_list[0]),
                 int(crop_points_list[1]),
@@ -805,11 +805,11 @@ def update_cameras_metadata(cameras_configs: Dict, work_dir: str):
         metadata["lon"] = cameras_config[cam].get("lon")
         updated_cameras_metadata["cameras"].append(metadata)
 
+    daily_cfg = timelapse_config.get("daily_timelapse", {}) or {}
+    freq_cfg = timelapse_config.get("frequent_timelapse", {}) or {}
     updated_cameras_metadata["global"] = {
-        "timelapse_file_extension": timelapse_config.get("file_extension", "webm"),
-        "frequent_timelapse_file_extension": timelapse_config.get(
-            "frequent_timelapse", {}
-        ).get("file_extension", "mp4"),
+        "timelapse_file_extension": daily_cfg.get("file_extension", "webm"),
+        "frequent_timelapse_file_extension": freq_cfg.get("file_extension", "mp4"),
     }
 
     with open(json_filepath, "w") as json_file:
@@ -1115,8 +1115,8 @@ def manage_camera_threads():
                     ip_address=cam_conf.get("gopro_ip"),
                     root_ca=cam_conf.get("gopro_root_ca"),
                     log_dir=global_config.get("log_dir"),
-                    latitude=cam_conf.get("lat"),
-                    longitude=cam_conf.get("lon"),
+                    lat=cam_conf.get("lat"),
+                    lon=cam_conf.get("lon"),
                     timezone=global_config.get("timezone"),
                     preset_day=cam_conf.get("gopro_preset_day"),
                     preset_night=cam_conf.get("gopro_preset_night"),
@@ -1312,17 +1312,18 @@ def timelapse_loop():
 
         if dir_to_process:
             try:
+                daily_cfg = timelapse_config.get("daily_timelapse", {}) or {}
                 result = create_timelapse(
                     dir=dir_to_process,
                     overwrite=True,
-                    two_pass=timelapse_config.get("ffmpeg_2pass", True),
+                    two_pass=daily_cfg.get("ffmpeg_2pass", True),
                     log_dir=global_config.get("log_dir"),
-                    ffmpeg_options=timelapse_config.get(
+                    ffmpeg_options=daily_cfg.get(
                         "ffmpeg_options",
                         "-c:v libvpx-vp9 -b:v 0 -crf 30 -deadline best",
                     ),
-                    file_extension=timelapse_config.get("file_extension", "webm"),
-                    framerate=timelapse_config.get("framerate", 60),
+                    file_extension=daily_cfg.get("file_extension", "webm"),
+                    framerate=daily_cfg.get("framerate", 60),
                     log_max_bytes=global_config.get("log_max_bytes", 10000000),
                     log_backup_count=global_config.get("log_backup_count", 5),
                 )
@@ -1338,11 +1339,12 @@ def timelapse_loop():
                     frequent_timelapse_config = timelapse_config.get(
                         "frequent_timelapse", {}
                     )
+                    daily_cfg = timelapse_config.get("daily_timelapse", {})
                     if frequent_timelapse_config:
                         frequent_timelapse_file_extention = (
                             frequent_timelapse_config.get("file_extension", "mp4")
                         )
-                        if frequent_timelapse_file_extention != timelapse_config.get(
+                        if frequent_timelapse_file_extention != daily_cfg.get(
                             "file_extension", "webm"
                         ):
                             frequent_timelapse_filepath = os.path.join(

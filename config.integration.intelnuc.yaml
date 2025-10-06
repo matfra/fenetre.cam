@@ -1,3 +1,4 @@
+# Any changes to the global section will require an application restart.
 global: #Requires app restart
   work_dir: /srv/fenetre/data
   log_dir: /srv/fenetre/logs
@@ -9,23 +10,28 @@ global: #Requires app restart
   sunrise_sunset_interval_s: 10
   storage_management:
     enabled: true
-    dry_run: true
+    dry_run: false
     check_interval_s: 300
     work_dir_max_size_GB: 10
-
+  ui:
+    landing_page: "list" # list, map, camera, fullscreen
+    fullscreen_camera: "a-cool-http-cam-with-clouds"
 timelapse:
   frequent_timelapse:
     ffmpeg_2pass: false
     # Recommended for Intel
-    ffmpeg_options: -extbrc 1 -look_ahead 1 -look_ahead_depth 60 -g 120 -bf 3 -preset
+    ffmpeg_options:
+      -extbrc 1 -look_ahead 1 -look_ahead_depth 60 -g 120 -bf 3 -preset
       veryslow -c:v hevc_qsv -b:v 4M -maxrate 5M -bufsize 8M -profile:v main -movflags
       +faststart
-    file_extension: mp4  
+    file_extension: mp4
     enabled: false
-  framerate: 48 # 60 fps if more than 1000 pictures in the day, 30 otherwise
-  ffmpeg_options: -c:v libvpx-vp9 -b:v 0 -crf 12 # -deadline best
-  ffmpeg_2pass: True
-  file_extension: webm
+  daily_timelapse:
+    enabled: true
+    framerate: 48 # 60 fps if more than 1000 pictures in the day, 30 otherwise
+    ffmpeg_options: -c:v libvpx-vp9 -b:v 0 -crf 12 # -deadline best
+    ffmpeg_2pass: True
+    file_extension: webm
 http_server:
   enabled: true
   listen: "0.0.0.0:8888 [::]:8888"
@@ -33,9 +39,8 @@ admin_server:
   enabled: true
   # Waitress args https://docs.pylonsproject.org/projects/waitress/en/stable/arguments.html#arguments
   listen: "0.0.0.0:8889 [::]:8889"
-ui:
-  landing_page: "list" # list, map, camera, fullscreen
-  fullscreen_camera: "a-cool-http-cam-with-clouds"
+
+# Changes to the camera section can be applied without restarting the app via the admin server.
 cameras:
   a-cool-http-cam-with-clouds:
     url: "https://isitfoggy.com/photos/latest.jpg"
@@ -59,7 +64,7 @@ cameras:
         format: "%Y-%m-%d %H:%M:%S %Z"
       - type: sun_path
         enabled: true
-        overlay_width: 800  # Width of the overlay in pixels
+        overlay_width: 800 # Width of the overlay in pixels
         position: "top_center" # e.g., top_left, bottom_right, etc.
         padding: 5 # Optional padding from the edge
         # Bar thickness options still work

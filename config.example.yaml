@@ -12,33 +12,46 @@ global: #Requires app restart
     dry_run: true
     check_interval_s: 300
     work_dir_max_size_GB: 10
+  ui:
+    landing_page: "list" # list, map, camera, fullscreen
+    fullscreen_camera: "a-cool-http-cam-with-clouds"
 
 timelapse:
   frequent_timelapse:
+    # For the frequent timelapse, we typically use a hardware encoder to offload the CPU since it runs often. 2 pass is unecessary.
     ffmpeg_2pass: false
-    # Recommended for Intel
-    ffmpeg_options: -extbrc 1 -look_ahead 1 -look_ahead_depth 60 -g 120 -bf 3 -preset
+    # Recommended encoder for Intel
+    ffmpeg_options:
+      -extbrc 1 -look_ahead 1 -look_ahead_depth 60 -g 120 -bf 3 -preset
       veryslow -c:v hevc_qsv -b:v 4M -maxrate 5M -bufsize 8M -profile:v main -movflags
       +faststart
-    file_extension: mp4  
+    file_extension: mp4
+    framerate: 30 # Default to 30 fps for the frequent timelapse since it's not complete and typically fine to play at "slow" speed.
+    # Additionally, some GPU hardware encoders, notably on Raspberry Pi (<=4) don't support 60fps.
     enabled: true
+  # Typically we enode the daily timelapse on CPU with the highest possible quality.
+  # 60 fps looks pretty smooth and makes the timelapse shorter.
   daily_timelapse:
     # https://trac.ffmpeg.org/wiki/Encode/VP9#twopass
     enabled: true
-    framerate: 60 # 60 fps if more than 1000 pictures in the day, 30 otherwise
+    framerate: 60 # 60 fps looks more smooth. Tyif more than 1000 pictures in the day, 30 otherwise
     ffmpeg_options: -c:v libvpx-vp9 -b:v 0 -crf 30 -deadline best
     ffmpeg_2pass: True
     file_extension: webm
+
+# The public part of this site it entirely made of static files.
+# While using this Python static server would work, it's better to use
+# a very robust static file server like nginx or https://caddyserver.com/
+# I highly recommend usind a CDN like Cloudflare in front of it.
 http_server:
   enabled: true
-  listen: "0.0.0.0:8888 [::]:8888"
+  listen: "0.0.0.0:8888"
+# This is a Python server with dynamic content. Please do not expose it to the internet.
 admin_server:
   enabled: true
   # Waitress args https://docs.pylonsproject.org/projects/waitress/en/stable/arguments.html#arguments
   listen: "0.0.0.0:8889 [::]:8889"
-ui:
-  landing_page: "list" # list, map, camera, fullscreen
-  fullscreen_camera: "a-cool-http-cam-with-clouds"
+
 cameras:
   a-cool-http-cam-with-clouds:
     url: "https://isitfoggy.com/photos/latest.jpg"
@@ -51,8 +64,8 @@ cameras:
     ssim_area: "0.0,0.08,1.0,0.7"
     ssim_setpoint: 0.93
     timeout_s: 20 # Default value is not specified
-    latitude: 37.7749
-    longitude: -122.4194
+    lat: 37.7749
+    lon: -122.4194
     postprocessing:
       - type: "timestamp"
         enabled: true
@@ -62,7 +75,7 @@ cameras:
         format: "%Y-%m-%d %H:%M:%S %Z"
       - type: sun_path
         enabled: true
-        overlay_width: 800  # Width of the overlay in pixels
+        overlay_width: 800 # Width of the overlay in pixels
         position: "top_center" # e.g., top_left, bottom_right, etc.
         padding: 20 # Optional padding from the edge
         # Bar thickness options still work

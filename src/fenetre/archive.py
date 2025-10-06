@@ -190,14 +190,15 @@ def archive_daydir(
         if create_timelapses:
             if not timelapse_queue_file:
                 logger.info(f"Creating timelapse for {daydir}")
+                daily_cfg = timelapse_config.get("daily_timelapse", {}) or {}
                 create_timelapse(
                     dir=daydir,
                     overwrite=True,
                     log_dir=global_config.get("log_dir"),
-                    two_pass=timelapse_config.get("ffmpeg_2pass", False),
+                    two_pass=daily_cfg.get("ffmpeg_2pass", False),
                     dry_run=dry_run,
-                    ffmpeg_options=timelapse_config.get("ffmpeg_options"),
-                    file_extension=timelapse_config.get("file_extension"),
+                    ffmpeg_options=daily_cfg.get("ffmpeg_options"),
+                    file_extension=daily_cfg.get("file_extension"),
                 )
             else:
                 add_to_timelapse_queue(

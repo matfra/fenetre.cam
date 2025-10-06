@@ -248,7 +248,7 @@ def _add_sun_path_overlay(
 
     if not lat or not lon:
         logger.error(
-            "sun_path overlay enabled, but 'latitude' and 'longitude' not found "
+            "sun_path overlay enabled, but 'lat' and 'lon' not found "
             "in the camera's configuration or the global configuration. Skipping."
         )
         return pic

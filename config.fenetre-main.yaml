@@ -1,0 +1,110 @@
+global: #Requires app restart
+  work_dir: /Users/fenetre
+  log_dir: /Users/fenetre/logs
+  logging_level: INFO
+  logging_levels:
+    fenetre.gopro: DEBUG
+    fenetre.postprocess: WARNING
+  timezone: "America/Los_Angeles"
+  sunrise_sunset_interval_s: 10
+  storage_management:
+    enabled: true
+    dry_run: true
+    check_interval_s: 300
+    work_dir_max_size_GB: 10
+
+timelapse:
+  frequent_timelapse:
+    ffmpeg_2pass: false
+    # Recommended for Intel
+    ffmpeg_options: -extbrc 1 -look_ahead 1 -look_ahead_depth 60 -g 120 -bf 3 -preset
+      veryslow -c:v hevc_qsv -b:v 4M -maxrate 5M -bufsize 8M -profile:v main -movflags
+      +faststart
+    file_extension: mp4  
+    enabled: true
+  daily_timelapse:
+    # https://trac.ffmpeg.org/wiki/Encode/VP9#twopass
+    enabled: true
+    framerate: 60 # 60 fps if more than 1000 pictures in the day, 30 otherwise
+    ffmpeg_options: -c:v libvpx-vp9 -b:v 0 -crf 30 -deadline best
+    ffmpeg_2pass: True
+    file_extension: webm
+http_server:
+  enabled: true
+  listen: "0.0.0.0:8888 [::]:8888"
+admin_server:
+  enabled: true
+  # Waitress args https://docs.pylonsproject.org/projects/waitress/en/stable/arguments.html#arguments
+  listen: "0.0.0.0:8889 [::]:8889"
+ui:
+  landing_page: "list" # list, map, camera, fullscreen
+  fullscreen_camera: "a-cool-http-cam-with-clouds"
+cameras:
+  a-cool-http-cam-with-clouds:
+    url: "https://isitfoggy.com/photos/latest.jpg"
+    sky_area: 0,80,1920,400
+    work_dir_max_size_GB: 5
+    # In order to fast forward the boring days and capture the beautiful sky motion,
+    # we can calculate a dynamic interval based on the difference between the last 2 pictures.
+    # try to grab the biggest area containing things not susceptible to the wind like shaking tree.
+    ssim_area: 0,80,1920,700
+    ssim_setpoint: 0.93
+    timeout_s: 20 # Default value is not specified
+    latitude: 37.7749
+    longitude: -122.4194
+    sunrise_sunset:
+      enabled: True
+    postprocessing:
+      - type: "crop"
+        area: "0,0,1920,1080"
+      - type: "resize"
+        width: 1280
+        height: 720
+      - type: "awb"
+      - type: "timestamp"
+        enabled: true
+        position: "bottom_right" # Options: "top_left", "top_right", "bottom_left", or "x,y" coordinates
+        size: 24
+        color: "white" # common color names or RGB tuple e.g., "(255, 255, 255)"
+        format: "%Y-%m-%d %H:%M:%S %Z"
+  a-boring-cam:
+    url: "http://boring.example.com/pic.jpg"
+    sky_area: 1200,0,1920,300 #Top right sky corner only
+    #If defined, overrides all the ssim based settings.
+    snap_interval_s: 45
+  a-cam-that-doesnt-exit-anymore:
+    url: "http://boring.example.com/pic.jpg"
+    sky_area: 1200,0,1920,300 #Top right sky corner only
+    #If defined, overrides all the ssim based settings.
+    snap_interval_s: 45
+    disabled: True
+  a-video-feed:
+    #Need to output a jpeg file on stdout (stderr can still output other things)
+    local_command: "ffmpeg -hide_banner -loglevel warning -i http://video.feed.url.cool.com:8081/ -frames:v 1 -q:v 2 -f singlejpeg -"
+    # resolution: 1056 × 704
+    sky_area: 0,0,1056,300
+    ssim_area: 0,0,1056,300
+    ssim_setpoint: 0.90
+  a-gopro-camera:
+    gopro_ip: "10.5.5.9"
+    gopro_ble_identifier: "XXXX" # Last 4 digits of GoPro serial number
+    bluetooth_adapter: "hci0" # Optional: specify bluetooth adapter (e.g. hci0 or hci1)
+    gopro_root_ca: |
+      -----BEGIN CERTIFICATE-----
+      YOUR-GOPRO-ROOT-CA
+      -----END CERTIFICATE-----
+    gopro_day_settings:
+      profile_id: 65536 #Normal photo (Higher ISO authorized)
+        # https://gopro.github.io/OpenGoPro/ble/features/settings.html#photo-output-125
+      settings:
+        125: 3 # Photo Output: SuperPhoto
+    gopro_night_settings:
+      profile_id: 65539 #Night photo (ISO locked to 100, long exposure and shadow boost)
+    gopro_utility_poll_interval_s: 10
+    gopro_bluetooth_retry_delay_s: 180
+    sky_area: 0,0,1920,500
+  an-external-website:
+    name: "A cool external website"
+    source: external_website
+    url: "https://www.youtube.com/embed/dQw4w9WgXcQ"
+    thumbnail_url: "https://i.ytimg.com/vi/dQw4w9WgXcQ/hq720.jpg"

@@ -63,8 +63,8 @@ class GoPro:
         timeout=5,
         root_ca=None,
         log_dir=None,
-        latitude=None,
-        longitude=None,
+        lat=None,
+        lon=None,
         timezone=None,
         preset_day=None,
         preset_night=None,
@@ -76,8 +76,8 @@ class GoPro:
         self.scheme = "https" if root_ca else "http"
         self.root_ca_filepath = ""
         self.temp_file = None
-        self.latitude = latitude
-        self.longitude = longitude
+        self.lat = lat
+        self.lon = lon
         self.timezone = timezone
         self.preset_day = preset_day
         self.preset_night = preset_night
@@ -207,14 +207,14 @@ class GoPro:
 
     def _is_night(self) -> bool:
         """Determines if it is currently night time."""
-        if not all([self.latitude, self.longitude, self.timezone]):
+        if not all([self.lat, self.lon, self.timezone]):
             logger.info("Location not configured for GoPro, assuming daytime.")
             return False
 
         try:
             tz = pytz.timezone(self.timezone)
             now = datetime.now(tz)
-            location = LocationInfo(latitude=self.latitude, longitude=self.longitude)
+            location = LocationInfo(latitude=self.lat, longitude=self.lon)
             s = sun(location.observer, date=now.date(), tzinfo=tz)
 
             # It's night if current time is after dusk or before dawn

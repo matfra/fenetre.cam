@@ -1,0 +1,54 @@
+admin_server:
+  enabled: true
+  listen: 0.0.0.0:8889 [::]:8889
+cameras:
+  a-cool-http-cam-with-clouds:
+    cache_bust: true
+    crop: 0,0,2777,1562
+    latitude: 37.7749
+    longitude: -122.4194
+    postprocessing: []
+    sky_area: 0,80,2777,762
+    ssim_area: 975,298,2410,1111
+    ssim_setpoint: 0.93
+    timeout_s: 20
+    url: https://isitfoggy.com/photos/latest.jpg
+  sutro1:
+    cache_bust: true
+    description: A new camera
+    disabled: false
+    latitude: 37.7551109
+    longitude: -122.4528811
+    mozjpeg_optimize: false
+    postprocessing: []
+    sky_area: 696,0,1739,372
+    ssim_area: 0,0,1920,1080
+    ssim_setpoint: 0.9
+    timeout_s: 60
+    url: https://cameras.alertcalifornia.org/public-camera-data/Axis-SutroTower2/panogrid/latest-pg-2.jpg
+global:
+  log_dir: /srv/fenetre/logs
+  timezone: America/Los_Angeles
+  work_dir: /srv/fenetre/data
+  work_dir_max_size_GB: 10
+http_server:
+  enabled: true
+  listen: 0.0.0.0:8889 [::]:8888
+timelapse:
+  frequent_timelapse: 
+    interval_s: 1200
+    ffmpeg_2pass: false
+    # Recommended for Intel
+    ffmpeg_options: -extbrc 1 -look_ahead 1 -look_ahead_depth 60 -g 120 -bf 3 -preset
+      veryslow -c:v hevc_qsv -b:v 4M -maxrate 5M -bufsize 8M -profile:v main -movflags
+      +faststart
+    file_extension: mp4  
+    framerate: 30 # Typically timelapses of the current day have fewer pictures, I prefer 30 fps for those
+    # https://trac.ffmpeg.org/wiki/Encode/VP9#twopass
+  framerate: 60 # 60 fps if more than 1000 pictures in the day, 30 otherwise
+  ffmpeg_options: -c:v libvpx-vp9 -b:v 5M -deadline best -speed 0
+  ffmpeg_2pass: True
+  file_extension: webm
+ui:
+  fullscreen_camera: a-cool-http-cam-with-clouds
+  landing_page: list
