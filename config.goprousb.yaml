@@ -22,36 +22,36 @@ cameras:
     - background_color: "(100, 100, 100)"
       color: white
       enabled: true
-      position: top_left
+      position: top_right
       size: 36
       type: timestamp
-    - angle: 180
-      type: rotate
-    - width: 3840
-      type: resize
-    - enabled: true
-      type: gather_metrics
     - type: sun_path
       enabled: true
-      overlay_width: 800  # Width of the overlay in pixels
+      overlay_width: 1000  # Width of the overlay in pixels
       position: "top_center" # e.g., top_left, bottom_right, etc.
       padding: 5 # Optional padding from the edge
       # Bar thickness options still work
-      major_bar_width: 2
-      minor_bar_width: 1
+      major_bar_width: 4
+      minor_bar_width: 2
       overlay_bar_width: 4
       overlay_rect_width: 15
-      overlay_border_width: 4
+      overlay_border_width: 3
       overlay_border_color: "white"
       major_bar_color: "grey"
       minor_bar_color: "#333333" # Can be hex code
       overlay_bar_color: "rgba(255, 0, 0, 0.5)" # Can be RGBA for transparency
       overlay_rect_height_ratio: 1.0
       background_color: "rgba(255, 255, 255, 0.3)"
-      sun_arc_color: "rgba(255, 165, 0, 0.6)"
+      sun_arc_color: "rgba(255, 165, 0, 0.65)"
+    - angle: 180
+      type: rotate
+    - width: 3840
+      type: resize
+    - enabled: true
+      type: gather_metrics
     sky_area: 0.000,0.000,0.986,0.500
     ssim_area: 0.000,0.000,0.997,0.500
-    ssim_setpoint: 0.89
+    ssim_setpoint: 0.9
     sunrise_sunset:
       enabled: true
 global:

@@ -95,6 +95,23 @@ class GoPro:
         self.settings = GoProSettings(self)
         self.state = {}
 
+        if self.gopro_usb:
+            logger.info("GoPro is in USB mode, waiting for it to be ready...")
+            start_time = time.time()
+            while time.time() - start_time < 30:
+                try:
+                    self.update_state()
+                    if self.state:
+                        logger.info("GoPro is ready.")
+                        self._make_gopro_request(
+                            "/gopro/camera/control/wired_usb?p=1"
+                        )
+                        break
+                except requests.RequestException:
+                    time.sleep(1)
+            else:
+                logger.error("GoPro did not become ready in 30 seconds.")
+
     def __del__(self):
         if self.temp_file:
             os.unlink(self.temp_file.name)
@@ -254,8 +271,6 @@ class GoPro:
     def capture_photo(self, output_file: Optional[str] = None) -> bytes:
         latest_dir_before, latest_file_before = self._get_latest_file()
 
-        if self.gopro_usb:
-            self._make_gopro_request("/gopro/camera/control/wired_usb?p=1")
         else:
             self._make_gopro_request("/gopro/camera/control/set_ui_controller?p=2")
         self.settings.control_mode = "pro"
