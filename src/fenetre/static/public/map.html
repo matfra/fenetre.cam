@@ -390,7 +390,6 @@
             yesterday.setDate(today.getDate() - 1);
             const todayStr = formatDate(today);
             const yesterdayStr = formatDate(yesterday);
-            const photo_dir = `/photos/${listItem.dataset.title}`;
 
             linkToday.href = `${photo_dir}/${todayStr}/`;
             linkToday.textContent = `Today's Pictures (${todayStr})`;

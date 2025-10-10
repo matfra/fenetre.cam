@@ -1118,6 +1118,7 @@ def manage_camera_threads():
                     lat=cam_conf.get("lat"),
                     lon=cam_conf.get("lon"),
                     timezone=global_config.get("timezone"),
+                    # TODO: Fix this to use the new config format for day and night presets. Currently these keys don't exist
                     preset_day=cam_conf.get("gopro_preset_day"),
                     preset_night=cam_conf.get("gopro_preset_night"),
                 )

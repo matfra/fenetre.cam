@@ -12,6 +12,9 @@
 - Tested picture sources
 
 
+### Main module
+- Check if an instance is already running with the exact same config and prevent starting again
+
 ### Daylight
 - On the daylight.html, there should be a top banner saying: average color of the sky for {camera_name}. Also a link to come back to the camera view
 

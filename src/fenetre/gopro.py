@@ -271,9 +271,8 @@ class GoPro:
     def capture_photo(self, output_file: Optional[str] = None) -> bytes:
         latest_dir_before, latest_file_before = self._get_latest_file()
 
-        else:
-            self._make_gopro_request("/gopro/camera/control/set_ui_controller?p=2")
-        self.settings.control_mode = "pro"
+        self._make_gopro_request("/gopro/camera/control/set_ui_controller?p=2") # Only for gopro 10+
+        #self.settings.control_mode = "pro" # Only for gopro 11+
         self.settings.lcd_brightness = 10
         self.settings.led = "All Off"
         self.settings.gps = "Off"
