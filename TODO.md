@@ -32,7 +32,7 @@
       - The status button should be based on the polling interval for that camera instead o fbeing hardcoded to N minutes.
   - camera details
   - Uniformize the behaviour of the camera details page wheter we come from the map view, the list view and the fullscreen view.
-
+  - Add a about page with links to Github, the main fenetre.cam and the code version
 ### Admin interface.
 - [BUG] Crop preview is broken (not to scale)
 - ssim and sky area should be defiend on the crop preview since they happen after crop
