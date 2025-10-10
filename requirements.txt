@@ -35,6 +35,7 @@ pyexiv2
 # siphash24
 # SSIM
 scikit-image
+cairosvg
 
 ## Dev only
 mock
