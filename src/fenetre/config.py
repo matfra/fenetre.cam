@@ -431,10 +431,10 @@ def config_load(config_file_path: str) -> Tuple[Dict, Dict, Dict, Dict, Dict]:
     except FileNotFoundError:
         logger.error(f"Configuration file {config_file_path} not found.")
         # Return 5 empty sections to maintain unpacking compatibility
-        return {}, {}, {}, {}, {}
+        raise
     except yaml.YAMLError as e:
         logger.error(f"Error parsing YAML configuration file {config_file_path}: {e}")
-        return {}, {}, {}, {}, {}
+        raise
 
     http_cfg, cameras_cfg, global_cfg, admin_cfg, timelapse_cfg = _extract_sections(raw)
 
