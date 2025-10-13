@@ -1,82 +1,103 @@
-# Any changes to the global section will require an application restart.
-global: #Requires app restart
-  work_dir: /srv/fenetre/data
+admin_server:
+  enabled: true
+  listen: 0.0.0.0:8889 [::]:8889
+cameras:
+  gopro-hero-6:
+    gopro_ble_identifier: '8608'
+    gopro_ip: 10.5.5.9
+    gopro_model: hero6
+    day_settings:
+      # When night exposure time goes below 4ms, switch to day settings
+      trigger_exposure_time_ms: 4
+      # Ordered list of URL to set a given profile
+      url_commands: # See https://gopro.github.io/OpenGoPro/http#tag/Presets/operation/OGP_PRESET_LOAD for Gopro hero 9+ or https://github.com/matfra/goprowifihack/tree/master for Gopro Hero 8-
+        - '/gp/gpControl/command/mode?p=1' #Photo mode
+        - '/gp/gpControl/command/sub_mode?mode=1&sub_mode=1' #Single photo
+        - '/gp/gpControl/setting/17/0'  # 12 MP wide
+        - '/gp/gpControl/setting/82/0'  # RAW Photo off
+        - '/gp/gpControl/setting/100/1' # HDR Photo ON
+        - '/gp/gpControl/setting/21/1'  # ProTune ON
+        - '/gp/gpControl/setting/22/0'  # WB Auto
+        - '/gp/gpControl/setting/23/0'  # GoPro color
+        - '/gp/gpControl/setting/24/1'  # 400 ISO limit
+        - '/gp/gpControl/setting/75/3'  # 100 ISO min
+        - '/gp/gpControl/setting/25/1'  # Medium sharpness
+        - '/gp/gpControl/setting/97/0'  # Auto shutter time
+    gopro_ip: 172.27.156.51
+    night_settings:
+      # Once ISO goes above 300, let's switch to night mode
+      trigger_iso: 300
+      url_commands: # See https://gopro.github.io/OpenGoPro/http#tag/Presets/operation/OGP_PRESET_LOAD for Gopro hero 9+ or https://github.com/matfra/goprowifihack/tree/master for Gopro Hero 8-
+        - '/gp/gpControl/command/mode?p=1' #Photo mode
+        - '/gp/gpControl/command/sub_mode?mode=1&sub_mode=1' #Single photo
+        - '/gp/gpControl/setting/17/0'  # 12 MP wide
+        - '/gp/gpControl/setting/19/0'  # Auto shutter time for night photo
+        - '/gp/gpControl/setting/82/0'  # RAW Photo off
+        - '/gp/gpControl/setting/100/0' # HDR Photo ON
+        - '/gp/gpControl/setting/21/1'  # ProTune ON
+        - '/gp/gpControl/setting/22/0'  # WB Auto
+        - '/gp/gpControl/setting/23/0'  # GoPro color
+        - '/gp/gpControl/setting/24/3'  # 100 ISO limit
+        - '/gp/gpControl/setting/75/3'  # 100 ISO min
+        - '/gp/gpControl/setting/25/1'  # Medium sharpness
+    lat: 37.75676
+    lon: -122.44577
+    postprocessing:
+    - background_color: "(100, 100, 100)"
+      color: white
+      enabled: true
+      position: top_right
+      size: 36
+      type: timestamp
+    - type: sun_path
+      enabled: true
+      overlay_width: 1000  # Width of the overlay in pixels
+      position: "top_center" # e.g., top_left, bottom_right, etc.
+      padding: 5 # Optional padding from the edge
+      # Bar thickness options still work
+      major_bar_width: 4
+      minor_bar_width: 2
+      overlay_bar_width: 4
+      overlay_rect_width: 15
+      overlay_border_width: 3
+      overlay_border_color: "white"
+      major_bar_color: "grey"
+      minor_bar_color: "#333333" # Can be hex code
+      overlay_bar_color: "rgba(255, 0, 0, 0.5)" # Can be RGBA for transparency
+      overlay_rect_height_ratio: 1.0
+    sky_area: 0.966,0.492,0.497,0.170
+    ssim_area: 1.000,0.520,0.507,0.009
+global:
   log_dir: /srv/fenetre/logs
   logging_level: INFO
   logging_levels:
-    fenetre.gopro: DEBUG
-    fenetre.postprocess: WARNING
-  timezone: "America/Los_Angeles"
-  sunrise_sunset_interval_s: 10
+    gopro: DEBUG
+    postprocess: WARNING
   storage_management:
-    enabled: true
-    dry_run: false
     check_interval_s: 300
-    work_dir_max_size_GB: 10
+    dry_run: false
+    enabled: true
+    work_dir_max_size_GB: 30
+  sunrise_sunset_interval_s: 10
+  timezone: America/Los_Angeles
   ui:
-    landing_page: "list" # list, map, camera, fullscreen
-    fullscreen_camera: "a-cool-http-cam-with-clouds"
+    fullscreen_camera: gopro-hero-6
+    landing_page: fullscreen
+  work_dir: /srv/fenetre/data
+http_server:
+  enabled: true
+  listen: 0.0.0.0:8888 [::]:8888
 timelapse:
+  daily_timelapse:
+    enabled: true
+    ffmpeg_2pass: true
+    ffmpeg_options: -c:v libvpx-vp9 -b:v 0 -crf 18
+    file_extension: webm
+    framerate: 60
   frequent_timelapse:
+    enabled: false
     ffmpeg_2pass: false
-    # Recommended for Intel
-    ffmpeg_options:
-      -extbrc 1 -look_ahead 1 -look_ahead_depth 60 -g 120 -bf 3 -preset
+    ffmpeg_options: -extbrc 1 -look_ahead 1 -look_ahead_depth 60 -g 120 -bf 3 -preset
       veryslow -c:v hevc_qsv -b:v 4M -maxrate 5M -bufsize 8M -profile:v main -movflags
       +faststart
     file_extension: mp4
-    enabled: false
-  daily_timelapse:
-    enabled: true
-    framerate: 48 # 60 fps if more than 1000 pictures in the day, 30 otherwise
-    ffmpeg_options: -c:v libvpx-vp9 -b:v 0 -crf 12 # -deadline best
-    ffmpeg_2pass: True
-    file_extension: webm
-http_server:
-  enabled: true
-  listen: "0.0.0.0:8888 [::]:8888"
-admin_server:
-  enabled: true
-  # Waitress args https://docs.pylonsproject.org/projects/waitress/en/stable/arguments.html#arguments
-  listen: "0.0.0.0:8889 [::]:8889"
-
-# Changes to the camera section can be applied without restarting the app via the admin server.
-cameras:
-  a-cool-http-cam-with-clouds:
-    url: "https://isitfoggy.com/photos/latest.jpg"
-    # sky_area and ssim_area are defined as ratios of the cropped image: "x1,y1,x2,y2"
-    sky_area: "0.0,0.08,1.0,0.4"
-    work_dir_max_size_GB: 5
-    # In order to fast forward the boring days and capture the beautiful sky motion,
-    # we can calculate a dynamic interval based on the difference between the last 2 pictures.
-    # try to grab the biggest area containing things not susceptible to the wind like shaking tree.
-    ssim_area: "0.0,0.08,1.0,0.7"
-    ssim_setpoint: 0.93
-    timeout_s: 20 # Default value is not specified
-    lat: 37.7749
-    lon: -122.4194
-    postprocessing:
-      - type: "timestamp"
-        enabled: true
-        position: "bottom_right" # Options: "top_left", "top_right", "bottom_left", or "x,y" coordinates
-        size: 24
-        color: "white" # common color names or RGB tuple e.g., "(255, 255, 255)"
-        format: "%Y-%m-%d %H:%M:%S %Z"
-      - type: sun_path
-        enabled: true
-        overlay_width: 800 # Width of the overlay in pixels
-        position: "top_center" # e.g., top_left, bottom_right, etc.
-        padding: 5 # Optional padding from the edge
-        # Bar thickness options still work
-        major_bar_width: 2
-        minor_bar_width: 1
-        overlay_bar_width: 4
-        overlay_rect_width: 15
-        overlay_border_width: 4
-        overlay_border_color: "white"
-        major_bar_color: "grey"
-        minor_bar_color: "#333333" # Can be hex code
-        overlay_bar_color: "rgba(255, 0, 0, 0.5)" # Can be RGBA for transparency
-        overlay_rect_height_ratio: 1.0
-        background_color: "rgba(255, 255, 255, 0.3)"
-        sun_arc_color: "rgba(255, 165, 0, 0.6)"
