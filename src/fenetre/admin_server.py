@@ -151,6 +151,10 @@ def update_config():
         if not new_config_json:
             return jsonify({"error": "Request body is empty or not valid JSON."}), 400
 
+        # If the whole config is nested under a "config" key, extract it.
+        if "config" in new_config_json and len(new_config_json.keys()) == 1:
+            new_config_json = new_config_json["config"]
+
         if not isinstance(new_config_json, dict):
             return (
                 jsonify(
@@ -288,7 +292,9 @@ def capture_for_ui(camera_name):
             return send_file(img_bytes, mimetype=content_type)
 
         elif gopro_ip:
-            gopro = GoPro(ip_address=gopro_ip)
+            gopro = GoPro(
+                ip_address=gopro_ip, gopro_model=camera_config.get("gopro_model")
+            )
             # This is a simplified capture, assuming the GoPro is ready.
             # The main app's GoProUtilityThread handles state management (presets, etc.)
             # which we don't replicate here for a simple capture.

@@ -5,15 +5,15 @@ from unittest import mock
 import json
 
 
-
 from fenetre import gopro
+
 
 class TestGoPro(unittest.TestCase):
     """Test suite for GoPro camera functions."""
 
     def setUp(self):
         """Set up test fixtures."""
-        self.gopro = gopro.GoPro()
+        self.gopro = gopro.GoProOpenGoPro()
 
     @mock.patch("fenetre.gopro.requests.get")
     def test_set_setting_success(self, mock_get):
@@ -44,7 +44,7 @@ class TestGoPro(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.gopro.settings.video_performance_mode = "invalid_value"
 
-    @mock.patch("fenetre.gopro.GoPro._get_latest_file")
+    @mock.patch("fenetre.gopro.GoProOpenGoPro._get_latest_file")
     @mock.patch("fenetre.gopro.requests.get")
     def test_capture_photo(self, mock_get, mock_get_latest_file):
         mock_response = mock.Mock()
@@ -65,11 +65,6 @@ class TestGoPro(unittest.TestCase):
         expected_calls = [
             mock.call(
                 "http://10.5.5.9/gopro/camera/control/set_ui_controller?p=2",
-                timeout=5,
-                verify="",
-            ),
-            mock.call(
-                "http://10.5.5.9/gopro/camera/setting?option=1&setting=175",
                 timeout=5,
                 verify="",
             ),
@@ -184,7 +179,9 @@ class TestGoProPresetValidation(unittest.TestCase):
         mock_response.json.return_value = self.mock_presets
         mock_get.return_value = mock_response
 
-        gopro_cam = gopro.GoPro(preset_day={"id": 65536}, preset_night={"id": 65539})
+        gopro_cam = gopro.GoProOpenGoPro(
+            preset_day={"id": 65536}, preset_night={"id": 65539}
+        )
         gopro_cam.validate_presets()
 
         mock_logging.info.assert_called_with(
@@ -201,7 +198,7 @@ class TestGoProPresetValidation(unittest.TestCase):
         mock_response.json.return_value = self.mock_presets
         mock_get.return_value = mock_response
 
-        gopro_cam = gopro.GoPro(
+        gopro_cam = gopro.GoProOpenGoPro(
             preset_day={"id": 12345}, preset_night={"id": 65539}  # Invalid ID
         )
         gopro_cam.validate_presets()
@@ -221,14 +218,14 @@ class TestGoProPresetValidation(unittest.TestCase):
         mock_response.json.return_value = {}  # Simulate empty response
         mock_get.return_value = mock_response
 
-        gopro_cam = gopro.GoPro()
+        gopro_cam = gopro.GoProOpenGoPro()
         gopro_cam.validate_presets()
 
         mock_logging.error.assert_called_with(
             "Could not retrieve available presets from the camera."
         )
 
-    @mock.patch("fenetre.gopro.GoPro._get_latest_file")
+    @mock.patch("fenetre.gopro.GoProOpenGoPro._get_latest_file")
     @mock.patch("fenetre.gopro.requests.get")
     def test_capture_photo_with_preset_settings(self, mock_get, mock_get_latest_file):
         """Test that capture_photo applies preset and its settings via HTTP calls."""
@@ -247,18 +244,13 @@ class TestGoProPresetValidation(unittest.TestCase):
                 "photo_output": "SuperPhoto",
             },
         }
-        gopro_cam = gopro.GoPro(preset_day=preset_config)
+        gopro_cam = gopro.GoProOpenGoPro(preset_day=preset_config)
         gopro_cam.capture_photo()
 
         expected_calls = [
             # Standard setup calls in capture_photo
             mock.call(
                 "http://10.5.5.9/gopro/camera/control/set_ui_controller?p=2",
-                timeout=5,
-                verify="",
-            ),
-            mock.call(
-                "http://10.5.5.9/gopro/camera/setting?option=1&setting=175",
                 timeout=5,
                 verify="",
             ),

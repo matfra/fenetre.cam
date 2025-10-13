@@ -405,10 +405,22 @@ def _validate_cameras(cfg: Dict, errors) -> Dict:
             "gopro_utility_poll_interval_s",
             "bluetooth_retry_delay_s",
             "gopro_usb",
+            "gopro_model",
             "name",
         ):
             if k in cam:
                 cam_out[k] = cam[k]
+
+        if "gopro_model" in cam_out:
+            cam_out["gopro_model"] = _str(
+                cam_out["gopro_model"],
+                f"cameras.{name}.gopro_model",
+                errors,
+                default="open_gopro",
+                choices={"hero6", "open_gopro"},
+            )
+        else:
+            cam_out["gopro_model"] = "open_gopro"
 
         out[name] = cam_out
 

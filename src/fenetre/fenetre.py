@@ -1092,13 +1092,25 @@ def manage_camera_threads():
                 else 60.0
             )
 
+            # Set exponential backoff limit based on camera type
+            if cam_conf.get("gopro_ip") or cam_conf.get("capture_method") == "picamera2":
+                exp_backoff_limit = 32
+            else:
+                exp_backoff_limit = 128
+
             # Start watchdog manager for the snap thread
             watchdog_name = f"{cam_name}_watchdog_manager"
             cam_watchdog_thread = Thread(
                 target=create_and_start_and_watch_thread,
                 daemon=True,
                 name=watchdog_name,
-                args=[snap, f"{cam_name}_snap", [cam_name, cam_conf], 86400, cam_name],
+                args=[
+                    snap,
+                    f"{cam_name}_snap",
+                    [cam_name, cam_conf],
+                    exp_backoff_limit,
+                    cam_name,
+                ],
             )
             cam_watchdog_thread.start()
             if cam_name not in active_camera_threads:
@@ -1121,14 +1133,20 @@ def manage_camera_threads():
                     # TODO: Fix this to use the new config format for day and night presets. Currently these keys don't exist
                     preset_day=cam_conf.get("gopro_preset_day"),
                     preset_night=cam_conf.get("gopro_preset_night"),
+                    gopro_model=cam_conf.get("gopro_model"),
                 )
-                gopro_utility_thread = GoProUtilityThread(
-                    gopro_instance, cam_name, cam_conf, exit_event
-                )
-                gopro_utility_thread.start()
-                if cam_name not in active_camera_threads:
-                    active_camera_threads[cam_name] = {}
-                active_camera_threads[cam_name]["gopro_utility"] = gopro_utility_thread
+
+                # The GoProUtilityThread is only for OpenGoPro models
+                if cam_conf.get("gopro_model", "open_gopro") == "open_gopro":
+                    gopro_utility_thread = GoProUtilityThread(
+                        gopro_instance, cam_name, cam_conf, exit_event
+                    )
+                    gopro_utility_thread.start()
+                    if cam_name not in active_camera_threads:
+                        active_camera_threads[cam_name] = {}
+                    active_camera_threads[cam_name][
+                        "gopro_utility"
+                    ] = gopro_utility_thread
                 active_camera_threads[cam_name]["gopro_instance"] = gopro_instance
         else:
             # For existing, running cameras, we could update settings like sleep_interval here if they change.

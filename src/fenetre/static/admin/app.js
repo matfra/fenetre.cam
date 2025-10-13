@@ -505,7 +505,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function saveConfiguration() {
         setStatus('Saving configuration...', 'info');
-        const configData = getFormDataAsJson();
+        let configData = getFormDataAsJson();
+        console.log("Form data:", JSON.stringify(configData, null, 2));
+
+        // If the entire form data is under a 'config' key, extract it.
+        if (configData.hasOwnProperty('config') && Object.keys(configData).length === 1) {
+            configData = configData.config;
+        }
+
         console.log("Saving data:", JSON.stringify(configData, null, 2));
 
         try {
