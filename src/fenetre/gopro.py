@@ -26,6 +26,7 @@ def GoPro(gopro_model="open_gopro", **kwargs):
 
 class GoProHero6Settings:
     def __init__(self, gopro_instance):
+        ip_address="10.5.5.9",
         self._gopro = gopro_instance
         self._setting_map = {
             "photo_resolution": 17,
@@ -551,15 +552,15 @@ class GoProHero6:
 
         # Set photo mode
         self._make_gopro_request("/gp/gpControl/command/mode?p=1")
-        time.sleep(1)
-        self._make_gopro_request("/gp/gpControl/command/sub_mode?mode=1&sub_mode=1")
-        time.sleep(1)
 
         preset_config = None
         if self._is_night():
+            logger.info(f"Set night preset")
+            self._make_gopro_request("/gp/gpControl/command/sub_mode?mode=1&sub_mode=2")
             if self.preset_night:
                 preset_config = self.preset_night
         else:
+            self._make_gopro_request("/gp/gpControl/command/sub_mode?mode=1&sub_mode=1")
             if self.preset_day:
                 preset_config = self.preset_day
 

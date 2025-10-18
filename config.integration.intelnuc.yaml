@@ -3,70 +3,67 @@ admin_server:
   listen: 0.0.0.0:8889 [::]:8889
 cameras:
   gopro-hero-6:
+    day_settings:
+      trigger_exposure_time_ms: 4
+      url_commands:
+      - /gp/gpControl/command/mode?p=1
+      - /gp/gpControl/command/sub_mode?mode=1&sub_mode=1
+      - /gp/gpControl/setting/17/0
+      - /gp/gpControl/setting/82/0
+      - /gp/gpControl/setting/100/1
+      - /gp/gpControl/setting/21/1
+      - /gp/gpControl/setting/22/0
+      - /gp/gpControl/setting/23/0
+      - /gp/gpControl/setting/24/1
+      - /gp/gpControl/setting/75/3
+      - /gp/gpControl/setting/25/1
+      - /gp/gpControl/setting/97/0
     gopro_ble_identifier: '8608'
     gopro_ip: 10.5.5.9
     gopro_model: hero6
-    day_settings:
-      # When night exposure time goes below 4ms, switch to day settings
-      trigger_exposure_time_ms: 4
-      # Ordered list of URL to set a given profile
-      url_commands: # See https://gopro.github.io/OpenGoPro/http#tag/Presets/operation/OGP_PRESET_LOAD for Gopro hero 9+ or https://github.com/matfra/goprowifihack/tree/master for Gopro Hero 8-
-        - '/gp/gpControl/command/mode?p=1' #Photo mode
-        - '/gp/gpControl/command/sub_mode?mode=1&sub_mode=1' #Single photo
-        - '/gp/gpControl/setting/17/0'  # 12 MP wide
-        - '/gp/gpControl/setting/82/0'  # RAW Photo off
-        - '/gp/gpControl/setting/100/1' # HDR Photo ON
-        - '/gp/gpControl/setting/21/1'  # ProTune ON
-        - '/gp/gpControl/setting/22/0'  # WB Auto
-        - '/gp/gpControl/setting/23/0'  # GoPro color
-        - '/gp/gpControl/setting/24/1'  # 400 ISO limit
-        - '/gp/gpControl/setting/75/3'  # 100 ISO min
-        - '/gp/gpControl/setting/25/1'  # Medium sharpness
-        - '/gp/gpControl/setting/97/0'  # Auto shutter time
-    gopro_ip: 172.27.156.51
-    night_settings:
-      # Once ISO goes above 300, let's switch to night mode
-      trigger_iso: 300
-      url_commands: # See https://gopro.github.io/OpenGoPro/http#tag/Presets/operation/OGP_PRESET_LOAD for Gopro hero 9+ or https://github.com/matfra/goprowifihack/tree/master for Gopro Hero 8-
-        - '/gp/gpControl/command/mode?p=1' #Photo mode
-        - '/gp/gpControl/command/sub_mode?mode=1&sub_mode=1' #Single photo
-        - '/gp/gpControl/setting/17/0'  # 12 MP wide
-        - '/gp/gpControl/setting/19/0'  # Auto shutter time for night photo
-        - '/gp/gpControl/setting/82/0'  # RAW Photo off
-        - '/gp/gpControl/setting/100/0' # HDR Photo ON
-        - '/gp/gpControl/setting/21/1'  # ProTune ON
-        - '/gp/gpControl/setting/22/0'  # WB Auto
-        - '/gp/gpControl/setting/23/0'  # GoPro color
-        - '/gp/gpControl/setting/24/3'  # 100 ISO limit
-        - '/gp/gpControl/setting/75/3'  # 100 ISO min
-        - '/gp/gpControl/setting/25/1'  # Medium sharpness
     lat: 37.75676
     lon: -122.44577
+    night_settings:
+      trigger_iso: 300
+      url_commands:
+      - /gp/gpControl/command/mode?p=1
+      - /gp/gpControl/command/sub_mode?mode=1&sub_mode=2
+      - /gp/gpControl/setting/17/0
+      - /gp/gpControl/setting/19/0
+      - /gp/gpControl/setting/82/0
+      - /gp/gpControl/setting/100/0
+      - /gp/gpControl/setting/21/1
+      - /gp/gpControl/setting/22/0
+      - /gp/gpControl/setting/23/0
+      - /gp/gpControl/setting/24/3
+      - /gp/gpControl/setting/75/3
+      - /gp/gpControl/setting/25/1
     postprocessing:
-    - background_color: "(100, 100, 100)"
+    - type: crop
+      area: 0,0,4000,3000
+    - background_color: (100, 100, 100)
       color: white
       enabled: true
       position: top_right
       size: 36
       type: timestamp
-    - type: sun_path
-      enabled: true
-      overlay_width: 1000  # Width of the overlay in pixels
-      position: "top_center" # e.g., top_left, bottom_right, etc.
-      padding: 5 # Optional padding from the edge
-      # Bar thickness options still work
+    - enabled: true
+      major_bar_color: grey
       major_bar_width: 4
+      minor_bar_color: '#333333'
       minor_bar_width: 2
+      overlay_bar_color: rgba(255, 0, 0, 0.5)
       overlay_bar_width: 4
-      overlay_rect_width: 15
+      overlay_border_color: white
       overlay_border_width: 3
-      overlay_border_color: "white"
-      major_bar_color: "grey"
-      minor_bar_color: "#333333" # Can be hex code
-      overlay_bar_color: "rgba(255, 0, 0, 0.5)" # Can be RGBA for transparency
-      overlay_rect_height_ratio: 1.0
-    sky_area: 0.966,0.492,0.497,0.170
-    ssim_area: 1.000,0.520,0.507,0.009
+      overlay_rect_height_ratio: 1
+      overlay_rect_width: 15
+      overlay_width: 1000
+      padding: 5
+      position: top_center
+      type: sun_path
+    sky_area: 0.499,0.171,1.000,0.492
+    ssim_area: 0.507,0.037,1.000,0.460
 global:
   log_dir: /srv/fenetre/logs
   logging_level: INFO
