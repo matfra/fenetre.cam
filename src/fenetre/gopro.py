@@ -311,7 +311,6 @@ class GoProOpenGoPro:
 
             # It's night if current time is after dusk or before dawn
             is_night_time = now > s["dusk"] or now < s["dawn"]
-            logger.debug(f"It is {"night" if is_night_time else "day"}.")
             return is_night_time
         except Exception as e:
             logger.error(f"Error calculating sunrise/sunset for GoPro: {e}")

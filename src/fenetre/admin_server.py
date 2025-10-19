@@ -293,7 +293,7 @@ def capture_for_ui(camera_name):
 
         elif gopro_ip:
             gopro = GoPro(
-                ip_address=gopro_ip, gopro_model=camera_config.get("gopro_model")
+                ip_address=gopro_ip, gopro_model=camera_config.get("gopro_model", "open_gopro")
             )
             # This is a simplified capture, assuming the GoPro is ready.
             # The main app's GoProUtilityThread handles state management (presets, etc.)

@@ -19,38 +19,37 @@ cameras:
     postprocessing:
     - area: 139,892,5568,3254
       type: crop
-    - background_color: "(100, 100, 100)"
+    - background_color: (100, 100, 100)
       color: white
       enabled: true
       position: top_right
       size: 36
       type: timestamp
-    - type: sun_path
+    - background_color: rgba(255, 255, 255, 0.3)
       enabled: true
-      overlay_width: 1000  # Width of the overlay in pixels
-      position: "top_center" # e.g., top_left, bottom_right, etc.
-      padding: 5 # Optional padding from the edge
-      # Bar thickness options still work
+      major_bar_color: grey
       major_bar_width: 4
+      minor_bar_color: '#333333'
       minor_bar_width: 2
+      overlay_bar_color: rgba(255, 0, 0, 0.5)
       overlay_bar_width: 4
-      overlay_rect_width: 15
+      overlay_border_color: white
       overlay_border_width: 3
-      overlay_border_color: "white"
-      major_bar_color: "grey"
-      minor_bar_color: "#333333" # Can be hex code
-      overlay_bar_color: "rgba(255, 0, 0, 0.5)" # Can be RGBA for transparency
-      overlay_rect_height_ratio: 1.0
-      background_color: "rgba(255, 255, 255, 0.3)"
-      sun_arc_color: "rgba(255, 165, 0, 0.65)"
+      overlay_rect_height_ratio: 1
+      overlay_rect_width: 15
+      overlay_width: 1000
+      padding: 5
+      position: top_center
+      sun_arc_color: rgba(255, 165, 0, 0.65)
+      type: sun_path
     - angle: 180
       type: rotate
-    - width: 3840
-      type: resize
+    - type: resize
+      width: 3840
     - enabled: true
       type: gather_metrics
     sky_area: 0.000,0.000,0.986,0.500
-    ssim_area: 0.000,0.000,0.997,0.500
+    ssim_area: 0.000,0.263,0.746,0.779
     ssim_setpoint: 0.9
     sunrise_sunset:
       enabled: true
@@ -72,11 +71,17 @@ http_server:
   host: 0.0.0.0
   port: 8888
 timelapse:
+  daily_timelapse:
+    ffmpeg_2pass: true
+    ffmpeg_options: -c:v libvpx-vp9 -b:v 7M
+    file_extension: webm
+    framerate: 60
   ffmpeg_2pass: true
   ffmpeg_options: -c:v libvpx-vp9 -b:v 7M
   file_extension: webm
   framerate: 60
   frequent_timelapse:
     ffmpeg_2pass: false
+    file_extension: mp4
     framerate: 30
     interval_s: 1200
