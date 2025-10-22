@@ -42,14 +42,14 @@ document.addEventListener('DOMContentLoaded', () => {
         },
         gopro_ip: {
             fields: {
+                gopro_model: { type: 'text', default: 'hero11' },
                 gopro_ip: { type: 'text', default: '10.5.5.9' },
                 gopro_ble_identifier: { type: 'text', default: 'XXXX' },
                 gopro_root_ca: { type: 'textarea', default: '-----BEGIN CERTIFICATE-----\nPASTE_CA_HERE\n-----END CERTIFICATE-----' },
-                gopro_preset: { type: 'text', default: '65539' }, // Could be a select with known presets
                 gopro_utility_poll_interval_s: { type: 'number', default: 10 },
                 gopro_bluetooth_retry_delay_s: { type: 'number', default: 180 }
             },
-            order: ['gopro_ip', 'gopro_ble_identifier', 'gopro_root_ca', 'gopro_preset', 'gopro_utility_poll_interval_s', 'gopro_bluetooth_retry_delay_s']
+            order: ['gopro_model', 'gopro_ip', 'gopro_ble_identifier', 'gopro_root_ca', 'gopro_utility_poll_interval_s', 'gopro_bluetooth_retry_delay_s']
         }
     };
     const availableCameraSourceTypes = Object.keys(cameraSourceTypes);

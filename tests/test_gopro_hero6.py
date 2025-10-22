@@ -46,10 +46,6 @@ class TestGoProHero6(unittest.TestCase):
 
         expected_calls = [
             mock.call("http://10.5.5.9/gp/gpControl/command/mode?p=1", timeout=5),
-            mock.call(
-                "http://10.5.5.9/gp/gpControl/command/sub_mode?mode=1&sub_mode=1",
-                timeout=5,
-            ),
             mock.call("http://10.5.5.9/gp/gpControl/command/shutter?p=1", timeout=5),
             mock.call("http://10.5.5.9/videos/DCIM/100GOPRO/GOPR0002.JPG", timeout=5),
             mock.call().raise_for_status(),

@@ -294,17 +294,19 @@ def _validate_cameras(cfg: Dict, errors) -> Dict:
             continue
 
         cam_out = {}
-        # Capture method: require at least one of url, local_command, gopro_ip or capture_method==picamera2
+        # Capture method: require at least one of url, local_command, gopro_model or capture_method==picamera2
         url = cam.get("url")
         local_cmd = cam.get("local_command")
         gopro_ip = cam.get("gopro_ip")
+        gopro_model = cam.get("gopro_model")
         capture_method = cam.get("capture_method")
         has_picamera2 = (
             isinstance(capture_method, str) and capture_method == "picamera2"
         )
-        if not (url or local_cmd or gopro_ip or has_picamera2):
+        is_gopro = gopro_model is not None
+        if not (url or local_cmd or is_gopro or has_picamera2):
             errors.append(
-                f"cameras.{name}: one of 'url', 'local_command', 'gopro_ip' or capture_method='picamera2' is required"
+                f"cameras.{name}: one of 'url', 'local_command', 'gopro_model' or capture_method='picamera2' is required"
             )
 
         if url is not None:
@@ -315,6 +317,25 @@ def _validate_cameras(cfg: Dict, errors) -> Dict:
             )
         if gopro_ip is not None:
             cam_out["gopro_ip"] = _str(gopro_ip, f"cameras.{name}.gopro_ip", errors)
+        if gopro_model is not None:
+            validated_model = _str(
+                gopro_model,
+                f"cameras.{name}.gopro_model",
+                errors,
+                choices={"hero6", "hero9", "hero11", "open_gopro"},
+            )
+            if validated_model == "open_gopro":
+                # normalize legacy value
+                validated_model = "hero11"
+            cam_out["gopro_model"] = validated_model
+            if gopro_ip is None:
+                errors.append(
+                    f"cameras.{name}: gopro_model is set but 'gopro_ip' is missing."
+                )
+        elif gopro_ip is not None:
+            errors.append(
+                f"cameras.{name}: gopro_ip is set but gopro_model is missing. Specify one of hero6, hero9, or hero11."
+            )
         if capture_method is not None:
             cam_out["capture_method"] = _str(
                 capture_method, f"cameras.{name}.capture_method", errors
@@ -405,22 +426,10 @@ def _validate_cameras(cfg: Dict, errors) -> Dict:
             "gopro_utility_poll_interval_s",
             "bluetooth_retry_delay_s",
             "gopro_usb",
-            "gopro_model",
             "name",
         ):
             if k in cam:
                 cam_out[k] = cam[k]
-
-        if "gopro_model" in cam_out:
-            cam_out["gopro_model"] = _str(
-                cam_out["gopro_model"],
-                f"cameras.{name}.gopro_model",
-                errors,
-                default="open_gopro",
-                choices={"hero6", "open_gopro"},
-            )
-        else:
-            cam_out["gopro_model"] = "open_gopro"
 
         out[name] = cam_out
 

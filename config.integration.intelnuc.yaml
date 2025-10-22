@@ -3,41 +3,43 @@ admin_server:
   listen: 0.0.0.0:8889 [::]:8889
 cameras:
   gopro-hero-6:
-    day_settings:
-      exposure_time_ms_threshold: 4
-      urlpaths_commands:
-      - /gp/gpControl/command/mode?p=1
-      - /gp/gpControl/command/sub_mode?mode=1&sub_mode=1
-      - /gp/gpControl/setting/17/0
-      - /gp/gpControl/setting/82/0
-      - /gp/gpControl/setting/100/1
-      - /gp/gpControl/setting/21/1
-      - /gp/gpControl/setting/22/0
-      - /gp/gpControl/setting/23/0
-      - /gp/gpControl/setting/24/1
-      - /gp/gpControl/setting/75/3
-      - /gp/gpControl/setting/25/1
-      - /gp/gpControl/setting/97/0
+    day_mode_exposure_time_threshold_s: 0.004
+    night_mode_iso_threshold: 300
+#    day_settings:
+#      trigger_exposure_time_ms: 4
+#      urlpaths_commands:
+#      - /gp/gpControl/command/mode?p=1
+#      - /gp/gpControl/command/sub_mode?mode=1&sub_mode=1
+#      - /gp/gpControl/setting/17/0
+#      - /gp/gpControl/setting/82/0
+#      - /gp/gpControl/setting/100/1
+#      - /gp/gpControl/setting/21/1
+#      - /gp/gpControl/setting/22/0
+#      - /gp/gpControl/setting/23/0
+#      - /gp/gpControl/setting/24/1
+#      - /gp/gpControl/setting/75/3
+#      - /gp/gpControl/setting/25/1
+#      - /gp/gpControl/setting/97/0
     gopro_ble_identifier: '8608'
     gopro_ip: 10.5.5.9
     gopro_model: hero6
     lat: 37.75676
     lon: -122.44577
-    night_settings:
-      iso_threshold: 300
-      urlpaths_commands:
-      - /gp/gpControl/command/mode?p=1
-      - /gp/gpControl/command/sub_mode?mode=1&sub_mode=2
-      - /gp/gpControl/setting/17/0
-      - /gp/gpControl/setting/19/0
-      - /gp/gpControl/setting/82/0
-      - /gp/gpControl/setting/100/0
-      - /gp/gpControl/setting/21/1
-      - /gp/gpControl/setting/22/0
-      - /gp/gpControl/setting/23/0
-      - /gp/gpControl/setting/24/3
-      - /gp/gpControl/setting/75/3
-      - /gp/gpControl/setting/25/1
+#   night_settings:
+#      trigger_iso: 300  
+#      extra_urlpaths_commands:
+#      - /gp/gpControl/command/mode?p=1
+#      - /gp/gpControl/command/sub_mode?mode=1&sub_mode=2
+#      - /gp/gpControl/setting/17/0
+#      - /gp/gpControl/setting/19/0
+#      - /gp/gpControl/setting/82/0
+#      - /gp/gpControl/setting/100/0
+#      - /gp/gpControl/setting/21/1
+#      - /gp/gpControl/setting/22/0
+#      - /gp/gpControl/setting/23/0
+#      - /gp/gpControl/setting/24/3
+#      - /gp/gpControl/setting/75/3
+#      - /gp/gpControl/setting/25/1
     postprocessing:
     - type: crop
       area: 0,0,4000,3000

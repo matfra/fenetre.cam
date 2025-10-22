@@ -292,12 +292,15 @@ def capture_for_ui(camera_name):
             return send_file(img_bytes, mimetype=content_type)
 
         elif gopro_ip:
+            gopro_model = camera_config.get("gopro_model") or "hero11"
+            if gopro_model == "open_gopro":
+                gopro_model = "hero11"
             gopro = GoPro(
                 ip_address=gopro_ip,
-                gopro_model=camera_config.get("gopro_model", "open_gopro"),
+                gopro_model=gopro_model,
             )
             # This is a simplified capture, assuming the GoPro is ready.
-            # The main app's GoProUtilityThread handles state management (presets, etc.)
+            # The main app's GoProUtilityThread handles GoPro state management
             # which we don't replicate here for a simple capture.
             jpeg_bytes = gopro.capture_photo()
             if not jpeg_bytes:

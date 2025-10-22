@@ -23,6 +23,7 @@ import requests
 from absl import app, flags
 from astral import LocationInfo
 from astral.sun import sun
+import piexif
 from PIL import Image
 from skimage.metrics import structural_similarity
 from waitress import serve as waitress_serve
@@ -48,6 +49,7 @@ from fenetre.daylight import run_end_of_day
 from fenetre.gopro_utility import GoProUtilityThread, format_gopro_sd_card
 from fenetre.platform_utils import is_raspberry_pi
 from fenetre.postprocess import gather_metrics, postprocess
+from fenetre.camera_utils import send_url_commands
 from fenetre.timelapse import (
     add_to_timelapse_queue,
     create_timelapse,
@@ -325,6 +327,133 @@ def snap(camera_name, camera_config: Dict):
     timeout = camera_config.get("timeout_s", 60)
     local_command = camera_config.get("local_command")
     gopro_ip = camera_config.get("gopro_ip")
+    night_iso_threshold = camera_config.get("night_mode_iso_threshold")
+    day_exposure_threshold = camera_config.get("day_mode_exposure_time_threshold_s")
+    current_mode: Optional[str] = None
+
+    def analyze_exif_mode(
+        exif_data: bytes,
+    ) -> Tuple[Optional[str], Optional[int], Optional[float]]:
+        if not exif_data or (
+            night_iso_threshold is None and day_exposure_threshold is None
+        ):
+            return None, None, None
+        try:
+            exif_dict = piexif.load(exif_data)
+        except Exception as e:
+            logger.debug(f"{camera_name}: Failed to load EXIF for mode analysis: {e}")
+            return None, None, None
+        exif_sub = exif_dict.get("Exif") or {}
+        iso_raw = exif_sub.get(piexif.ExifIFD.ISOSpeedRatings)
+        iso_value: Optional[int] = None
+        if isinstance(iso_raw, (list, tuple)):
+            iso_value = iso_raw[0] if iso_raw else None
+        elif isinstance(iso_raw, int):
+            iso_value = iso_raw
+        exposure_raw = exif_sub.get(piexif.ExifIFD.ExposureTime)
+        exposure_seconds: Optional[float] = None
+        if (
+            isinstance(exposure_raw, tuple)
+            and len(exposure_raw) == 2
+            and exposure_raw[1]
+        ):
+            exposure_seconds = exposure_raw[0] / exposure_raw[1]
+        elif isinstance(exposure_raw, (int, float)):
+            exposure_seconds = float(exposure_raw)
+        new_mode: Optional[str] = None
+        if (
+            night_iso_threshold is not None
+            and iso_value is not None
+            and iso_value >= night_iso_threshold
+        ):
+            new_mode = "night"
+        elif (
+            day_exposure_threshold is not None
+            and exposure_seconds is not None
+            and exposure_seconds < day_exposure_threshold
+        ):
+            new_mode = "day"
+        return new_mode, iso_value, exposure_seconds
+
+    def apply_mode_change(
+        desired_mode: Optional[str],
+        iso_value: Optional[int],
+        exposure_seconds: Optional[float],
+    ):
+        nonlocal current_mode
+        if iso_value is not None or exposure_seconds is not None:
+            logger.debug(
+                "%s: EXIF iso=%s, exposure=%s",
+                camera_name,
+                iso_value if iso_value is not None else "unknown",
+                (
+                    f"{exposure_seconds:.6f}s"
+                    if exposure_seconds is not None
+                    else "unknown"
+                ),
+            )
+        if desired_mode is None or desired_mode == current_mode:
+            return
+        previous_mode = current_mode
+        settings_key = "day_settings" if desired_mode == "day" else "night_settings"
+        settings_conf = camera_config.get(settings_key) or {}
+        gopro_instance = active_camera_threads.get(camera_name, {}).get(
+            "gopro_instance"
+        )
+        applied = False
+
+        gopro_settings = (
+            settings_conf.get("gopro_settings")
+            if isinstance(settings_conf, dict)
+            else None
+        )
+        if (
+            gopro_instance
+            and gopro_settings
+            and hasattr(gopro_instance, "apply_settings")
+        ):
+            try:
+                gopro_instance.apply_settings(gopro_settings)
+                applied = True
+            except Exception as e:
+                logger.error(
+                    f"{camera_name}: Failed to apply GoPro settings for '{desired_mode}' mode: {e}"
+                )
+        url_commands = (
+            settings_conf.get("urlpaths_commands")
+            if isinstance(settings_conf, dict)
+            else []
+        )
+        if url_commands:
+            try:
+                send_url_commands(
+                    camera_name,
+                    camera_config,
+                    url_commands,
+                    gopro_instance,
+                )
+                applied = True
+            except Exception as e:
+                logger.error(
+                    f"{camera_name}: Failed to run {desired_mode} commands: {e}"
+                )
+        if applied or (not url_commands and not gopro_settings):
+            if camera_name in active_camera_threads:
+                active_camera_threads[camera_name]["photo_mode"] = desired_mode
+            current_mode = desired_mode
+
+        if current_mode == desired_mode:
+            if previous_mode is None:
+                logger.info(
+                    "%s: Initialized GoPro mode to %s", camera_name, current_mode
+                )
+            elif previous_mode != current_mode:
+                logger.info(
+                    "%s: Switching GoPro mode %s -> %s",
+                    camera_name,
+                    previous_mode,
+                    current_mode,
+                )
 
     def capture() -> Image.Image:
         logger.info(f"{camera_name}: Fetching new picture.")
@@ -376,6 +505,8 @@ def snap(camera_name, camera_config: Dict):
             global_config,
             camera_config,
         )
+    desired_mode, iso_value, exposure_seconds = analyze_exif_mode(previous_exif)
+    apply_mode_change(desired_mode, iso_value, exposure_seconds)
     fixed_snap_interval = camera_config.get("snap_interval_s", None)
     if camera_name not in sleep_intervals:
         sleep_intervals[camera_name] = (
@@ -469,6 +600,8 @@ def snap(camera_name, camera_config: Dict):
                 global_config,
                 camera_config,
             )
+        desired_mode, iso_value, exposure_seconds = analyze_exif_mode(new_exif)
+        apply_mode_change(desired_mode, iso_value, exposure_seconds)
         if not (
             is_sunrise_or_sunset(camera_config, global_config) or fixed_snap_interval
         ):
@@ -1096,7 +1229,7 @@ def manage_camera_threads():
 
             # Set exponential backoff limit based on camera type
             if (
-                cam_conf.get("gopro_ip")
+                cam_conf.get("gopro_model")
                 or cam_conf.get("capture_method") == "picamera2"
             ):
                 exp_backoff_limit = 32
@@ -1125,34 +1258,41 @@ def manage_camera_threads():
             ] = cam_watchdog_thread
 
             # Start GoPro utility thread if needed
-            if cam_conf.get("gopro_ip"):
+            gopro_model = cam_conf.get("gopro_model")
+            if gopro_model:
                 from .gopro import GoPro
 
-                gopro_instance = GoPro(
-                    ip_address=cam_conf.get("gopro_ip"),
-                    root_ca=cam_conf.get("gopro_root_ca"),
-                    log_dir=global_config.get("log_dir"),
-                    lat=cam_conf.get("lat"),
-                    lon=cam_conf.get("lon"),
-                    timezone=global_config.get("timezone"),
-                    # TODO: Fix this to use the new config format for day and night presets. Currently these keys don't exist
-                    preset_day=cam_conf.get("gopro_preset_day"),
-                    preset_night=cam_conf.get("gopro_preset_night"),
-                    gopro_model=cam_conf.get("gopro_model"),
-                )
-
-                # The GoProUtilityThread is only for OpenGoPro models
-                if cam_conf.get("gopro_model", "open_gopro") == "open_gopro":
-                    gopro_utility_thread = GoProUtilityThread(
-                        gopro_instance, cam_name, cam_conf, exit_event
+                gopro_ip = cam_conf.get("gopro_ip")
+                if not gopro_ip:
+                    logger.error(
+                        f"Camera {cam_name} specifies gopro_model '{gopro_model}' but no gopro_ip."
                     )
-                    gopro_utility_thread.start()
-                    if cam_name not in active_camera_threads:
-                        active_camera_threads[cam_name] = {}
-                    active_camera_threads[cam_name][
-                        "gopro_utility"
-                    ] = gopro_utility_thread
-                active_camera_threads[cam_name]["gopro_instance"] = gopro_instance
+                else:
+                    gopro_instance = GoPro(
+                        ip_address=gopro_ip,
+                        root_ca=cam_conf.get("gopro_root_ca"),
+                        log_dir=global_config.get("log_dir"),
+                        lat=cam_conf.get("lat"),
+                        lon=cam_conf.get("lon"),
+                        timezone=global_config.get("timezone"),
+                        gopro_model=gopro_model,
+                    )
+
+                    # The GoProUtilityThread is only for Hero 11 (OpenGoPro) models
+                    if gopro_model in {"hero11", "open_gopro"}:
+                        gopro_utility_thread = GoProUtilityThread(
+                            gopro_instance, cam_name, cam_conf, exit_event
+                        )
+                        gopro_utility_thread.start()
+                        if cam_name not in active_camera_threads:
+                            active_camera_threads[cam_name] = {}
+                        active_camera_threads[cam_name][
+                            "gopro_utility"
+                        ] = gopro_utility_thread
+
+                    active_camera_threads.setdefault(cam_name, {})[
+                        "gopro_instance"
+                    ] = gopro_instance
         else:
             # For existing, running cameras, we could update settings like sleep_interval here if they change.
             fixed_snap_interval = cam_conf.get("snap_interval_s", None)

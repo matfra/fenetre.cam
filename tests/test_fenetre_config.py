@@ -1,4 +1,5 @@
 import os
+
 # Add project root to allow importing fenetre
 import sys
 import tempfile
@@ -10,7 +11,6 @@ import yaml
 # Import the functions/classes to be tested
 from fenetre.config import config_load
 from fenetre.fenetre import load_and_apply_configuration
-
 
 
 # Minimal stub for GoProUtilityThread if fenetre.py imports it and it causes issues
@@ -51,7 +51,9 @@ class FenetreConfigTestCase(unittest.TestCase):
             fenetre_module.active_camera_threads = {}
             fenetre_module.http_server_thread_global = None
             fenetre_module.http_server_instance = None
-            if hasattr(fenetre_module, "exit_event") and fenetre_module.exit_event:  # If it was set by a previous test
+            if (
+                hasattr(fenetre_module, "exit_event") and fenetre_module.exit_event
+            ):  # If it was set by a previous test
                 fenetre_module.exit_event.clear()
 
     def tearDown(self):
