@@ -31,3 +31,10 @@ timelapse-tool = "fenetre.timelapse_tool:run"
 package-dir = {"" = "src"}
 packages = ["fenetre"]
 
+[tool.flake8]
+max-line-length = 120
+ignore = "E501" # Example of ignoring other codes
+
+[tool.isort]
+profile = "black"
+line_length = 120

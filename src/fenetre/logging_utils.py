@@ -3,7 +3,6 @@ import os
 from logging.handlers import RotatingFileHandler
 from typing import Dict, Optional
 
-
 COLOR_CODES = [
     "\033[31m",
     "\033[32m",

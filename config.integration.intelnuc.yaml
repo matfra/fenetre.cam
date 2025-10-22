@@ -4,8 +4,8 @@ admin_server:
 cameras:
   gopro-hero-6:
     day_settings:
-      trigger_exposure_time_ms: 4
-      url_commands:
+      exposure_time_ms_threshold: 4
+      urlpaths_commands:
       - /gp/gpControl/command/mode?p=1
       - /gp/gpControl/command/sub_mode?mode=1&sub_mode=1
       - /gp/gpControl/setting/17/0
@@ -24,8 +24,8 @@ cameras:
     lat: 37.75676
     lon: -122.44577
     night_settings:
-      trigger_iso: 300
-      url_commands:
+      iso_threshold: 300
+      urlpaths_commands:
       - /gp/gpControl/command/mode?p=1
       - /gp/gpControl/command/sub_mode?mode=1&sub_mode=2
       - /gp/gpControl/setting/17/0

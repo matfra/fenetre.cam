@@ -1,8 +1,8 @@
+import io
 import logging
 import os
 from datetime import datetime
 from typing import Dict, Optional, Tuple, Union
-import io
 
 import cairosvg
 import numpy as np

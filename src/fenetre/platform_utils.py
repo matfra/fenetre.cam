@@ -1,6 +1,5 @@
-import platform
 import os
-from datetime import datetime
+import platform
 
 
 def is_raspberry_pi():

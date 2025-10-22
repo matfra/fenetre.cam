@@ -5,15 +5,13 @@ import logging.handlers
 import os
 import subprocess
 import threading
+from io import TextIOWrapper
 from typing import Optional
-
-from datetime import datetime
 
 from PIL import Image
 
 from fenetre.admin_server import metric_timelapse_queue_size
 from fenetre.platform_utils import is_raspberry_pi
-from io import TextIOWrapper
 
 logger = logging.getLogger(__name__)
 

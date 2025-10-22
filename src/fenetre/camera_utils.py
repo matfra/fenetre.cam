@@ -1,9 +1,9 @@
 import logging
 from typing import Dict, Optional
+from urllib.parse import urlparse
 
 import piexif
 import requests
-from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
 

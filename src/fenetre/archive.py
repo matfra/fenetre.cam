@@ -17,7 +17,8 @@ from fenetre.admin_server import (
 )
 from fenetre.config import config_load
 from fenetre.daylight import run_end_of_day
-from fenetre.timelapse import create_timelapse, add_to_timelapse_queue
+from fenetre.timelapse import add_to_timelapse_queue, create_timelapse
+
 from .logging_utils import apply_module_levels, setup_logging
 
 logger = logging.getLogger(__name__)

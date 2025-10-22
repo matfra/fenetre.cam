@@ -1,9 +1,8 @@
-
 import datetime
-import math
 import pytz
 from astral import LocationInfo
-from astral.sun import sun, noon, elevation
+from astral.sun import elevation, noon, sun
+
 
 def create_sun_path_svg(
     date,
@@ -55,7 +54,6 @@ def create_sun_path_svg(
         # Sun is below the horizon all day
         return f'<svg width="{width}" height="{height}" xmlns="http://www.w3.org/2000/svg"><rect width="100%" height="100%" fill="transparent" /></svg>'
 
-
     # Convert to seconds from midnight
     sunrise_seconds = sunrise.hour * 3600 + sunrise.minute * 60 + sunrise.second
     sunset_seconds = sunset.hour * 3600 + sunset.minute * 60 + sunset.second
@@ -65,7 +63,7 @@ def create_sun_path_svg(
 
     arc_width = sunset_x - sunrise_x
     rx = arc_width / 2
-    
+
     # Make arc height proportional to the sun's max elevation
     # Max elevation is 90 degrees. Max arc height is height - 10 for margin.
     ry = (max_elevation / 90.0) * (height - 10)
@@ -74,7 +72,9 @@ def create_sun_path_svg(
     # The y-coordinate for start and end should be the same.
     y_coord = height - 5
 
-    path_data = f"M {sunrise_x:.2f},{y_coord} A {rx:.2f},{ry} 0 0 1 {sunset_x:.2f},{y_coord}"
+    path_data = (
+        f"M {sunrise_x:.2f},{y_coord} A {rx:.2f},{ry} 0 0 1 {sunset_x:.2f},{y_coord}"
+    )
 
     time_bars = []
     hour_width = width / 24
@@ -98,6 +98,7 @@ def create_sun_path_svg(
 </svg>
 """
     return svg.strip()
+
 
 def overlay_time_bar(
     svg_content,
@@ -142,36 +143,74 @@ def overlay_time_bar(
     return svg_content.replace("</svg>", f"    {bar_svg}\n</svg>")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     import argparse
+
     parser = argparse.ArgumentParser()
-    parser.add_argument('--date', default=datetime.date.today().isoformat(), help='Date in YYYY-MM-DD format for base SVG creation')
-    parser.add_argument('--lat', type=float, help='Latitude for base SVG creation')
-    parser.add_argument('--lon', type=float, help='Longitude for base SVG creation')
-    parser.add_argument('--timezone', default='UTC', help='Timezone for base SVG creation')
-    
-    parser.add_argument('--major-bar-width', type=int, default=1, help='Width of major time bars')
-    parser.add_argument('--minor-bar-width', type=int, default=1, help='Width of minor time bars')
-    parser.add_argument('--major-bar-color', default='darkgrey', help='Color of major time bars')
-    parser.add_argument('--minor-bar-color', default='lightgrey', help='Color of minor time bars')
-    parser.add_argument('--background-color', default='transparent', help='Background color of the SVG')
-    parser.add_argument('--sun-arc-color', default='rgba(255, 255, 0, 0.5)', help='Color of the sun arc')
+    parser.add_argument(
+        "--date",
+        default=datetime.date.today().isoformat(),
+        help="Date in YYYY-MM-DD format for base SVG creation",
+    )
+    parser.add_argument("--lat", type=float, help="Latitude for base SVG creation")
+    parser.add_argument("--lon", type=float, help="Longitude for base SVG creation")
+    parser.add_argument(
+        "--timezone", default="UTC", help="Timezone for base SVG creation"
+    )
 
-    parser.add_argument('--input', help='Path to an existing SVG file to modify')
-    parser.add_argument('--time', help='Time to overlay on the SVG, in HH:MM format')
-    parser.add_argument('--overlay-rect-width', type=int, default=5, help='Width of the overlay rectangle')
-    parser.add_argument('--overlay-rect-height-ratio', type=float, default=1.0, help='Height of the overlay rectangle as a ratio')
-    parser.add_argument('--overlay-border-width', type=int, default=2, help='Width of the overlay rectangle border')
-    parser.add_argument('--overlay-border-color', default='white', help='Color of the overlay rectangle border')
+    parser.add_argument(
+        "--major-bar-width", type=int, default=1, help="Width of major time bars"
+    )
+    parser.add_argument(
+        "--minor-bar-width", type=int, default=1, help="Width of minor time bars"
+    )
+    parser.add_argument(
+        "--major-bar-color", default="darkgrey", help="Color of major time bars"
+    )
+    parser.add_argument(
+        "--minor-bar-color", default="lightgrey", help="Color of minor time bars"
+    )
+    parser.add_argument(
+        "--background-color", default="transparent", help="Background color of the SVG"
+    )
+    parser.add_argument(
+        "--sun-arc-color", default="rgba(255, 255, 0, 0.5)", help="Color of the sun arc"
+    )
 
-    parser.add_argument('--output', required=True, help='Output file name')
+    parser.add_argument("--input", help="Path to an existing SVG file to modify")
+    parser.add_argument("--time", help="Time to overlay on the SVG, in HH:MM format")
+    parser.add_argument(
+        "--overlay-rect-width",
+        type=int,
+        default=5,
+        help="Width of the overlay rectangle",
+    )
+    parser.add_argument(
+        "--overlay-rect-height-ratio",
+        type=float,
+        default=1.0,
+        help="Height of the overlay rectangle as a ratio",
+    )
+    parser.add_argument(
+        "--overlay-border-width",
+        type=int,
+        default=2,
+        help="Width of the overlay rectangle border",
+    )
+    parser.add_argument(
+        "--overlay-border-color",
+        default="white",
+        help="Color of the overlay rectangle border",
+    )
+
+    parser.add_argument("--output", required=True, help="Output file name")
     args = parser.parse_args()
 
     if args.input and args.time:
-        with open(args.input, 'r') as f:
+        with open(args.input, "r") as f:
             svg_content = f.read()
-        
-        time_obj = datetime.datetime.strptime(args.time, '%H:%M').time()
+
+        time_obj = datetime.datetime.strptime(args.time, "%H:%M").time()
         # Combine with a dummy date to create a datetime object
         datetime_obj = datetime.datetime.combine(datetime.date.today(), time_obj)
 
@@ -183,8 +222,8 @@ if __name__ == '__main__':
             args.overlay_border_color,
             args.overlay_rect_height_ratio,
         )
-        
-        with open(args.output, 'w') as f:
+
+        with open(args.output, "w") as f:
             f.write(modified_svg)
         print(f"Overlay SVG image saved to {args.output}")
 
@@ -202,8 +241,10 @@ if __name__ == '__main__':
             args.sun_arc_color,
             args.timezone,
         )
-        with open(args.output, 'w') as f:
+        with open(args.output, "w") as f:
             f.write(svg_content)
         print(f"Base SVG image saved to {args.output}")
     else:
-        print("Error: You must either provide --lat and --lon to create a base image, or --input and --time to overlay a bar.")
+        print(
+            "Error: You must either provide --lat and --lon to create a base image, or --input and --time to overlay a bar."
+        )
