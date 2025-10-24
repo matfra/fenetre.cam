@@ -14,8 +14,7 @@ cameras:
       trigger_iso: 400
       urlpaths_commands:
         - /gopro/camera/presets/load?id=65539 # Night photo
-    gopro_ip: 10.5.5.9
-
+    gopro_model: hero11
     lat: 37.75676
     lon: -122.44577
     postprocessing:
