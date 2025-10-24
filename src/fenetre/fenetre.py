@@ -290,7 +290,8 @@ def is_sunrise_or_sunset(camera_config: Dict, global_config: Dict) -> bool:
     """
     Determines if the current time is within the sunrise or sunset window for a given camera.
     """
-    if not camera_config.get("sunrise_sunset", {}).get("enabled", False):
+    sunrise_sunset_config = camera_config.get("sunrise_sunset", {})
+    if not sunrise_sunset_config.get("enabled"):
         return False
 
     lat = camera_config.get("lat")
@@ -345,12 +346,15 @@ def snap(camera_name, camera_config: Dict):
             return None, None, None
         exif_sub = exif_dict.get("Exif") or {}
         iso_raw = exif_sub.get(piexif.ExifIFD.ISOSpeedRatings)
+        logger.info(f"{camera_name}: EXIF iso (raw value)={iso_raw}")
         iso_value: Optional[int] = None
         if isinstance(iso_raw, (list, tuple)):
             iso_value = iso_raw[0] if iso_raw else None
         elif isinstance(iso_raw, int):
             iso_value = iso_raw
+        logger.debug(f"{camera_name}: EXIF iso={iso_value}")
         exposure_raw = exif_sub.get(piexif.ExifIFD.ExposureTime)
+        logger.debug(f"{camera_name}: EXIF exposure time (raw value)={exposure_raw}")
         exposure_seconds: Optional[float] = None
         if (
             isinstance(exposure_raw, tuple)
@@ -360,6 +364,7 @@ def snap(camera_name, camera_config: Dict):
             exposure_seconds = exposure_raw[0] / exposure_raw[1]
         elif isinstance(exposure_raw, (int, float)):
             exposure_seconds = float(exposure_raw)
+        logger.debug(f"{camera_name}: EXIF exposure time in seconds={exposure_seconds}")
         new_mode: Optional[str] = None
         if (
             night_iso_threshold is not None
@@ -373,6 +378,8 @@ def snap(camera_name, camera_config: Dict):
             and exposure_seconds < day_exposure_threshold
         ):
             new_mode = "day"
+        logger.debug(f"Current mode: {current_mode}, ISO threshold: {night_iso_threshold}, Exposure threshold: {day_exposure_threshold}")
+        logger.debug(f"We should use the mode {new_mode}")
         return new_mode, iso_value, exposure_seconds
 
     def apply_mode_change(
@@ -553,7 +560,9 @@ def snap(camera_name, camera_config: Dict):
 
         current_sleep_interval = sleep_intervals[camera_name]
         if is_sunrise_or_sunset(camera_config, global_config):
-            current_sleep_interval = global_config.get("sunrise_sunset_interval_s", 3)
+            current_sleep_interval = camera_config.get("sunrise_sunset", {}).get(
+                "interval_s", 10
+            )
             logger.info(
                 f"{camera_name}: Sunrise/sunset detected, using fast interval: {current_sleep_interval}s"
             )

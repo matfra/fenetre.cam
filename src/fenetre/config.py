@@ -89,7 +89,6 @@ def _validate_global(cfg: Dict, errors) -> Dict:
         "logging_level",
         "logging_levels",
         "timezone",
-        "sunrise_sunset_interval_s",
         "storage_management",
         "user_agent",
         "log_max_bytes",
@@ -130,14 +129,6 @@ def _validate_global(cfg: Dict, errors) -> Dict:
     if not tz:
         errors.append("global.timezone: required string is missing")
     out["timezone"] = tz or "UTC"
-
-    out["sunrise_sunset_interval_s"] = _int(
-        cfg.get("sunrise_sunset_interval_s"),
-        "global.sunrise_sunset_interval_s",
-        errors,
-        default=10,
-        min_value=1,
-    )
 
     sm = _dict(cfg.get("storage_management"), "global.storage_management", errors)
     if sm:
@@ -405,6 +396,23 @@ def _validate_cameras(cfg: Dict, errors) -> Dict:
                 min_value=-180,
                 max_value=180,
             )
+        ss_cfg = _dict(cam.get("sunrise_sunset"), f"cameras.{name}.sunrise_sunset", errors)
+        if ss_cfg:
+            ss_out = {}
+            ss_out["enabled"] = _bool(
+                ss_cfg.get("enabled"),
+                f"cameras.{name}.sunrise_sunset.enabled",
+                errors,
+                default=False,
+            )
+            ss_out["interval_s"] = _int(
+                ss_cfg.get("interval_s"),
+                f"cameras.{name}.sunrise_sunset.interval_s",
+                errors,
+                default=10,
+                min_value=1,
+            )
+            cam_out["sunrise_sunset"] = ss_out
 
         # Optional postprocessing list (pass-through, validated elsewhere)
         if cam.get("postprocessing") is not None:
