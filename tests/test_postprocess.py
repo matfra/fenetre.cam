@@ -1,4 +1,4 @@
-from fenetre.postprocess import _parse_color, add_timestamp, postprocess
+from fenetre.postprocess import _parse_color, add_timestamp, get_exif_dict, postprocess
 import unittest
 from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
@@ -240,7 +240,9 @@ class TestPostprocess(unittest.TestCase):
         # Mock textbbox return value
         mock_draw_instance.textbbox.return_value = (0, 0, 100, 20)  # l, t, r, b
 
-        add_timestamp(mock_image, position="50,75", size=10, color="red", timezone="UTC")
+        add_timestamp(
+            mock_image, position="50,75", size=10, color="red", timezone="UTC"
+        )
 
         mock_draw_instance.text.assert_called_once()
         args, kwargs = mock_draw_instance.text.call_args
@@ -569,6 +571,55 @@ class TestPostprocess(unittest.TestCase):
         mock_logging.warning.assert_called_with(
             "Generic text step is enabled but no 'text_content' was provided."
         )
+
+    @patch("fenetre.postprocess.pyexiv2.Image")
+    def test_get_exif_dict_from_path(self, mock_image_cls):
+        mock_context = MagicMock()
+        mock_img = MagicMock()
+        mock_img.read_exif.return_value = {
+            "Exif.Photo.ISOSpeedRatings": "200",
+            "Exif.Photo.FocalLength": "350/10",
+            "Exif.Photo.FNumber": "28/10",
+            "Exif.Photo.ExposureTime": "1/50",
+            "Exif.Photo.WhiteBalance": "1",
+            "Exif.Image.ImageWidth": "4000",
+            "Exif.Image.ImageLength": "3000",
+        }
+        mock_context.__enter__.return_value = mock_img
+        mock_context.__exit__.return_value = False
+        mock_image_cls.return_value = mock_context
+
+        result = get_exif_dict("/tmp/fake.jpg")
+
+        mock_image_cls.assert_called_once_with("/tmp/fake.jpg")
+        self.assertEqual(result["iso"], 200.0)
+        self.assertAlmostEqual(result["focal_length"], 35.0)
+        self.assertAlmostEqual(result["aperture"], 2.8)
+        self.assertAlmostEqual(result["exposure_time"], 1 / 50)
+        self.assertEqual(result["white_balance"], 1.0)
+        self.assertEqual(result["width"], 4000.0)
+        self.assertEqual(result["height"], 3000.0)
+
+    @patch("fenetre.postprocess.pyexiv2.ImageData")
+    def test_get_exif_dict_from_bytes(self, mock_image_data_cls):
+        mock_context = MagicMock()
+        mock_img = MagicMock()
+        mock_img.read_exif.return_value = {
+            "Exif.Photo.ISOSpeedRatings": 100,
+        }
+        mock_context.__enter__.return_value = mock_img
+        mock_context.__exit__.return_value = False
+        mock_image_data_cls.return_value = mock_context
+
+        payload = b"\xff\xd8\xff\xe1"
+        result = get_exif_dict(payload)
+
+        mock_image_data_cls.assert_called_once_with(payload)
+        self.assertEqual(result["iso"], 100.0)
+
+    def test_get_exif_dict_unsupported_type(self):
+        with self.assertRaises(TypeError):
+            get_exif_dict(object())
 
 
 if __name__ == "__main__":

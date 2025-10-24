@@ -1,6 +1,7 @@
 import io
 import logging
 import os
+from pathlib import Path
 from datetime import datetime
 from typing import Dict, Optional, Tuple, Union
 
@@ -392,7 +393,6 @@ def postprocess(
     if camera_config is None:
         camera_config = {}
 
-
     # Correct orientation based on EXIF data before any processing
     pic = ImageOps.exif_transpose(pic)
 
@@ -530,34 +530,47 @@ def auto_white_balance(pic: Image.Image) -> Image.Image:
     # Convert the NumPy array back to a PIL image
     return Image.fromarray(img_array_awb.astype(np.uint8))
 
-def get_exif_dict(image: Image.Image) -> Dict:
+
+def get_exif_dict(
+    image_source: Union[bytes, bytearray, memoryview, str, os.PathLike],
+) -> Dict:
     """
-    Reads metadata from an image file or bytes using pyexiv2 and returns a dictionary.
+    Reads metadata from image bytes or a filesystem path using pyexiv2 and returns a dictionary.
     """
     exif_values = {}
     try:
-        with pyexiv2.ImageData(image) as img:
-            exif = img.read_exif()
+        if isinstance(image_source, (str, os.PathLike)):
+            with pyexiv2.Image(str(Path(image_source))) as img:
+                exif = img.read_exif()
+        elif isinstance(image_source, (bytes, bytearray, memoryview)):
+            with pyexiv2.ImageData(bytes(image_source)) as img:
+                exif = img.read_exif()
+        else:
+            raise TypeError(f"Unsupported image source type: {type(image_source)}")
 
-            def get_value(key, default=None):
-                v = exif.get(key)
-                if v is None:
-                    return default
-                try:
-                    if isinstance(v, str) and "/" in v:
-                        num, den = v.split("/")
-                        return float(num) / float(den)
-                    return float(v)
-                except (ValueError, TypeError):
-                    return default
+        def get_value(key, default=None):
+            v = exif.get(key)
+            if v is None:
+                return default
+            try:
+                if isinstance(v, str) and "/" in v:
+                    num, den = v.split("/")
+                    return float(num) / float(den)
+                return float(v)
+            except (ValueError, TypeError):
+                return default
 
-            exif_values["iso"] = get_value("Exif.Photo.ISOSpeedRatings")
-            exif_values["focal_length"] = get_value("Exif.Photo.FocalLength")
-            exif_values["aperture"] = get_value("Exif.Photo.FNumber")
-            exif_values["exposure_time"] = get_value("Exif.Photo.ExposureTime")
-            exif_values["white_balance"] = get_value("Exif.Photo.WhiteBalance")
-            exif_values["width"] = get_value("Exif.Image.ImageWidth") or get_value("Exif.Photo.PixelXDimension")
-            exif_values["height"] = get_value("Exif.Image.ImageLength") or get_value("Exif.Photo.PixelYDimension")
+        exif_values["iso"] = get_value("Exif.Photo.ISOSpeedRatings")
+        exif_values["focal_length"] = get_value("Exif.Photo.FocalLength")
+        exif_values["aperture"] = get_value("Exif.Photo.FNumber")
+        exif_values["exposure_time"] = get_value("Exif.Photo.ExposureTime")
+        exif_values["white_balance"] = get_value("Exif.Photo.WhiteBalance")
+        exif_values["width"] = get_value("Exif.Image.ImageWidth") or get_value(
+            "Exif.Photo.PixelXDimension"
+        )
+        exif_values["height"] = get_value("Exif.Image.ImageLength") or get_value(
+            "Exif.Photo.PixelYDimension"
+        )
 
     except Exception as e:
         logger.error(f"Error reading metadata with pyexiv2: {e}")
@@ -567,18 +580,30 @@ def get_exif_dict(image: Image.Image) -> Dict:
 
 
 def publish_metrics_from_exif_dict(exif_dict: Dict, camera_name: str):
-        # Subset of EXIF Metrics we care about.
-        if exif_dict.get("iso") is not None:
-            metric_picture_iso.labels(camera_name=camera_name).set(exif_dict["iso"])
-        if exif_dict.get("focal_length") is not None:
-            metric_picture_focal_length_mm.labels(camera_name=camera_name).set(exif_dict["focal_length"])
-        if exif_dict.get("aperture") is not None:
-            metric_picture_aperture.labels(camera_name=camera_name).set(exif_dict["aperture"])
-        if exif_dict.get("exposure_time") is not None:
-            metric_picture_exposure_time_seconds.labels(camera_name=camera_name).set(exif_dict["exposure_time"])
-        if exif_dict.get("white_balance") is not None:
-            metric_picture_white_balance.labels(camera_name=camera_name).set(exif_dict["white_balance"])
-        if exif_dict.get("width") is not None:
-            metric_picture_width_pixels.labels(camera_name=camera_name).set(exif_dict["width"])
-        if exif_dict.get("height") is not None:
-            metric_picture_height_pixels.labels(camera_name=camera_name).set(exif_dict["height"])
+    # Subset of EXIF Metrics we care about.
+    if exif_dict.get("iso") is not None:
+        metric_picture_iso.labels(camera_name=camera_name).set(exif_dict["iso"])
+    if exif_dict.get("focal_length") is not None:
+        metric_picture_focal_length_mm.labels(camera_name=camera_name).set(
+            exif_dict["focal_length"]
+        )
+    if exif_dict.get("aperture") is not None:
+        metric_picture_aperture.labels(camera_name=camera_name).set(
+            exif_dict["aperture"]
+        )
+    if exif_dict.get("exposure_time") is not None:
+        metric_picture_exposure_time_seconds.labels(camera_name=camera_name).set(
+            exif_dict["exposure_time"]
+        )
+    if exif_dict.get("white_balance") is not None:
+        metric_picture_white_balance.labels(camera_name=camera_name).set(
+            exif_dict["white_balance"]
+        )
+    if exif_dict.get("width") is not None:
+        metric_picture_width_pixels.labels(camera_name=camera_name).set(
+            exif_dict["width"]
+        )
+    if exif_dict.get("height") is not None:
+        metric_picture_height_pixels.labels(camera_name=camera_name).set(
+            exif_dict["height"]
+        )

@@ -327,15 +327,12 @@ def is_sunrise_or_sunset(camera_config: Dict, global_config: Dict) -> bool:
         return False
 
 
-
-
 def snap(camera_name, camera_config: Dict):
 
     # This is the capture function which is the only place in this snap thread where we have image source type specific info and logic.
     def capture(mode: str) -> Image.Image:
 
         logger.info("%s: Fetching new picture.", camera_name)
-
 
         # Capture picture from a URL. Useful for public cams or CCTV
         url = camera_config.get("url")
@@ -353,9 +350,9 @@ def snap(camera_name, camera_config: Dict):
             return get_pic_from_local_command(
                 local_command, timeout, camera_name, camera_config
             )
-        
-        # gopro_model will call GoPro specific Classes defiend in gopro.py 
-        gopro_model= camera_config.get("gopro_model")
+
+        # gopro_model will call GoPro specific Classes defiend in gopro.py
+        gopro_model = camera_config.get("gopro_model")
         if gopro_model is not None:
             gopro_instance = active_camera_threads.get(camera_name, {}).get(
                 "gopro_instance"
@@ -374,7 +371,7 @@ def snap(camera_name, camera_config: Dict):
                 )
                 raise
             return Image.open(BytesIO(jpeg_bytes))
-        
+
         # capture_method: picamera2 is still to be implemented
         if camera_config.get("capture_method") == "picamera2":
             return get_pic_from_picamera2(camera_config)
@@ -407,8 +404,6 @@ def snap(camera_name, camera_config: Dict):
             else 60.0
         )
 
-
-
     while not exit_event.is_set():
         # Immediately save the previous pic to disk.
         write_pic_to_disk(
@@ -418,9 +413,10 @@ def snap(camera_name, camera_config: Dict):
             previous_exif_bytes,
         )
 
-        # Read EXIF data that will be used for metrics 
+        # Read EXIF data that will be used for metrics
         from .postprocess import get_exif_dict
-        previous_exif = get_exif_dict(previous_pic)
+
+        previous_exif = get_exif_dict(previous_pic_fullpath)
 
         # Gather and publish metrics after we have succesfully written the picture on disk
         # TODO: We should only do that if the admin server is enabled.
@@ -449,7 +445,9 @@ def snap(camera_name, camera_config: Dict):
             json.dump(metadata, f, indent=4)
             logger.debug(f"{camera_name}: Updated metadata file {metadata_path}")
 
-        current_mode = get_day_night_from_exif(previous_exif, camera_config, previous_mode)
+        current_mode = get_day_night_from_exif(
+            previous_exif, camera_config, previous_mode
+        )
 
         # This is a good moment to gracefully exit if the user wants to.
         if exit_event.is_set():
