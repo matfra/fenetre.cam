@@ -8,6 +8,7 @@ import requests
 
 from fenetre.gopro_state_map import GoProEnums
 
+
 logger = logging.getLogger(__name__)
 
 
@@ -145,6 +146,7 @@ class _GoProModernBase:
         lon=None,
         timezone=None,
         gopro_usb=False,
+        camera_config={},
     ):
         self.ip_address = ip_address
         self.timeout = timeout
@@ -157,6 +159,7 @@ class _GoProModernBase:
         self.timezone = timezone
         self.gopro_usb = gopro_usb
         self.log_dir = log_dir
+        self.camera_config = camera_config
 
         if self.root_ca:
             import tempfile
@@ -299,7 +302,15 @@ class _GoProModernBase:
             latest_file = latest_file_info.get("filename") or latest_file_info.get("n")
         return latest_dir, latest_file
 
-    def capture_photo(self, output_file: Optional[str] = None) -> bytes:
+    def set_mode(self, mode: str):
+        logger.info(f"Setting GoPro mode to '{mode}'")
+        settings_to_apply = self.camera_config.get(f"{mode}_settings", {})
+        gopro_settings = settings_to_apply.get("gopro_settings")
+        self.apply_settings(gopro_settings)
+
+    def capture_photo(
+        self, output_file: Optional[str] = None
+    ) -> bytes:
         latest_dir_before, latest_file_before = self._get_latest_file()
 
         self._make_gopro_request(
@@ -382,6 +393,7 @@ class GoProHero6:
         timezone=None,
         gopro_usb=False,  # Not supported on Hero6
         root_ca=None,  # Not supported on Hero6
+        camera_config={},
     ):
         self.ip_address = ip_address
         self.timeout = timeout
@@ -392,8 +404,12 @@ class GoProHero6:
         self.log_dir = log_dir
         self.state = {}
         self.settings = GoProHero6Settings(self)
+        self.camera_config = camera_config
 
-    def apply_settings(self, settings: Optional[dict]):
+
+    def apply_settings(
+        self, settings: Optional[dict], camera_config: Optional[dict] = None
+    ):
         if not settings:
             return
         if not isinstance(settings, dict):
@@ -491,11 +507,19 @@ class GoProHero6:
             logger.error(f"Failed to get GoPro state from {self.ip_address}: {e}")
             self.state = {}
 
-    def capture_photo(self, output_file: Optional[str] = None) -> bytes:
-        latest_dir_before, latest_file_before = self._get_latest_file()
-
+    def set_mode(self, mode: str):
         # Set photo mode
+        logger.debug("Setting GoPro mode to photo")
         self._make_gopro_request("/gp/gpControl/command/mode?p=1")
+        logger.debug(f"Will apply settings for mode '{mode}': {settings_to_apply}")
+        settings_to_apply = self.camera_config.get(f"{mode}_settings", {})
+        gopro_settings = settings_to_apply.get("gopro_settings")
+        self.apply_settings(gopro_settings)
+
+    def capture_photo(
+        self, output_file: Optional[str] = None
+    ) -> bytes:
+        latest_dir_before, latest_file_before = self._get_latest_file()
 
         # Trigger shutter
         self._make_gopro_request("/gp/gpControl/command/shutter?p=1")

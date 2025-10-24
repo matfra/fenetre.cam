@@ -9,7 +9,7 @@ cameras:
     day_mode_exposure_time_threshold_s: 0.004
     night_mode_iso_threshold: 300
     day_settings:
-      trigger_exposure_time_ms: 4
+      trigger_exposure_time_s: 0.004
       urlpaths_commands:
       - /gp/gpControl/command/mode?p=1
       - /gp/gpControl/command/sub_mode?mode=1&sub_mode=1

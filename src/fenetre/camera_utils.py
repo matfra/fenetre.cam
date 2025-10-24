@@ -1,14 +1,64 @@
 import logging
 from typing import Dict, Optional
 from urllib.parse import urlparse
+import pyexiv2
 
 import piexif
 import requests
+from .postprocess import get_exif_dict
 
 logger = logging.getLogger(__name__)
 
-# In-memory store for the current mode of each camera
-camera_modes = {}
+
+def get_day_night_from_exif(
+    exif_dict: Dict, camera_config: Dict, current_mode: str
+) -> str:
+    """
+    Determines the desired camera mode ('day' or 'night') based on EXIF data.
+
+    :param exif_dict: A dictionary of parsed EXIF values.
+    :param camera_config: The camera's configuration dictionary.
+    :param current_mode: The current mode of the camera ('day', 'night', 'unknown').
+    :return: The desired mode as a string ('day' or 'night').
+    """
+    day_settings = camera_config.get("day_settings", {})
+    night_settings = camera_config.get("night_settings", {})
+    new_mode = current_mode
+
+    # Decide if we need to switch to night mode
+    if current_mode != "night" and night_settings.get("trigger_iso"):
+        iso = exif_dict.get("iso")
+        if iso is not None and iso > night_settings["trigger_iso"]:
+            logger.debug(f"Switching to night mode based on ISO: {iso} > {night_settings['trigger_iso']}")
+            new_mode = "night"
+
+    # Decide if we need to switch to day mode
+    if current_mode != "day" and day_settings.get("trigger_exposure_time_s"):
+        exposure_time_s = exif_dict.get("exposure_time")
+        if (
+            exposure_time_s is not None
+            and exposure_time_s < day_settings["trigger_exposure_time_s"]
+        ):
+            new_mode = "day"
+            logger.debug(f"Switching to day mode based on exposure time: {exposure_time_s} < {day_settings['trigger_exposure_time_s']}")
+
+
+    return new_mode
+
+
+def set_camera_mode(
+    camera_name: str,
+    camera_config: Dict,
+    new_mode: str,
+    gopro_instance: Optional[object] = None,
+):
+    if gopro_instance and hasattr(gopro_instance, "set_mode"):
+        gopro_instance.set_mode(new_mode)
+        return
+
+    settings_to_apply = camera_config.get(f"{new_mode}_settings", {})
+    if url_commands := settings_to_apply.get("url_commands"):
+        send_url_commands(camera_name, camera_config, url_commands)
 
 
 def check_and_switch_day_night_mode(
@@ -25,70 +75,37 @@ def check_and_switch_day_night_mode(
         return
 
     try:
-        exif_data_dict = piexif.load(exif_data)
+        exif_dict = get_exif_dict(exif_data)
     except Exception as e:
-        logger.error(f"{camera_name}: Failed to parse EXIF data: {e}")
+        logger.error(f"{camera_name}: Failed to parse EXIF data with pyexiv2: {e}")
         return
 
-    day_settings = camera_config.get("day_settings", {})
-    night_settings = camera_config.get("night_settings", {})
-
-    if not day_settings and not night_settings:
+    if not camera_config.get("day_settings") and not camera_config.get(
+        "night_settings"
+    ):
         return
 
-    current_mode = camera_modes.get(camera_name, "unknown")
-    new_mode = current_mode
-
-    # Decide if we need to switch to night mode
-    if current_mode != "night" and night_settings.get("trigger_iso"):
-        try:
-            iso = exif_data_dict["Exif"].get(piexif.ExifIFD.ISOSpeedRatings)
-            if iso and iso > night_settings["trigger_iso"]:
-                new_mode = "night"
-        except Exception as e:
-            logger.error(f"{camera_name}: Could not read ISO from EXIF: {e}")
-
-    # Decide if we need to switch to day mode
-    if current_mode != "day" and day_settings.get("trigger_exposure_time_ms"):
-        try:
-            exposure_time = exif_data_dict["Exif"].get(piexif.ExifIFD.ExposureTime)
-            if exposure_time:
-                exposure_time_ms = exposure_time[0] / exposure_time[1] * 1000
-                if exposure_time_ms < day_settings["trigger_exposure_time_ms"]:
-                    new_mode = "day"
-        except Exception as e:
-            logger.error(f"{camera_name}: Could not read ExposureTime from EXIF: {e}")
+    current_mode = "unknown"  # This function is now state-less from a caller perspective
+    new_mode = get_day_night_from_exif(exif_dict, camera_config, current_mode)
 
     if new_mode != current_mode:
         logger.info(f"{camera_name}: Switching from {current_mode} to {new_mode} mode.")
-        settings_to_apply = day_settings if new_mode == "day" else night_settings
-        url_commands = settings_to_apply.get("url_commands", [])
-
-        if url_commands:
-            send_url_commands(camera_name, camera_config, url_commands, gopro_instance)
-
-        camera_modes[camera_name] = new_mode
+        try:
+            set_camera_mode(camera_name, camera_config, new_mode, gopro_instance)
+        except Exception as e:
+            logger.error(f"{camera_name}: Failed to set camera mode to {new_mode}: {e}")
 
 
 def send_url_commands(
     camera_name: str,
     camera_config: Dict,
     url_commands: list,
-    gopro_instance: Optional[object] = None,
 ):
     """
     Sends a list of URL commands to a camera.
     """
-    if gopro_instance:
-        logger.info(f"{camera_name}: Sending commands to GoPro.")
-        for command in url_commands:
-            try:
-                gopro_instance._make_gopro_request(command)
-            except Exception as e:
-                logger.error(
-                    f"{camera_name}: Failed to send command '{command}' to GoPro: {e}"
-                )
-        return
+    # GoPro commands are now handled directly via apply_settings in the gopro class.
+    # This function is now only for generic URL-based cameras.
 
     base_url = camera_config.get("url")
     if not base_url:

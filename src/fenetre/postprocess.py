@@ -383,7 +383,7 @@ def postprocess(
     postprocessing_steps: list,
     global_config: Optional[Dict] = None,
     camera_config: Optional[Dict] = None,
-) -> Tuple[Image.Image, dict]:
+) -> Image.Image:
     """
     Applies a series of post-processing steps to an image.
     """
@@ -391,7 +391,7 @@ def postprocess(
         global_config = {}
     if camera_config is None:
         camera_config = {}
-    exif_data = pic.info.get("exif") or b""
+
 
     # Correct orientation based on EXIF data before any processing
     pic = ImageOps.exif_transpose(pic)
@@ -469,7 +469,7 @@ def postprocess(
                 logger.debug("Adding sun path overlay")
                 pic = _add_sun_path_overlay(pic, global_config, camera_config, step)
 
-    return pic, exif_data
+    return pic
 
 
 def crop(pic: Image.Image, area: str) -> Image.Image:
@@ -530,59 +530,20 @@ def auto_white_balance(pic: Image.Image) -> Image.Image:
     # Convert the NumPy array back to a PIL image
     return Image.fromarray(img_array_awb.astype(np.uint8))
 
-
-def gather_metrics(image_path: str, camera_name: str):
+def get_exif_dict(image: Image.Image) -> Dict:
     """
-    Reads metadata from an image file using pyexiv2 and updates Prometheus metrics.
+    Reads metadata from an image file or bytes using pyexiv2 and returns a dictionary.
     """
+    exif_values = {}
     try:
-        with pyexiv2.Image(image_path) as img:
+        with pyexiv2.ImageData(image) as img:
             exif = img.read_exif()
 
-            # Basic file stats
-            try:
-                stat = os.stat(image_path)
-                metric_picture_size_bytes.labels(camera_name=camera_name).set(
-                    stat.st_size
-                )
-
-                # Get image dimensions from EXIF or fallback to reading image
-                width = exif.get("Exif.Image.ImageWidth") or exif.get(
-                    "Exif.Photo.PixelXDimension"
-                )
-                height = exif.get("Exif.Image.ImageLength") or exif.get(
-                    "Exif.Photo.PixelYDimension"
-                )
-
-                if width and height:
-                    metric_picture_width_pixels.labels(camera_name=camera_name).set(
-                        int(width)
-                    )
-                    metric_picture_height_pixels.labels(camera_name=camera_name).set(
-                        int(height)
-                    )
-                else:
-                    # Fallback to PIL if dimensions not in EXIF
-                    with Image.open(image_path) as pil_img:
-                        metric_picture_width_pixels.labels(camera_name=camera_name).set(
-                            pil_img.width
-                        )
-                        metric_picture_height_pixels.labels(
-                            camera_name=camera_name
-                        ).set(pil_img.height)
-
-            except Exception as e:
-                logger.error(
-                    f"Error getting file stats or dimensions for {image_path}: {e}"
-                )
-
-            # EXIF Metrics
-            def get_exif_value(key, default=0):
+            def get_value(key, default=None):
                 v = exif.get(key)
                 if v is None:
                     return default
                 try:
-                    # Fractions are returned as 'num/den' strings
                     if isinstance(v, str) and "/" in v:
                         num, den = v.split("/")
                         return float(num) / float(den)
@@ -590,23 +551,34 @@ def gather_metrics(image_path: str, camera_name: str):
                 except (ValueError, TypeError):
                     return default
 
-            metric_picture_iso.labels(camera_name=camera_name).set(
-                get_exif_value("Exif.Photo.ISOSpeedRatings")
-            )
-            metric_picture_focal_length_mm.labels(camera_name=camera_name).set(
-                get_exif_value("Exif.Photo.FocalLength")
-            )
-            metric_picture_aperture.labels(camera_name=camera_name).set(
-                get_exif_value("Exif.Photo.FNumber")
-            )
-            metric_picture_exposure_time_seconds.labels(camera_name=camera_name).set(
-                get_exif_value("Exif.Photo.ExposureTime")
-            )
-            metric_picture_white_balance.labels(camera_name=camera_name).set(
-                get_exif_value("Exif.Photo.WhiteBalance")
-            )
-
-            logger.debug(f"Successfully gathered metrics for {image_path}")
+            exif_values["iso"] = get_value("Exif.Photo.ISOSpeedRatings")
+            exif_values["focal_length"] = get_value("Exif.Photo.FocalLength")
+            exif_values["aperture"] = get_value("Exif.Photo.FNumber")
+            exif_values["exposure_time"] = get_value("Exif.Photo.ExposureTime")
+            exif_values["white_balance"] = get_value("Exif.Photo.WhiteBalance")
+            exif_values["width"] = get_value("Exif.Image.ImageWidth") or get_value("Exif.Photo.PixelXDimension")
+            exif_values["height"] = get_value("Exif.Image.ImageLength") or get_value("Exif.Photo.PixelYDimension")
 
     except Exception as e:
-        logger.error(f"Error reading metadata from {image_path} with pyexiv2: {e}")
+        logger.error(f"Error reading metadata with pyexiv2: {e}")
+        raise
+
+    return exif_values
+
+
+def publish_metrics_from_exif_dict(exif_dict: Dict, camera_name: str):
+        # Subset of EXIF Metrics we care about.
+        if exif_dict.get("iso") is not None:
+            metric_picture_iso.labels(camera_name=camera_name).set(exif_dict["iso"])
+        if exif_dict.get("focal_length") is not None:
+            metric_picture_focal_length_mm.labels(camera_name=camera_name).set(exif_dict["focal_length"])
+        if exif_dict.get("aperture") is not None:
+            metric_picture_aperture.labels(camera_name=camera_name).set(exif_dict["aperture"])
+        if exif_dict.get("exposure_time") is not None:
+            metric_picture_exposure_time_seconds.labels(camera_name=camera_name).set(exif_dict["exposure_time"])
+        if exif_dict.get("white_balance") is not None:
+            metric_picture_white_balance.labels(camera_name=camera_name).set(exif_dict["white_balance"])
+        if exif_dict.get("width") is not None:
+            metric_picture_width_pixels.labels(camera_name=camera_name).set(exif_dict["width"])
+        if exif_dict.get("height") is not None:
+            metric_picture_height_pixels.labels(camera_name=camera_name).set(exif_dict["height"])

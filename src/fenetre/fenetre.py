@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 import http.server
-import json
 import logging
 import os
 import shutil
@@ -12,12 +11,10 @@ import sys
 from collections import deque
 from datetime import datetime, timedelta
 from functools import partial
-from io import BytesIO
 from threading import Thread
 from typing import Callable, Dict, List, Optional, Tuple
 
 import mozjpeg_lossless_optimization
-import numpy as np
 import pytz
 import requests
 from absl import app, flags
@@ -26,7 +23,7 @@ from astral.sun import sun
 import piexif
 from PIL import Image
 from skimage.metrics import structural_similarity
-from waitress import serve as waitress_serve
+
 from .logging_utils import apply_module_levels, setup_logging, get_camera_logger
 
 from fenetre.admin_server import (
@@ -44,12 +41,13 @@ from fenetre.archive import (
     list_unarchived_dirs,
     scan_and_publish_metrics,
 )
+from fenetre.camera_utils import (
+    get_day_night_from_exif,
+)
 from fenetre.config import config_load
 from fenetre.daylight import run_end_of_day
 from fenetre.gopro_utility import GoProUtilityThread, format_gopro_sd_card
-from fenetre.platform_utils import is_raspberry_pi
-from fenetre.postprocess import gather_metrics, postprocess
-from fenetre.camera_utils import send_url_commands
+from fenetre.postprocess import postprocess, publish_metrics_from_exif_dict
 from fenetre.timelapse import (
     add_to_timelapse_queue,
     create_timelapse,
@@ -58,6 +56,12 @@ from fenetre.timelapse import (
     remove_from_timelapse_queue,
 )
 from fenetre.ui_utils import copy_public_html_files
+
+from io import BytesIO
+import json
+import numpy as np
+from waitress import serve as waitress_serve
+
 
 logger = logging.getLogger(__name__)
 
@@ -323,197 +327,78 @@ def is_sunrise_or_sunset(camera_config: Dict, global_config: Dict) -> bool:
         return False
 
 
+
+
 def snap(camera_name, camera_config: Dict):
-    url = camera_config.get("url")
-    timeout = camera_config.get("timeout_s", 60)
-    local_command = camera_config.get("local_command")
-    gopro_ip = camera_config.get("gopro_ip")
-    night_iso_threshold = camera_config.get("night_mode_iso_threshold")
-    day_exposure_threshold = camera_config.get("day_mode_exposure_time_threshold_s")
-    current_mode: Optional[str] = None
 
-    def analyze_exif_mode(
-        exif_data: bytes,
-    ) -> Tuple[Optional[str], Optional[int], Optional[float]]:
-        if not exif_data or (
-            night_iso_threshold is None and day_exposure_threshold is None
-        ):
-            return None, None, None
-        try:
-            exif_dict = piexif.load(exif_data)
-        except Exception as e:
-            logger.debug(f"{camera_name}: Failed to load EXIF for mode analysis: {e}")
-            return None, None, None
-        exif_sub = exif_dict.get("Exif") or {}
-        iso_raw = exif_sub.get(piexif.ExifIFD.ISOSpeedRatings)
-        logger.info(f"{camera_name}: EXIF iso (raw value)={iso_raw}")
-        iso_value: Optional[int] = None
-        if isinstance(iso_raw, (list, tuple)):
-            iso_value = iso_raw[0] if iso_raw else None
-        elif isinstance(iso_raw, int):
-            iso_value = iso_raw
-        logger.debug(f"{camera_name}: EXIF iso={iso_value}")
-        exposure_raw = exif_sub.get(piexif.ExifIFD.ExposureTime)
-        logger.debug(f"{camera_name}: EXIF exposure time (raw value)={exposure_raw}")
-        exposure_seconds: Optional[float] = None
-        if (
-            isinstance(exposure_raw, tuple)
-            and len(exposure_raw) == 2
-            and exposure_raw[1]
-        ):
-            exposure_seconds = exposure_raw[0] / exposure_raw[1]
-        elif isinstance(exposure_raw, (int, float)):
-            exposure_seconds = float(exposure_raw)
-        logger.debug(f"{camera_name}: EXIF exposure time in seconds={exposure_seconds}")
-        new_mode: Optional[str] = None
-        if (
-            night_iso_threshold is not None
-            and iso_value is not None
-            and iso_value >= night_iso_threshold
-        ):
-            new_mode = "night"
-        elif (
-            day_exposure_threshold is not None
-            and exposure_seconds is not None
-            and exposure_seconds < day_exposure_threshold
-        ):
-            new_mode = "day"
-        logger.debug(f"Current mode: {current_mode}, ISO threshold: {night_iso_threshold}, Exposure threshold: {day_exposure_threshold}")
-        logger.debug(f"We should use the mode {new_mode}")
-        return new_mode, iso_value, exposure_seconds
+    # This is the capture function which is the only place in this snap thread where we have image source type specific info and logic.
+    def capture(mode: str) -> Image.Image:
 
-    def apply_mode_change(
-        desired_mode: Optional[str],
-        iso_value: Optional[int],
-        exposure_seconds: Optional[float],
-    ):
-        nonlocal current_mode
-        if iso_value is not None or exposure_seconds is not None:
-            logger.debug(
-                "%s: EXIF iso=%s, exposure=%s",
-                camera_name,
-                iso_value if iso_value is not None else "unknown",
-                (
-                    f"{exposure_seconds:.6f}s"
-                    if exposure_seconds is not None
-                    else "unknown"
-                ),
-            )
-        if desired_mode is None or desired_mode == current_mode:
-            return
-        previous_mode = current_mode
-        settings_key = "day_settings" if desired_mode == "day" else "night_settings"
-        settings_conf = camera_config.get(settings_key) or {}
-        gopro_instance = active_camera_threads.get(camera_name, {}).get(
-            "gopro_instance"
-        )
-        applied = False
+        logger.info("%s: Fetching new picture.", camera_name)
 
-        gopro_settings = (
-            settings_conf.get("gopro_settings")
-            if isinstance(settings_conf, dict)
-            else None
-        )
-        if (
-            gopro_instance
-            and gopro_settings
-            and hasattr(gopro_instance, "apply_settings")
-        ):
-            try:
-                gopro_instance.apply_settings(gopro_settings)
-                applied = True
-            except Exception as e:
-                logger.error(
-                    f"{camera_name}: Failed to apply GoPro settings for '{desired_mode}' mode: {e}"
-                )
-        url_commands = (
-            settings_conf.get("urlpaths_commands")
-            if isinstance(settings_conf, dict)
-            else []
-        )
-        if url_commands:
-            try:
-                send_url_commands(
-                    camera_name,
-                    camera_config,
-                    url_commands,
-                    gopro_instance,
-                )
-                applied = True
-            except Exception as e:
-                logger.error(
-                    f"{camera_name}: Failed to run {desired_mode} commands: {e}"
-                )
-        if applied or (not url_commands and not gopro_settings):
-            if camera_name in active_camera_threads:
-                active_camera_threads[camera_name]["photo_mode"] = desired_mode
-            current_mode = desired_mode
 
-        if current_mode == desired_mode:
-            if previous_mode is None:
-                logger.info(
-                    "%s: Initialized GoPro mode to %s", camera_name, current_mode
-                )
-            elif previous_mode != current_mode:
-                logger.info(
-                    "%s: Switching GoPro mode %s -> %s",
-                    camera_name,
-                    previous_mode,
-                    current_mode,
-                )
-
-    def capture() -> Image.Image:
-        logger.info(f"{camera_name}: Fetching new picture.")
+        # Capture picture from a URL. Useful for public cams or CCTV
+        url = camera_config.get("url")
         if url is not None:
             ua = global_config.get("user_agent", "")
             return get_pic_from_url(
                 url, timeout, ua, camera_name, camera_config, global_config
             )
+
+        timeout = camera_config.get("timeout_s", 60)
+        local_command = camera_config.get("local_command")
+
+        # local_command is very flexible, it could be anything from running raspistill locally, to extracting a picture from a stream with ffmpeg, etc...
         if local_command is not None:
             return get_pic_from_local_command(
                 local_command, timeout, camera_name, camera_config
             )
-        if gopro_ip is not None:
+        
+        # gopro_model will call GoPro specific Classes defiend in gopro.py 
+        gopro_model= camera_config.get("gopro_model")
+        if gopro_model is not None:
             gopro_instance = active_camera_threads.get(camera_name, {}).get(
                 "gopro_instance"
             )
             if not gopro_instance:
                 raise RuntimeError(f"GoPro instance not found for camera {camera_name}")
+            if mode in ("day", "night"):
+                gopro_instance.set_mode(mode)
             jpeg_bytes = gopro_instance.capture_photo()
             try:
                 # new_pic is only used to check if the image is valid
                 Image.open(BytesIO(jpeg_bytes))
             except Image.UnidentifiedImageError:
                 logger.error(
-                    f"Failed to open image from GoPro: {gopro_ip}. Resetting gopro"
+                    f"Failed to open image from GoPro: {gopro_model}. Resetting gopro"
                 )
-                format_gopro_sd_card(gopro_ip)
                 raise
             return Image.open(BytesIO(jpeg_bytes))
+        
+        # capture_method: picamera2 is still to be implemented
         if camera_config.get("capture_method") == "picamera2":
             return get_pic_from_picamera2(camera_config)
         return None
 
-    # Initialization before the main loop
+    # Here we take the very first picture, we will only save it when we start the main loop. I don't remember why I implemented the loop that way but it made sense at the time.
     previous_pic_dir, previous_pic_filename = get_pic_dir_and_filename(camera_name)
     previous_pic_fullpath = os.path.join(previous_pic_dir, previous_pic_filename)
+    previous_mode = "unknown"
     try:
-        previous_pic = capture()
+        previous_pic = capture(mode=previous_mode)
     except Exception as e:
         error_msg = f"Failed to capture initial image for {camera_name}: {e}"
         logger.error(error_msg, exc_info=True)
         log_camera_error(camera_name, error_msg, global_config)
         raise
-    previous_exif = previous_pic.info.get("exif") or b""
+    previous_exif_bytes = previous_pic.info.get("exif") or b""
     if len(camera_config.get("postprocessing", [])) > 0:
-        previous_pic, previous_exif = postprocess(
+        previous_pic = postprocess(
             previous_pic,
             camera_config.get("postprocessing", []),
             global_config,
             camera_config,
         )
-    desired_mode, iso_value, exposure_seconds = analyze_exif_mode(previous_exif)
-    apply_mode_change(desired_mode, iso_value, exposure_seconds)
     fixed_snap_interval = camera_config.get("snap_interval_s", None)
     if camera_name not in sleep_intervals:
         sleep_intervals[camera_name] = (
@@ -522,18 +407,26 @@ def snap(camera_name, camera_config: Dict):
             else 60.0
         )
 
-    # Capture loop
+
+
     while not exit_event.is_set():
         # Immediately save the previous pic to disk.
         write_pic_to_disk(
             previous_pic,
             previous_pic_fullpath,
             camera_config.get("mozjpeg_optimize", False),
-            previous_exif,
+            previous_exif_bytes,
         )
+
+        # Read EXIF data that will be used for metrics 
+        from .postprocess import get_exif_dict
+        previous_exif = get_exif_dict(previous_pic)
+
+        # Gather and publish metrics after we have succesfully written the picture on disk
+        # TODO: We should only do that if the admin server is enabled.
         if camera_config.get("gather_metrics", True):
             try:
-                gather_metrics(previous_pic_fullpath, camera_name)
+                publish_metrics_from_exif_dict(previous_exif, camera_name)
             except Exception as e:
                 logger.error(
                     f"Error gathering metrics for {previous_pic_fullpath}: {e}"
@@ -542,6 +435,8 @@ def snap(camera_name, camera_config: Dict):
         metric_last_successful_picture_timestamp.labels(
             camera_name=camera_name
         ).set_to_current_time()
+
+        # Now we update the links for the frontend/UI
         update_latest_link(previous_pic_fullpath)
         metadata = {
             "last_picture_url": os.path.relpath(
@@ -554,10 +449,14 @@ def snap(camera_name, camera_config: Dict):
             json.dump(metadata, f, indent=4)
             logger.debug(f"{camera_name}: Updated metadata file {metadata_path}")
 
+        current_mode = get_day_night_from_exif(previous_exif, camera_config, previous_mode)
+
+        # This is a good moment to gracefully exit if the user wants to.
         if exit_event.is_set():
             logger.info(f"{camera_name}: Exiting snap loop.")
             return
 
+        # Let's figure out how long we will be waiting before taking the next picture
         current_sleep_interval = sleep_intervals[camera_name]
         if is_sunrise_or_sunset(camera_config, global_config):
             current_sleep_interval = camera_config.get("sunrise_sunset", {}).get(
@@ -591,26 +490,25 @@ def snap(camera_name, camera_config: Dict):
             )
 
         try:
-            new_pic = capture()
+            new_pic = capture(current_mode)
         except Exception as e:
             error_msg = f"Could not fetch picture for {camera_name}: {e}"
             logger.warning(error_msg)
             log_camera_error(camera_name, error_msg, global_config)
             metric_capture_failures_total.labels(camera_name=camera_name).inc()
             raise
-        new_exif = new_pic.info.get("exif") or b""
         if new_pic is None:
             logger.error(f"{camera_name}: Could not fetch picture.")
             raise ValueError
+        new_exif_bytes = new_pic.info.get("exif") or b""
         if len(camera_config.get("postprocessing", [])) > 0:
-            new_pic, new_exif = postprocess(
+            new_pic = postprocess(
                 new_pic,
                 camera_config.get("postprocessing", []),
                 global_config,
                 camera_config,
             )
-        desired_mode, iso_value, exposure_seconds = analyze_exif_mode(new_exif)
-        apply_mode_change(desired_mode, iso_value, exposure_seconds)
+        # SSIM logic
         if not (
             is_sunrise_or_sunset(camera_config, global_config) or fixed_snap_interval
         ):
@@ -630,7 +528,7 @@ def snap(camera_name, camera_config: Dict):
             end_time - start_time
         )
         previous_pic = new_pic
-        previous_exif = new_exif
+        previous_exif_bytes = new_exif_bytes
         previous_pic_dir = new_pic_dir
         previous_pic_fullpath = new_pic_fullpath
 
@@ -1281,6 +1179,7 @@ def manage_camera_threads():
                         ip_address=gopro_ip,
                         root_ca=cam_conf.get("gopro_root_ca"),
                         log_dir=global_config.get("log_dir"),
+                        camera_config=cam_conf,
                         lat=cam_conf.get("lat"),
                         lon=cam_conf.get("lon"),
                         timezone=global_config.get("timezone"),
