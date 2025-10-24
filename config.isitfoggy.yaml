@@ -5,13 +5,17 @@ cameras:
   gopro-hero-11:
     bluetooth_adapter: hci0
     gopro_ble_identifier: '9756'
-    gopro_day_settings:
-      profile_id: 65536
-      settings:
-        '125': 3
+    day_settings:
+      trigger_exposure_time_s: 0.004
+      urlpaths_commands:
+        - /gopro/camera/presets/load?id=65536 # Single photo day
+        - /gopro/camera/setting?option=3&setting=125 # Superphoto for better HDR and constrast
+    night_settings:
+      trigger_iso: 400
+      urlpaths_commands:
+        - /gopro/camera/presets/load?id=65539 # Night photo
     gopro_ip: 10.5.5.9
-    gopro_night_settings:
-      profile_id: 65539
+
     lat: 37.75676
     lon: -122.44577
     postprocessing:

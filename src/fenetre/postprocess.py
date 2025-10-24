@@ -259,7 +259,7 @@ def _add_sun_path_overlay(
 
     # If the date has changed, clear the cache
     if _cache_date != today:
-        logger.info(f"New day ({today}), clearing sun path cache.")
+        logger.info(f"We don't have a sun path SVG cached for today ({today}).")
         _sun_path_cache.clear()
         _cache_date = today
 
@@ -268,7 +268,7 @@ def _add_sun_path_overlay(
 
     # Use cache if available
     if camera_key not in _sun_path_cache:
-        logger.info(f"Generating new sun path SVG for '{camera_key}' on {today}")
+        logger.info(f"Generating a new sun path SVG for '{camera_key}' on {today}")
         _sun_path_cache[camera_key] = create_sun_path_svg(
             date=today,
             latitude=lat,
@@ -580,6 +580,7 @@ def get_exif_dict(
 
 
 def publish_metrics_from_exif_dict(exif_dict: Dict, camera_name: str):
+    logger.debug(f"Will try to publish the following metrics: {exif_dict}")
     # Subset of EXIF Metrics we care about.
     if exif_dict.get("iso") is not None:
         metric_picture_iso.labels(camera_name=camera_name).set(exif_dict["iso"])

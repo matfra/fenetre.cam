@@ -519,7 +519,7 @@ def snap(camera_name, camera_config: Dict):
             else:
                 sleep_intervals[camera_name] += 0.5
             logger.info(
-                f"{camera_name}: ssim {ssim}, setpoint: {ssim_setpoint}, new sleep interval: {sleep_intervals[camera_name]}s"
+                f"{camera_name}: ssim {ssim}, setpoint: {ssim_setpoint}, new sleep interval: {sleep_intervals[camera_name]}s, next mode: {current_mode}"
             )
         end_time = time.time()
         metric_processing_time_seconds.labels(camera_name=camera_name).set(

@@ -1,6 +1,6 @@
 import logging
 import os
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Optional
 
 import yaml
 
@@ -271,6 +271,40 @@ def _validate_timelapse(cfg: Dict, errors) -> Dict:
     return out
 
 
+def _validate_day_night_settings(cam_config: Dict, cam_name: str, errors: list) -> Dict:
+    """Validate day_settings and night_settings for a camera."""
+    out = {}
+
+    def validate_settings_block(settings_key: str) -> Optional[Dict]:
+        settings_block = _dict(cam_config.get(settings_key), f"cameras.{cam_name}.{settings_key}", errors)
+        if not settings_block:
+            return None
+
+        block_out = {}
+        path_prefix = f"cameras.{cam_name}.{settings_key}"
+
+        if "trigger_iso" in settings_block:
+            block_out["trigger_iso"] = _int(settings_block.get("trigger_iso"), f"{path_prefix}.trigger_iso", errors, min_value=1)
+
+        if "trigger_exposure_time_s" in settings_block:
+            block_out["trigger_exposure_time_s"] = _float(settings_block.get("trigger_exposure_time_s"), f"{path_prefix}.trigger_exposure_time_s", errors, min_value=0.0)
+
+        if "urlpaths_commands" in settings_block:
+            if isinstance(settings_block["urlpaths_commands"], list):
+                block_out["urlpaths_commands"] = settings_block["urlpaths_commands"]
+            else:
+                errors.append(f"{path_prefix}.urlpaths_commands: expected a list of strings")
+
+        return block_out
+
+    if (day_settings := validate_settings_block("day_settings")):
+        out["day_settings"] = day_settings
+    if (night_settings := validate_settings_block("night_settings")):
+        out["night_settings"] = night_settings
+
+    return out
+
+
 def _validate_cameras(cfg: Dict, errors) -> Dict:
     if cfg is None:
         return {}
@@ -413,6 +447,9 @@ def _validate_cameras(cfg: Dict, errors) -> Dict:
                 min_value=1,
             )
             cam_out["sunrise_sunset"] = ss_out
+
+        # Day/Night settings
+        cam_out.update(_validate_day_night_settings(cam, name, errors))
 
         # Optional postprocessing list (pass-through, validated elsewhere)
         if cam.get("postprocessing") is not None:

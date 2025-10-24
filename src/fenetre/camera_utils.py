@@ -29,7 +29,7 @@ def get_day_night_from_exif(
     if current_mode != "night" and night_settings.get("trigger_iso"):
         iso = exif_dict.get("iso")
         if iso is not None and iso > night_settings["trigger_iso"]:
-            logger.debug(f"Switching to night mode based on ISO: {iso} > {night_settings['trigger_iso']}")
+            logger.debug(f"Next shooting mode should be night based on ISO: {iso} > {night_settings['trigger_iso']}")
             new_mode = "night"
 
     # Decide if we need to switch to day mode
@@ -40,7 +40,7 @@ def get_day_night_from_exif(
             and exposure_time_s < day_settings["trigger_exposure_time_s"]
         ):
             new_mode = "day"
-            logger.debug(f"Switching to day mode based on exposure time: {exposure_time_s} < {day_settings['trigger_exposure_time_s']}")
+            logger.debug(f"Next shooting mode should be day based on exposure time: {exposure_time_s} < {day_settings['trigger_exposure_time_s']}")
 
 
     return new_mode

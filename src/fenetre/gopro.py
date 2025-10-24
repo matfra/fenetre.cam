@@ -303,10 +303,11 @@ class _GoProModernBase:
         return latest_dir, latest_file
 
     def set_mode(self, mode: str):
-        logger.info(f"Setting GoPro mode to '{mode}'")
-        settings_to_apply = self.camera_config.get(f"{mode}_settings", {})
-        gopro_settings = settings_to_apply.get("gopro_settings")
-        self.apply_settings(gopro_settings)
+        logger.info(f"Setting GoPro 9+ mode to '{mode}'")
+        settings_to_apply = self.camera_config.get(f"{mode}_settings", {}).get("urlpaths_commands", [])
+        logger.debug(f"Will apply settings for mode '{mode}': {settings_to_apply}")
+        for urlpath in settings_to_apply:
+            self._make_gopro_request(urlpath)
 
     def capture_photo(
         self, output_file: Optional[str] = None
@@ -509,12 +510,12 @@ class GoProHero6:
 
     def set_mode(self, mode: str):
         # Set photo mode
-        logger.debug("Setting GoPro mode to photo")
+        logger.debug("Setting GoPro 6 mode to photo")
         self._make_gopro_request("/gp/gpControl/command/mode?p=1")
+        settings_to_apply = self.camera_config.get(f"{mode}_settings", {}).get("urlpaths_commands", [])
         logger.debug(f"Will apply settings for mode '{mode}': {settings_to_apply}")
-        settings_to_apply = self.camera_config.get(f"{mode}_settings", {})
-        gopro_settings = settings_to_apply.get("gopro_settings")
-        self.apply_settings(gopro_settings)
+        for urlpath in settings_to_apply:
+            self._make_gopro_request(urlpath)
 
     def capture_photo(
         self, output_file: Optional[str] = None

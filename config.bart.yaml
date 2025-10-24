@@ -2,9 +2,7 @@ admin_server:
   enabled: true
   listen: 0.0.0.0:8889 [::]:8889
 cameras:
-  gopro-hero-11:
-    #    bluetooth_adapter: hci0
-    gopro_ble_identifier: '9756'
+  gopro-hero-9:
     gopro_day_settings: # you can can the profile IDs by sending sending a curl to http://10.5.5.9/gopro/camera/presets/get
       profile_id: 65536 # Specific profile for GoPro Hero 11 Single photo mode
       settings:
