@@ -139,7 +139,7 @@ class _GoProModernBase:
     def __init__(
         self,
         ip_address="10.5.5.9",
-        timeout=5,
+        timeout=20,
         root_ca=None,
         log_dir=None,
         lat=None,
@@ -387,7 +387,7 @@ class GoProHero6:
     def __init__(
         self,
         ip_address="10.5.5.9",
-        timeout=5,
+        timeout=20,
         log_dir=None,
         lat=None,
         lon=None,

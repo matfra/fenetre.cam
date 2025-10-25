@@ -3,9 +3,6 @@ admin_server:
   listen: 0.0.0.0:8889 [::]:8889
 cameras:
   gopro-hero-6:
-    sunrise_sunset:
-      enabled: true
-      interval_s: 5
     day_settings:
       trigger_exposure_time_s: 0.004
       # Command reference here: https://github.com/KonradIT/goprowifihack and https://gopro.github.io/OpenGoPro/http
@@ -13,7 +10,7 @@ cameras:
         - /gp/gpControl/command/mode?p=1
         - /gp/gpControl/command/sub_mode?mode=1&sub_mode=1
         - /gp/gpControl/setting/17/0
-        - /gp/gpControl/setting/82/0
+#        - /gp/gpControl/setting/82/0
         - /gp/gpControl/setting/100/1
         - /gp/gpControl/setting/21/1
         - /gp/gpControl/setting/22/0
@@ -24,18 +21,21 @@ cameras:
         - /gp/gpControl/setting/97/0
     night_settings:
       trigger_iso: 300
+      trigger_exposure_time_s: 0.01 # On the gopro 6, it looks like exposure time stops at 4 ms and then ISO cranks up 
       urlpaths_commands:
-        - /gp/gpControl/command/mode?p=1
-        - /gp/gpControl/command/sub_mode?mode=1&sub_mode=2
-        - /gp/gpControl/setting/17/0
-        - /gp/gpControl/setting/19/0
-        - /gp/gpControl/setting/82/0
-        - /gp/gpControl/setting/100/0
-        - /gp/gpControl/setting/21/1
-        - /gp/gpControl/setting/22/0
-        - /gp/gpControl/setting/23/0
-        - /gp/gpControl/setting/24/3
-        - /gp/gpControl/setting/75/3
+#        - /gp/gpControl/command/mode?p=1 # Photo mode, Common to both modes. Should be required only for initilization
+        - /gp/gpControl/command/sub_mode?mode=1&sub_mode=2 # Night photo mode
+#        - /gp/gpControl/setting/17/0 # 12MP Wide . Common to both modes. Should be required only for initilization
+        - /gp/gpControl/setting/19/5 # Exposure time for NightPhoto: Auto
+#        - /gp/gpControl/setting/100/0 # HDR Photo off. Not needed at night
+        - /gp/gpControl/setting/21/1 # ProTune on
+        - /gp/gpControl/setting/22/0 # Auto AWB (Night scenes with stars should be 4500K)
+        - /gp/gpControl/setting/23/0 # Gopro Color
+#        - /gp/gpControl/setting/24/3 # Max ISO: 100
+        - /gp/gpControl/setting/75/3 # ISO Min: 100
+        - /gp/gpControl/setting/24/1 # ISO Max: 400
+        - /gp/gpControl/setting/25/2 # Sharpness: low
+        - /gp/gpControl/setting/26/3 # EV +0.5
     gopro_ble_identifier: '8608'
     gopro_ip: 10.5.5.9
     gopro_model: hero6
@@ -43,7 +43,9 @@ cameras:
     lon: -122.44577
     postprocessing:
     - type: crop
-      area: 0,0,4000,3000
+      area: 0,0,4000,2250
+    - type: resize
+      width: 2560
     - background_color: (100, 100, 100)
       color: white
       enabled: true
@@ -63,10 +65,10 @@ cameras:
       overlay_rect_width: 15
       overlay_width: 1000
       padding: 5
-      position: top_center
+      position: bottom_center
       type: sun_path
-    sky_area: 0.499,0.171,1.000,0.492
-    ssim_area: 0.507,0.037,1.000,0.460
+    sky_area: 0.436,0.000,0.847,0.492
+    ssim_area: 0.255,0.037,1.000,0.353
 global:
   log_dir: /srv/fenetre/logs
   logging_level: DEBUG
