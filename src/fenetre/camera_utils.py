@@ -31,19 +31,23 @@ def get_day_night_from_exif(
         logger.warning("Could not detect day/night mode based on EXIF data.")
         return "unknown"
 
-    if current_mode == "unknown":
-        if iso > night_settings.get("trigger_iso", 300): # In any situation, we should be in night mode if we are above 300 ISO
-            return "night"
-        if exposure_time_s > night_settings.get("trigger_exposure_time_s", 0.5): # Obviously we are already in night mode
-            return "night"
-        return "day"
-            
-    if current_mode == "day" and iso > night_settings.get("trigger_iso", 300):
-            logger.debug(f"Next shooting mode should be night based on ISO: {iso} > {night_settings['trigger_iso']}")
+    exposure_composite_value = iso * exposure_time_s
+
+    if current_mode != "night":
+        night_value = night_settings.get("trigger_exposure_composite_value", 30)
+        if exposure_composite_value > night_value:
+            logger.debug(
+                f"Switching to night mode because {iso}ISO * {exposure_time_s}s > {night_value}. You can customize this settings in the config: camera.night_settings.trigger_exposure_composite_value"
+            )
             return "night"
 
-    if current_mode == "night" and exposure_time_s < day_settings.get("trigger_exposure_time_s", 0.05):
-        return "day"
+    if current_mode != "day":
+        day_value = day_settings.get("trigger_exposure_composite_value", 2)
+        if exposure_composite_value < day_value:
+            logger.debug(
+                f"Switching to night mode because {iso}ISO * {exposure_time_s}s < {day_value}. You can customize this settings in the config: camera.day_settings.trigger_exposure_composite_value"
+            )
+            return "day"
 
+    logger.debug(f"Keeping the current shooting mode: {current_mode}")
     return current_mode
-

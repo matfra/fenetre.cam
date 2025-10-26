@@ -4,12 +4,12 @@ admin_server:
 cameras:
   gopro-hero-6:
     day_settings:
-      trigger_exposure_time_s: 0.004
+      trigger_exposure_composite_value: 3 # Composite value is ISO * exposure time. 3 = 100 * 0.03s
       # Command reference here: https://github.com/KonradIT/goprowifihack and https://gopro.github.io/OpenGoPro/http
       urlpaths_commands: 
-        - /gp/gpControl/command/mode?p=1
+#        - /gp/gpControl/command/mode?p=1
         - /gp/gpControl/command/sub_mode?mode=1&sub_mode=1
-        - /gp/gpControl/setting/17/0
+#        - /gp/gpControl/setting/17/0
 #        - /gp/gpControl/setting/82/0
         - /gp/gpControl/setting/100/1
         - /gp/gpControl/setting/21/1
@@ -20,22 +20,25 @@ cameras:
         - /gp/gpControl/setting/25/1
         - /gp/gpControl/setting/97/0
     night_settings:
-      trigger_iso: 300
-      trigger_exposure_time_s: 0.01 # On the gopro 6, it looks like exposure time stops at 4 ms and then ISO cranks up 
+      trigger_exposure_composite_value: 20 
+#      trigger_iso: 300
+#      trigger_exposure_time_s: 0.01 # On the gopro 6, it looks like exposure time stops at 4 ms and then ISO cranks up 
       urlpaths_commands:
 #        - /gp/gpControl/command/mode?p=1 # Photo mode, Common to both modes. Should be required only for initilization
         - /gp/gpControl/command/sub_mode?mode=1&sub_mode=2 # Night photo mode
 #        - /gp/gpControl/setting/17/0 # 12MP Wide . Common to both modes. Should be required only for initilization
-        - /gp/gpControl/setting/19/5 # Exposure time for NightPhoto: Auto
+#        - /gp/gpControl/setting/19/0 # Exposure time for NightPhoto: Auto
+        - /gp/gpControl/setting/19/5 # Exposure time for NightPhoto: 20s
+        - /gp/gpControl/setting/19/6 # Exposure time for NightPhoto: 20s
 #        - /gp/gpControl/setting/100/0 # HDR Photo off. Not needed at night
         - /gp/gpControl/setting/21/1 # ProTune on
         - /gp/gpControl/setting/22/0 # Auto AWB (Night scenes with stars should be 4500K)
-        - /gp/gpControl/setting/23/0 # Gopro Color
+        - /gp/gpControl/setting/23/1 # Flat Color
 #        - /gp/gpControl/setting/24/3 # Max ISO: 100
         - /gp/gpControl/setting/75/3 # ISO Min: 100
-        - /gp/gpControl/setting/24/1 # ISO Max: 400
+        - /gp/gpControl/setting/24/2 # ISO Max: 200
         - /gp/gpControl/setting/25/2 # Sharpness: low
-        - /gp/gpControl/setting/26/3 # EV +0.5
+#        - /gp/gpControl/setting/26/3 # EV +0.5
     gopro_ble_identifier: '8608'
     gopro_ip: 10.5.5.9
     gopro_model: hero6

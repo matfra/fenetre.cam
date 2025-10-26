@@ -283,11 +283,10 @@ def _validate_day_night_settings(cam_config: Dict, cam_name: str, errors: list) 
         block_out = {}
         path_prefix = f"cameras.{cam_name}.{settings_key}"
 
-        if "trigger_iso" in settings_block:
-            block_out["trigger_iso"] = _int(settings_block.get("trigger_iso"), f"{path_prefix}.trigger_iso", errors, min_value=1)
-
-        if "trigger_exposure_time_s" in settings_block:
-            block_out["trigger_exposure_time_s"] = _float(settings_block.get("trigger_exposure_time_s"), f"{path_prefix}.trigger_exposure_time_s", errors, min_value=0.0)
+        if "trigger_exposure_composite_value" in settings_block:
+            block_out["trigger_exposure_composite_value"] = _float(
+                settings_block.get("trigger_exposure_composite_value"), f"{path_prefix}.trigger_exposure_composite_value", errors, min_value=0.0
+            )
 
         if "urlpaths_commands" in settings_block:
             if isinstance(settings_block["urlpaths_commands"], list):
