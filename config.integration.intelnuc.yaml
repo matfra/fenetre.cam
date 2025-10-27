@@ -16,8 +16,8 @@ cameras:
         - /gp/gpControl/setting/22/0
         - /gp/gpControl/setting/23/0
         - /gp/gpControl/setting/24/1
-        - /gp/gpControl/setting/75/3
-        - /gp/gpControl/setting/25/1
+        - /gp/gpControl/setting/75/3 # ISO Min: 100
+        - /gp/gpControl/setting/25/1 # ISO Max: 400
         - /gp/gpControl/setting/97/0
     night_settings:
       trigger_exposure_composite_value: 3 
@@ -28,10 +28,10 @@ cameras:
         - /gp/gpControl/setting/22/0 # Auto AWB (Night scenes with stars should be 4500K)
         - /gp/gpControl/setting/23/1 # Flat Color
         - /gp/gpControl/setting/75/3 # ISO Min: 100
-        - /gp/gpControl/setting/24/1 # ISO Max: 400
+        - /gp/gpControl/setting/24/2 # ISO Max: 200
         - /gp/gpControl/setting/25/2 # Sharpness: low
     astro_settings:
-      trigger_exposure_composite_value: 2021 # As soon as we are back to 20s * 100 ISO, we fall back to night mode. This value needs to be acheivable by both night and astro mode or the threshold won't work. 
+      trigger_exposure_composite_value: 1999 # As soon as we are back to 20s * 99 ISO (even if configured at 100, it can go down to 99), we fall back to night mode. This value needs to be acheivable by both night and astro mode or the threshold won't work. 
       urlpaths_commands:
         - /gp/gpControl/setting/19/5 # Exposure time for NightPhoto: 20s
         - /gp/gpControl/setting/21/1 # ProTune on

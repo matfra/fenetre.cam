@@ -104,6 +104,21 @@ metric_sleep_time_seconds = Gauge(
     "Time the camera sleeps between pictures",
     ["camera_name"],
 )
+metric_camera_mode = Gauge(
+    "camera_mode",
+    "Current camera mode with mode label",
+    ["camera_name", "mode"],
+)
+metric_camera_ssim_value = Gauge(
+    "camera_ssim_value",
+    "Latest SSIM measurement",
+    ["camera_name"],
+)
+metric_camera_ssim_target = Gauge(
+    "camera_ssim_target",
+    "Configured SSIM target",
+    ["camera_name"],
+)
 
 # GoPro specific metrics
 gopro_state_gauge = Gauge("gopro_state", "GoPro State", ["camera_name", "state_name"])

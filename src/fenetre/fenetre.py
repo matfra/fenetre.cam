@@ -28,6 +28,9 @@ from .logging_utils import apply_module_levels, setup_logging, get_camera_logger
 
 from fenetre.admin_server import (
     metric_camera_directory_size_bytes,
+    metric_camera_mode,
+    metric_camera_ssim_target,
+    metric_camera_ssim_value,
     metric_capture_failures_total,
     metric_last_successful_picture_timestamp,
     metric_pictures_taken_total,
@@ -105,6 +108,18 @@ def interruptible_sleep(
 
         if sleep_duration > 0:
             time.sleep(sleep_duration)
+
+
+def update_camera_mode_metric(camera_name: str, mode: str) -> None:
+    if mode not in {"unknown", "day", "night", "astro"}:
+        logger.debug(
+            "%s: received unexpected mode '%s' when updating metrics", camera_name, mode
+        )
+        mode = "unknown"
+    for tracked_mode in ("unknown", "day", "night", "astro"):
+        metric_camera_mode.labels(camera_name=camera_name, mode=tracked_mode).set(
+            1.0 if tracked_mode == mode else 0.0
+        )
 
 
 def log_camera_error(camera_name: str, error_message: str, global_config: Dict):
@@ -448,6 +463,8 @@ def snap(camera_name, camera_config: Dict):
         current_mode = get_day_night_from_exif(
             previous_exif, camera_config, previous_mode
         )
+        if camera_config.get("gather_metrics", True):
+            update_camera_mode_metric(camera_name, previous_mode)
 
         # This is a good moment to gracefully exit if the user wants to.
         if exit_event.is_set():
@@ -517,7 +534,12 @@ def snap(camera_name, camera_config: Dict):
             if ssim < ssim_setpoint:
                 sleep_intervals[camera_name] = sleep_intervals[camera_name] * 0.9
             else:
-                sleep_intervals[camera_name] += 0.5
+                sleep_intervals[camera_name] += 2
+            if camera_config.get("gather_metrics", True):
+                metric_camera_ssim_value.labels(camera_name=camera_name).set(ssim)
+                metric_camera_ssim_target.labels(camera_name=camera_name).set(
+                    ssim_setpoint
+                )
             logger.info(
                 f"{camera_name}: ssim {ssim}, setpoint: {ssim_setpoint}, new sleep interval: {sleep_intervals[camera_name]}s, next mode: {current_mode}"
             )
@@ -530,8 +552,6 @@ def snap(camera_name, camera_config: Dict):
         previous_pic_dir = new_pic_dir
         previous_pic_fullpath = new_pic_fullpath
         previous_mode = current_mode
-
-
 
 
 def get_ssim_for_area(
