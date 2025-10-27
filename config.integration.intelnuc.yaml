@@ -4,7 +4,7 @@ admin_server:
 cameras:
   gopro-hero-6:
     day_settings:
-      trigger_exposure_composite_value: 3 # Composite value is ISO * exposure time. 3 = 100 * 0.03s
+      trigger_exposure_composite_value: 2 # Composite value is ISO * exposure time. 3 = 100 * 0.03s
       # Command reference here: https://github.com/KonradIT/goprowifihack and https://gopro.github.io/OpenGoPro/http
       urlpaths_commands: 
 #        - /gp/gpControl/command/mode?p=1
@@ -20,25 +20,26 @@ cameras:
         - /gp/gpControl/setting/25/1
         - /gp/gpControl/setting/97/0
     night_settings:
-      trigger_exposure_composite_value: 20 
-#      trigger_iso: 300
-#      trigger_exposure_time_s: 0.01 # On the gopro 6, it looks like exposure time stops at 4 ms and then ISO cranks up 
+      trigger_exposure_composite_value: 3 
       urlpaths_commands:
-#        - /gp/gpControl/command/mode?p=1 # Photo mode, Common to both modes. Should be required only for initilization
         - /gp/gpControl/command/sub_mode?mode=1&sub_mode=2 # Night photo mode
-#        - /gp/gpControl/setting/17/0 # 12MP Wide . Common to both modes. Should be required only for initilization
-#        - /gp/gpControl/setting/19/0 # Exposure time for NightPhoto: Auto
-        - /gp/gpControl/setting/19/5 # Exposure time for NightPhoto: 20s
-        - /gp/gpControl/setting/19/6 # Exposure time for NightPhoto: 20s
-#        - /gp/gpControl/setting/100/0 # HDR Photo off. Not needed at night
+        - /gp/gpControl/setting/19/0 # Exposure time for NightPhoto: Auto
         - /gp/gpControl/setting/21/1 # ProTune on
         - /gp/gpControl/setting/22/0 # Auto AWB (Night scenes with stars should be 4500K)
         - /gp/gpControl/setting/23/1 # Flat Color
-#        - /gp/gpControl/setting/24/3 # Max ISO: 100
         - /gp/gpControl/setting/75/3 # ISO Min: 100
-        - /gp/gpControl/setting/24/2 # ISO Max: 200
+        - /gp/gpControl/setting/24/1 # ISO Max: 400
         - /gp/gpControl/setting/25/2 # Sharpness: low
-#        - /gp/gpControl/setting/26/3 # EV +0.5
+    astro_settings:
+      trigger_exposure_composite_value: 2021 # As soon as we are back to 20s * 100 ISO, we fall back to night mode. This value needs to be acheivable by both night and astro mode or the threshold won't work. 
+      urlpaths_commands:
+        - /gp/gpControl/setting/19/5 # Exposure time for NightPhoto: 20s
+        - /gp/gpControl/setting/21/1 # ProTune on
+        - /gp/gpControl/setting/22/11 # 4500K for stars
+        - /gp/gpControl/setting/23/1 # Flat Color
+        - /gp/gpControl/setting/75/3 # ISO Min: 100
+        - /gp/gpControl/setting/24/0 # ISO Max: 800
+        - /gp/gpControl/setting/25/2 # Sharpness: low
     gopro_ble_identifier: '8608'
     gopro_ip: 10.5.5.9
     gopro_model: hero6
@@ -72,6 +73,8 @@ cameras:
       type: sun_path
     sky_area: 0.436,0.000,0.847,0.492
     ssim_area: 0.255,0.037,1.000,0.353
+    sunrise_sunset:
+      enabled: true
 global:
   log_dir: /srv/fenetre/logs
   logging_level: DEBUG

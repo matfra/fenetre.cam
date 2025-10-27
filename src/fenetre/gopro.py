@@ -456,8 +456,8 @@ class GoProHero6:
 
         log_message = (
             f"Request URL: {url}\n"
-            f"Response Code: {response.status_code}\n"
-            f"Response Text: {response.text}"
+            f"Response Code: {response.status_code}"
+#            f"Response Text: {response.text}"
         )
         gopro_logger.debug(log_message)
 

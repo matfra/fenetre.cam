@@ -359,7 +359,7 @@ def snap(camera_name, camera_config: Dict):
             )
             if not gopro_instance:
                 raise RuntimeError(f"GoPro instance not found for camera {camera_name}")
-            if mode in ("day", "night"):
+            if mode in ("day", "night", "astro"):
                 gopro_instance.set_mode(mode)
             jpeg_bytes = gopro_instance.capture_photo()
             try:
@@ -529,6 +529,9 @@ def snap(camera_name, camera_config: Dict):
         previous_exif_bytes = new_exif_bytes
         previous_pic_dir = new_pic_dir
         previous_pic_fullpath = new_pic_fullpath
+        previous_mode = current_mode
+
+
 
 
 def get_ssim_for_area(

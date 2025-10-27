@@ -300,6 +300,9 @@ def _validate_day_night_settings(cam_config: Dict, cam_name: str, errors: list) 
         out["day_settings"] = day_settings
     if (night_settings := validate_settings_block("night_settings")):
         out["night_settings"] = night_settings
+    if (astro_settings := validate_settings_block("astro_settings")):
+        out["astro_settings"] = astro_settings
+
 
     return out
 
