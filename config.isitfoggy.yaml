@@ -6,12 +6,10 @@ cameras:
     bluetooth_adapter: hci0
     gopro_ble_identifier: '9756'
     day_settings:
-      trigger_exposure_time_s: 0.004
       urlpaths_commands:
         - /gopro/camera/presets/load?id=65536 # Single photo day
         - /gopro/camera/setting?option=3&setting=125 # Superphoto for better HDR and constrast
     night_settings:
-      trigger_iso: 400
       urlpaths_commands:
         - /gopro/camera/presets/load?id=65539 # Night photo
     gopro_model: hero11
@@ -57,4 +55,3 @@ timelapse:
     file_extension: mp4
     framerate: 30
     interval_s: 1200
-  smooth_timelapse: true
