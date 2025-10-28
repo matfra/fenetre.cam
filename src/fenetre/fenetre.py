@@ -355,7 +355,7 @@ def snap(camera_name, camera_config: Dict):
     def clear_camera_gauges():
         for mode in ("unknown", "day", "night", "astro"):
             try:
-                metric_camera_mode.remove(camera_name=camera_name, mode=mode)
+                metric_camera_mode.remove(camera_name, mode)
             except KeyError:
                 pass
         for gauge in (
@@ -375,7 +375,7 @@ def snap(camera_name, camera_config: Dict):
             metric_picture_white_balance,
         ):
             try:
-                gauge.remove(camera_name=camera_name)
+                gauge.remove(camera_name)
             except KeyError:
                 pass
 
