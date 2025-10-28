@@ -259,7 +259,6 @@ class _GoProModernBase:
         self,
         url_path: str,
         expected_response_code: int = 200,
-        expected_response_text: str = "{}\n",
     ):
         """Helper function to make HTTP requests to GoPro with common parameters."""
         url = f"{self.scheme}://{self.ip_address}{url_path}"
@@ -268,10 +267,6 @@ class _GoProModernBase:
         if r.status_code != expected_response_code:
             raise RuntimeError(
                 f"Expected response code {expected_response_code} but got {r.status_code}. Request URL: {url}"
-            )
-        if expected_response_text is not None and r.text != expected_response_text:
-            raise RuntimeError(
-                f"Expected response text {expected_response_text} but got {r.text}. Request URL: {url}"
             )
         return r
 
@@ -303,7 +298,6 @@ class _GoProModernBase:
         return latest_dir, latest_file
 
     def set_mode(self, mode: str):
-        logger.info(f"Setting GoPro 9+ mode to '{mode}'")
         settings_to_apply = self.camera_config.get(f"{mode}_settings", {}).get("urlpaths_commands", [])
         logger.debug(f"Will apply settings for mode '{mode}': {settings_to_apply}")
         for urlpath in settings_to_apply:

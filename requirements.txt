@@ -30,6 +30,9 @@ waitress
 prometheus-client
 pyexiv2
 
+# For fenetre
+piexif
+
 # Postprocessing
 # opencv-python
 # siphash24
