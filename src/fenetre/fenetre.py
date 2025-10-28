@@ -31,6 +31,7 @@ from fenetre.admin_server import (
     metric_camera_mode,
     metric_camera_ssim_target,
     metric_camera_ssim_value,
+    metric_camera_online,
     metric_capture_failures_total,
     metric_last_successful_picture_timestamp,
     metric_pictures_taken_total,
@@ -343,6 +344,8 @@ def is_sunrise_or_sunset(camera_config: Dict, global_config: Dict) -> bool:
 
 
 def snap(camera_name, camera_config: Dict):
+    camera_online_metric = metric_camera_online.labels(camera_name=camera_name)
+    camera_online_metric.set(0.0)
 
     # This is the capture function which is the only place in this snap thread where we have image source type specific info and logic.
     def capture(mode: str) -> Image.Image:
@@ -446,6 +449,7 @@ def snap(camera_name, camera_config: Dict):
         metric_last_successful_picture_timestamp.labels(
             camera_name=camera_name
         ).set_to_current_time()
+        camera_online_metric.set(1.0)
 
         # Now we update the links for the frontend/UI
         update_latest_link(previous_pic_fullpath)

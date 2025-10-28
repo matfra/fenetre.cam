@@ -119,6 +119,11 @@ metric_camera_ssim_target = Gauge(
     "Configured SSIM target",
     ["camera_name"],
 )
+metric_camera_online = Gauge(
+    "camera_online",
+    "Camera online status reported by the snap loop",
+    ["camera_name"],
+)
 
 # GoPro specific metrics
 gopro_state_gauge = Gauge("gopro_state", "GoPro State", ["camera_name", "state_name"])
