@@ -574,7 +574,10 @@ def snap(camera_name, camera_config: Dict):
             if ssim < ssim_setpoint:
                 sleep_intervals[camera_name] = sleep_intervals[camera_name] * 0.9
             else:
-                sleep_intervals[camera_name] += 2
+                sleep_intervals[camera_name] = max(
+                    90, # TODO: Make this configurable
+                    sleep_intervals[camera_name] + 2
+                )
             if camera_config.get("gather_metrics", True):
                 metric_camera_ssim_value.labels(camera_name=camera_name).set(ssim)
                 metric_camera_ssim_target.labels(camera_name=camera_name).set(
