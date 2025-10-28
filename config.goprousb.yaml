@@ -5,6 +5,7 @@ cameras:
   gopro-hero-11:
     gopro_ble_identifier: 9756
     day_settings:
+      trigger_exposure_composite_value: 0.5
       urlpaths_commands:
         - /gopro/camera/presets/load?id=65536 # Single photo day
         - /gopro/camera/setting?option=3&setting=125 # Superphoto for better HDR and constrast
