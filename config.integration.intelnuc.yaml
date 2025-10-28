@@ -97,7 +97,7 @@ timelapse:
   daily_timelapse:
     enabled: true
     ffmpeg_2pass: true
-    ffmpeg_options: -c:v libvpx-vp9 -b:v 0 -crf 18
+    ffmpeg_options: -c:v libvpx-vp9 -b:v 7M
     file_extension: webm
     framerate: 60
   frequent_timelapse:

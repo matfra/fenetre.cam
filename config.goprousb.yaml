@@ -11,8 +11,8 @@ cameras:
     night_settings:
       urlpaths_commands:
         - /gopro/camera/presets/load?id=65539 # Night photo
-    gopro_model: hero11
-    gopro_ip: 172.27.156.51
+    gopro_model: hero11 # Required now that we support multiple gopros. Should work for any Hero9+
+    gopro_ip: 172.27.156.51 # In USB: 172.2B.1CD.51 where ABCD is the camera ID
     gopro_usb: true
     lat: 37.75676
     lon: -122.44577
@@ -68,20 +68,14 @@ global:
   work_dir: /srv/fenetre/data
 http_server:
   enabled: false
-  host: 0.0.0.0
-  port: 8888
 timelapse:
-  daily_timelapse:
-    ffmpeg_2pass: true
-    ffmpeg_options: -c:v libvpx-vp9 -b:v 7M
-    file_extension: webm
-    framerate: 60
-  ffmpeg_2pass: true
-  ffmpeg_options: -c:v libvpx-vp9 -b:v 7M
-  file_extension: webm
-  framerate: 60
-  frequent_timelapse:
-    ffmpeg_2pass: false
+  daily_timelapse: # Enabled if this key is present
+    ffmpeg_2pass: true  # Default
+    ffmpeg_options: -c:v libvpx-vp9 -b:v 7M  # Default
+    file_extension: webm # Default
+    framerate: 60 # Default 
+  frequent_timelapse: # Enabled if this key is present
+    ffmpeg_2pass: false  # Default
     file_extension: mp4
-    framerate: 30
-    interval_s: 1200
+    framerate: 30  # Default
+    interval_s: 1200  # Default
