@@ -574,7 +574,7 @@ def snap(camera_name, camera_config: Dict):
             if ssim < ssim_setpoint:
                 sleep_intervals[camera_name] = sleep_intervals[camera_name] * 0.9
             else:
-                sleep_intervals[camera_name] = max(
+                sleep_intervals[camera_name] = min(
                     90, # TODO: Make this configurable
                     sleep_intervals[camera_name] + 2
                 )
