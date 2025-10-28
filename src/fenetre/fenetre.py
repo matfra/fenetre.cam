@@ -34,6 +34,14 @@ from fenetre.admin_server import (
     metric_camera_online,
     metric_capture_failures_total,
     metric_last_successful_picture_timestamp,
+    metric_picture_aperture,
+    metric_picture_exposure_time_seconds,
+    metric_picture_focal_length_mm,
+    metric_picture_height_pixels,
+    metric_picture_iso,
+    metric_picture_size_bytes,
+    metric_picture_white_balance,
+    metric_picture_width_pixels,
     metric_pictures_taken_total,
     metric_processing_time_seconds,
     metric_sleep_time_seconds,
@@ -344,6 +352,34 @@ def is_sunrise_or_sunset(camera_config: Dict, global_config: Dict) -> bool:
 
 
 def snap(camera_name, camera_config: Dict):
+    def clear_camera_gauges():
+        for mode in ("unknown", "day", "night", "astro"):
+            try:
+                metric_camera_mode.remove(camera_name=camera_name, mode=mode)
+            except KeyError:
+                pass
+        for gauge in (
+            metric_camera_online,
+            metric_last_successful_picture_timestamp,
+            metric_processing_time_seconds,
+            metric_sleep_time_seconds,
+            metric_camera_ssim_value,
+            metric_camera_ssim_target,
+            metric_picture_width_pixels,
+            metric_picture_height_pixels,
+            metric_picture_size_bytes,
+            metric_picture_iso,
+            metric_picture_focal_length_mm,
+            metric_picture_aperture,
+            metric_picture_exposure_time_seconds,
+            metric_picture_white_balance,
+        ):
+            try:
+                gauge.remove(camera_name=camera_name)
+            except KeyError:
+                pass
+
+    clear_camera_gauges()
     camera_online_metric = metric_camera_online.labels(camera_name=camera_name)
     camera_online_metric.set(0.0)
 
