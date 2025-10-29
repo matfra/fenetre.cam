@@ -124,16 +124,8 @@ class FenetreConfigTestCase(unittest.TestCase):
 
     @patch("fenetre.config.logger")
     def test_config_load_file_not_found(self, mock_config_logging):
-        server_conf, cameras_conf, global_conf, admin_server_conf = config_load(
-            "non_existent_config.yaml"
-        )
-
-        self.assertEqual(global_conf, {})
-        self.assertEqual(server_conf, {})
-        self.assertEqual(cameras_conf, {})
-        mock_config_logging.error.assert_called_with(
-            "Configuration file non_existent_config.yaml not found."
-        )
+        with self.assertRaises(FileNotFoundError):
+            config_load("non_existent_config.yaml")
 
     @patch("fenetre.config.logger")
     def test_config_load_invalid_yaml(self, mock_config_logging):
@@ -141,16 +133,8 @@ class FenetreConfigTestCase(unittest.TestCase):
         with os.fdopen(fd, "w") as f:
             f.write("global: setting: value\n  nested_setting: [1,2")  # Invalid YAML
 
-        server_conf, cameras_conf, global_conf, admin_server_conf = config_load(path)
-
-        self.assertEqual(global_conf, {})
-        self.assertEqual(server_conf, {})
-        self.assertEqual(cameras_conf, {})
-        # The exact error message from yaml.YAMLError can be complex and vary.
-        # Checking that an error was logged and it contains key parts might be more robust.
-        self.assertTrue(mock_config_logging.error.called)
-        args, _ = mock_config_logging.error.call_args
-        self.assertIn(f"Error parsing YAML configuration file {path}", args[0])
+        with self.assertRaises(yaml.YAMLError):
+            config_load(path)
 
     @patch("fenetre.fenetre.copy_public_html_files")
     @patch("fenetre.fenetre.update_cameras_metadata")
@@ -177,7 +161,7 @@ class FenetreConfigTestCase(unittest.TestCase):
             "http_server": {"enabled": True, "listen": "0.0.0.0:8080"},
             "cameras": {
                 "cam1": {"url": "http://cam1", "snap_interval_s": 30},
-                "cam2": {"gopro_ip": "10.5.5.9", "gopro_ble_identifier": "XXXX"},
+                "cam2": {"gopro_ip": "10.5.5.9", "gopro_model": "hero11"},
             },
         }
         config_path = self._create_temp_config_file(test_data)
@@ -226,7 +210,7 @@ class FenetreConfigTestCase(unittest.TestCase):
         MockGoProThread.assert_any_call(
             unittest.mock.ANY,
             "cam2",
-            test_data["cameras"]["cam2"],
+            fenetre_module.cameras_config["cam2"],
             fenetre_module.exit_event,
         )
 
@@ -356,6 +340,63 @@ class FenetreConfigTestCase(unittest.TestCase):
         # Cam_to_remove's original watchdog manager thread should have been joined
         # This requires the mock thread to have a join method.
         mock_cam_to_remove_watchdog_manager.join.assert_called_with(timeout=5)
+
+    def test_config_load_sunrise_sunset_offsets(self):
+        test_data = {
+            "global": {"work_dir": self.mock_work_dir, "timezone": "UTC"},
+            "cameras": {
+                "cam1": {
+                    "url": "http://cam1",
+                    "sunrise_sunset": {
+                        "enabled": True,
+                        "interval_s": 15,
+                        "sunrise_offset_start_minutes": -45,
+                        "sunrise_offset_end_minutes": 15,
+                        "sunset_offset_start_minutes": -25,
+                        "sunset_offset_end_minutes": 55,
+                    },
+                }
+            },
+        }
+        config_path = self._create_temp_config_file(test_data)
+
+        _, cameras_conf, _, _, _ = config_load(config_path)
+
+        self.assertIn("cam1", cameras_conf)
+        self.assertIn("sunrise_sunset", cameras_conf["cam1"])
+        ss_config = cameras_conf["cam1"]["sunrise_sunset"]
+        self.assertEqual(ss_config["enabled"], True)
+        self.assertEqual(ss_config["interval_s"], 15)
+        self.assertEqual(ss_config["sunrise_offset_start_minutes"], -45)
+        self.assertEqual(ss_config["sunrise_offset_end_minutes"], 15)
+        self.assertEqual(ss_config["sunset_offset_start_minutes"], -25)
+        self.assertEqual(ss_config["sunset_offset_end_minutes"], 55)
+
+    def test_config_load_sunrise_sunset_offsets_defaults(self):
+        test_data = {
+            "global": {"work_dir": self.mock_work_dir, "timezone": "UTC"},
+            "cameras": {
+                "cam1": {
+                    "url": "http://cam1",
+                    "sunrise_sunset": {
+                        "enabled": True,
+                    },
+                }
+            },
+        }
+        config_path = self._create_temp_config_file(test_data)
+
+        _, cameras_conf, _, _, _ = config_load(config_path)
+
+        self.assertIn("cam1", cameras_conf)
+        self.assertIn("sunrise_sunset", cameras_conf["cam1"])
+        ss_config = cameras_conf["cam1"]["sunrise_sunset"]
+        self.assertEqual(ss_config["enabled"], True)
+        self.assertEqual(ss_config["interval_s"], 10)  # default
+        self.assertEqual(ss_config["sunrise_offset_start_minutes"], 60)  # default
+        self.assertEqual(ss_config["sunrise_offset_end_minutes"], 30)  # default
+        self.assertEqual(ss_config["sunset_offset_start_minutes"], 30)  # default
+        self.assertEqual(ss_config["sunset_offset_end_minutes"], 60)  # default
 
 
 if __name__ == "__main__":

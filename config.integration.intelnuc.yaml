@@ -1,6 +1,6 @@
 admin_server:
   enabled: true
-  listen: 0.0.0.0:8889 [::]:8889
+  listen: 0.0.0.0:8889
 cameras:
   gopro-hero-6:
     day_settings:
@@ -31,7 +31,7 @@ cameras:
         - /gp/gpControl/setting/24/2 # ISO Max: 200
         - /gp/gpControl/setting/25/2 # Sharpness: low
     astro_settings:
-      trigger_exposure_composite_value: 1999 # As soon as we are back to 20s * 99 ISO (even if configured at 100, it can go down to 99), we fall back to night mode. This value needs to be acheivable by both night and astro mode or the threshold won't work. 
+      trigger_exposure_composite_value: 1986 # max value in day : 10 * 199. Min value in night: 20 * 99 ISO = 1980
       urlpaths_commands:
         - /gp/gpControl/setting/19/5 # Exposure time for NightPhoto: 20s
         - /gp/gpControl/setting/21/1 # ProTune on
@@ -75,11 +75,15 @@ cameras:
     ssim_area: 0.255,0.037,1.000,0.353
     sunrise_sunset:
       enabled: true
+      sunrise_offset_start_minutes: 0 # Camera is pointing north west so nothing happens before sunrise
+      sunrise_offset_end_minutes: 60 # Blissful golden sunrise light is very pretty, let's slow down to enjoy the moment
+      sunset_offset_start_minutes: 30
+      sunset_offset_end_minutes: 60
 global:
   log_dir: /srv/fenetre/logs
-  logging_level: DEBUG
-  logging_levels:
-    gopro: DEBUG
+  logging_level: INFO
+    #logging_levels:
+    #  gopro: DEBUG
   storage_management:
     check_interval_s: 300
     dry_run: false
@@ -92,7 +96,7 @@ global:
   work_dir: /srv/fenetre/data
 http_server:
   enabled: true
-  listen: 0.0.0.0:8888 [::]:8888
+  listen: 0.0.0.0:8888
 timelapse:
   daily_timelapse:
     enabled: true

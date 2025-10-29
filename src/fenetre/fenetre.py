@@ -337,10 +337,18 @@ def is_sunrise_or_sunset(camera_config: Dict, global_config: Dict) -> bool:
         )
         s = sun(location.observer, date=now.date(), tzinfo=location.timezone)
 
-        sunrise_start = s["sunrise"] - timedelta(minutes=60)
-        sunrise_end = s["sunrise"] + timedelta(minutes=20)
-        sunset_start = s["sunset"] - timedelta(minutes=30)
-        sunset_end = s["sunset"] + timedelta(minutes=60)
+        sunrise_start = s["sunrise"] - timedelta(
+            minutes=sunrise_sunset_config["sunrise_offset_start_minutes"]
+        )
+        sunrise_end = s["sunrise"] + timedelta(
+            minutes=sunrise_sunset_config["sunrise_offset_end_minutes"]
+        )
+        sunset_start = s["sunset"] - timedelta(
+            minutes=sunrise_sunset_config["sunset_offset_start_minutes"]
+        )
+        sunset_end = s["sunset"] + timedelta(
+            minutes=sunrise_sunset_config["sunset_offset_end_minutes"]
+        )
 
         return (sunrise_start <= now <= sunrise_end) or (
             sunset_start <= now <= sunset_end
@@ -512,15 +520,16 @@ def snap(camera_name, camera_config: Dict):
             return
 
         # Let's figure out how long we will be waiting before taking the next picture
-        current_sleep_interval = sleep_intervals[camera_name]
-        if is_sunrise_or_sunset(camera_config, global_config):
-            current_sleep_interval = camera_config.get("sunrise_sunset", {}).get(
+        sunrise_sunset = is_sunrise_or_sunset(camera_config, global_config)
+        if sunrise_sunset:
+            fast_sunrise_sunset_interval = camera_config.get("sunrise_sunset", {}).get(
                 "interval_s", 10
             )
+            sleep_intervals[camera_name] = fast_sunrise_sunset_interval
             logger.info(
-                f"{camera_name}: Sunrise/sunset detected, using fast interval: {current_sleep_interval}s"
+                f"{camera_name}: Sunrise/sunset detected, using fast interval: {fast_sunrise_sunset_interval}s"
             )
-
+        current_sleep_interval = sleep_intervals[camera_name]
         metric_sleep_time_seconds.labels(camera_name=camera_name).set(
             current_sleep_interval
         )
@@ -564,9 +573,7 @@ def snap(camera_name, camera_config: Dict):
                 camera_config,
             )
         # SSIM logic
-        if not (
-            is_sunrise_or_sunset(camera_config, global_config) or fixed_snap_interval
-        ):
+        if not ( sunrise_sunset or fixed_snap_interval ):
             ssim = get_ssim_for_area(
                 previous_pic, new_pic, camera_config.get("ssim_area", None)
             )

@@ -448,6 +448,30 @@ def _validate_cameras(cfg: Dict, errors) -> Dict:
                 default=10,
                 min_value=1,
             )
+            ss_out["sunrise_offset_start_minutes"] = _int(
+                ss_cfg.get("sunrise_offset_start_minutes"),
+                f"cameras.{name}.sunrise_sunset.sunrise_offset_start_minutes",
+                errors,
+                default=60,
+            )
+            ss_out["sunrise_offset_end_minutes"] = _int(
+                ss_cfg.get("sunrise_offset_end_minutes"),
+                f"cameras.{name}.sunrise_sunset.sunrise_offset_end_minutes",
+                errors,
+                default=30,
+            )
+            ss_out["sunset_offset_start_minutes"] = _int(
+                ss_cfg.get("sunset_offset_start_minutes"),
+                f"cameras.{name}.sunrise_sunset.sunset_offset_start_minutes",
+                errors,
+                default=30,
+            )
+            ss_out["sunset_offset_end_minutes"] = _int(
+                ss_cfg.get("sunset_offset_end_minutes"),
+                f"cameras.{name}.sunrise_sunset.sunset_offset_end_minutes",
+                errors,
+                default=60,
+            )
             cam_out["sunrise_sunset"] = ss_out
 
         # Day/Night settings
