@@ -298,14 +298,14 @@ class _GoProModernBase:
         return latest_dir, latest_file
 
     def set_mode(self, mode: str):
-        settings_to_apply = self.camera_config.get(f"{mode}_settings", {}).get("urlpaths_commands", [])
+        settings_to_apply = self.camera_config.get(f"{mode}_settings", {}).get(
+            "urlpaths_commands", []
+        )
         logger.debug(f"Will apply settings for mode '{mode}': {settings_to_apply}")
         for urlpath in settings_to_apply:
             self._make_gopro_request(urlpath)
 
-    def capture_photo(
-        self, output_file: Optional[str] = None
-    ) -> bytes:
+    def capture_photo(self, output_file: Optional[str] = None) -> bytes:
         latest_dir_before, latest_file_before = self._get_latest_file()
 
         self._make_gopro_request(
@@ -401,7 +401,6 @@ class GoProHero6:
         self.settings = GoProHero6Settings(self)
         self.camera_config = camera_config
 
-
     def apply_settings(
         self, settings: Optional[dict], camera_config: Optional[dict] = None
     ):
@@ -451,7 +450,7 @@ class GoProHero6:
         log_message = (
             f"Request URL: {url}\n"
             f"Response Code: {response.status_code}"
-#            f"Response Text: {response.text}"
+            #            f"Response Text: {response.text}"
         )
         gopro_logger.debug(log_message)
 
@@ -506,14 +505,14 @@ class GoProHero6:
         # Set photo mode
         logger.debug("Setting GoPro 6 mode to photo")
         self._make_gopro_request("/gp/gpControl/command/mode?p=1")
-        settings_to_apply = self.camera_config.get(f"{mode}_settings", {}).get("urlpaths_commands", [])
+        settings_to_apply = self.camera_config.get(f"{mode}_settings", {}).get(
+            "urlpaths_commands", []
+        )
         logger.debug(f"Will apply settings for mode '{mode}': {settings_to_apply}")
         for urlpath in settings_to_apply:
             self._make_gopro_request(urlpath)
 
-    def capture_photo(
-        self, output_file: Optional[str] = None
-    ) -> bytes:
+    def capture_photo(self, output_file: Optional[str] = None) -> bytes:
         latest_dir_before, latest_file_before = self._get_latest_file()
 
         # Trigger shutter

@@ -573,7 +573,7 @@ def snap(camera_name, camera_config: Dict):
                 camera_config,
             )
         # SSIM logic
-        if not ( sunrise_sunset or fixed_snap_interval ):
+        if not (sunrise_sunset or fixed_snap_interval):
             ssim = get_ssim_for_area(
                 previous_pic, new_pic, camera_config.get("ssim_area", None)
             )
@@ -582,8 +582,7 @@ def snap(camera_name, camera_config: Dict):
                 sleep_intervals[camera_name] = sleep_intervals[camera_name] * 0.9
             else:
                 sleep_intervals[camera_name] = min(
-                    90, # TODO: Make this configurable
-                    sleep_intervals[camera_name] + 2
+                    90, sleep_intervals[camera_name] + 2  # TODO: Make this configurable
                 )
             if camera_config.get("gather_metrics", True):
                 metric_camera_ssim_value.labels(camera_name=camera_name).set(ssim)

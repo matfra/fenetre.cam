@@ -276,7 +276,9 @@ def _validate_day_night_settings(cam_config: Dict, cam_name: str, errors: list) 
     out = {}
 
     def validate_settings_block(settings_key: str) -> Optional[Dict]:
-        settings_block = _dict(cam_config.get(settings_key), f"cameras.{cam_name}.{settings_key}", errors)
+        settings_block = _dict(
+            cam_config.get(settings_key), f"cameras.{cam_name}.{settings_key}", errors
+        )
         if not settings_block:
             return None
 
@@ -285,24 +287,28 @@ def _validate_day_night_settings(cam_config: Dict, cam_name: str, errors: list) 
 
         if "trigger_exposure_composite_value" in settings_block:
             block_out["trigger_exposure_composite_value"] = _float(
-                settings_block.get("trigger_exposure_composite_value"), f"{path_prefix}.trigger_exposure_composite_value", errors, min_value=0.0
+                settings_block.get("trigger_exposure_composite_value"),
+                f"{path_prefix}.trigger_exposure_composite_value",
+                errors,
+                min_value=0.0,
             )
 
         if "urlpaths_commands" in settings_block:
             if isinstance(settings_block["urlpaths_commands"], list):
                 block_out["urlpaths_commands"] = settings_block["urlpaths_commands"]
             else:
-                errors.append(f"{path_prefix}.urlpaths_commands: expected a list of strings")
+                errors.append(
+                    f"{path_prefix}.urlpaths_commands: expected a list of strings"
+                )
 
         return block_out
 
-    if (day_settings := validate_settings_block("day_settings")):
+    if day_settings := validate_settings_block("day_settings"):
         out["day_settings"] = day_settings
-    if (night_settings := validate_settings_block("night_settings")):
+    if night_settings := validate_settings_block("night_settings"):
         out["night_settings"] = night_settings
-    if (astro_settings := validate_settings_block("astro_settings")):
+    if astro_settings := validate_settings_block("astro_settings"):
         out["astro_settings"] = astro_settings
-
 
     return out
 
@@ -432,7 +438,9 @@ def _validate_cameras(cfg: Dict, errors) -> Dict:
                 min_value=-180,
                 max_value=180,
             )
-        ss_cfg = _dict(cam.get("sunrise_sunset"), f"cameras.{name}.sunrise_sunset", errors)
+        ss_cfg = _dict(
+            cam.get("sunrise_sunset"), f"cameras.{name}.sunrise_sunset", errors
+        )
         if ss_cfg:
             ss_out = {}
             ss_out["enabled"] = _bool(

@@ -594,7 +594,9 @@ def generate_month_html(monthband_path: str, camera_name: str):
             if camera_name == "..":
                 dirlink = f"{camera_name}/{isodate}/"
             else:
-                dirlink = f"/photos/{camera_name}/{isodate}/"  # Assumes this path structure
+                dirlink = (
+                    f"/photos/{camera_name}/{isodate}/"  # Assumes this path structure
+                )
 
             # Define the coordinates for the clickable area for this day's band
             # x1 = current x-offset, y1 = 0
