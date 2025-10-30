@@ -398,6 +398,36 @@ class FenetreConfigTestCase(unittest.TestCase):
         self.assertEqual(ss_config["sunset_offset_start_minutes"], 30)  # default
         self.assertEqual(ss_config["sunset_offset_end_minutes"], 60)  # default
 
+    @patch("fenetre.config.logger")
+    def test_config_load_sanitization_warning(self, mock_logger):
+        test_data = {
+            "global": {"work_dir": self.mock_work_dir, "timezone": "UTC"},
+            "http_server": {
+                "enabled": "not-a-boolean",  # Invalid value
+                "listen": "0.0.0.0:8080",
+                "extra_key": "should be ignored",
+            },
+            "cameras": {},
+        }
+        config_path = self._create_temp_config_file(test_data)
+
+        config_load(config_path)
+
+        self.assertTrue(mock_logger.warning.called)
+
+        # Check that a warning with a diff was logged for the http_server section
+        found_diff_warning = False
+        for call in mock_logger.warning.call_args_list:
+            message = call[0][0]
+            if (
+                "Configuration for 'http_server' has been sanitized" in message
+                and "--- http_server_original" in message
+            ):
+                found_diff_warning = True
+                break
+
+        self.assertTrue(found_diff_warning, "Expected a diff warning for http_server section, but none was found.")
+
 
 if __name__ == "__main__":
     # Need to setup absl flags before running tests if fenetre.py uses app.run() or defines its own flags

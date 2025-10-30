@@ -1,5 +1,6 @@
 import logging
 import os
+import difflib
 from typing import Dict, Tuple, Optional
 
 import yaml
@@ -9,6 +10,26 @@ logger = logging.getLogger(__name__)
 
 class ConfigError(Exception):
     pass
+
+
+def _log_config_diff(section_name: str, before: Dict, after: Dict):
+    """Logs the difference between two configuration dictionaries using YAML."""
+    before_str = yaml.dump(before, sort_keys=True, default_flow_style=False, indent=2)
+    after_str = yaml.dump(after, sort_keys=True, default_flow_style=False, indent=2)
+
+    if before_str != after_str:
+        diff = difflib.unified_diff(
+            before_str.splitlines(keepends=True),
+            after_str.splitlines(keepends=True),
+            fromfile=f"{section_name}_original",
+            tofile=f"{section_name}_validated",
+        )
+        diff_str = "".join(diff)
+        logger.warning(
+            f"Configuration for '{section_name}' has been sanitized. "
+            "Some values may have been ignored, coerced, or set to defaults.\n"
+            f"Configuration diff for '{section_name}':\n{diff_str}"
+        )
 
 
 def _bool(value, path, errors, default=None):
@@ -545,6 +566,12 @@ def config_load(config_file_path: str) -> Tuple[Dict, Dict, Dict, Dict, Dict]:
     global_out = _validate_global(global_cfg, errors)
     admin_out = _validate_admin(admin_cfg, errors)
     timelapse_out = _validate_timelapse(timelapse_cfg, errors)
+
+    _log_config_diff("global", global_cfg, global_out)
+    _log_config_diff("http_server", http_cfg, http_out)
+    _log_config_diff("admin_server", admin_cfg, admin_out)
+    _log_config_diff("cameras", cameras_cfg, cameras_out)
+    _log_config_diff("timelapse", timelapse_cfg, timelapse_out)
 
     if errors:
         # Be strict: better fail fast with actionable messages
