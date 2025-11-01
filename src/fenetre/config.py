@@ -115,6 +115,7 @@ def _validate_global(cfg: Dict, errors) -> Dict:
         "log_max_bytes",
         "log_backup_count",
         "ui",
+        "deployment_name",
     }
     _warn_unknown_keys("global", cfg, allowed)
 
@@ -195,17 +196,16 @@ def _validate_global(cfg: Dict, errors) -> Dict:
         min_value=0,
     )
 
-    ui_cfg = _dict(cfg.get("ui"), "global.ui", errors)
-    ui_out = {}
-    _warn_unknown_keys(
-        "global.ui", ui_cfg, {"deployment_name"}
-    )  # Add allowed keys for ui here
-    ui_out["deployment_name"] = _str(
-        ui_cfg.get("deployment_name"),
-        "global.ui.deployment_name",
+    out["deployment_name"] = _str(
+        cfg.get("deployment_name"),
+        "global.deployment_name",
         errors,
         default="fenetre.cam",
     )
+
+    ui_cfg = _dict(cfg.get("ui"), "global.ui", errors)
+    ui_out = {}
+    _warn_unknown_keys("global.ui", ui_cfg, set())  # Add allowed keys for ui here
     out["ui"] = ui_out
     return out
 

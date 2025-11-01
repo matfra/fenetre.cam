@@ -90,6 +90,7 @@ global:
     enabled: true
     work_dir_max_size_GB: 30
   timezone: America/Los_Angeles
+  deployment_name: dev.fenetre.cam
   ui:
     fullscreen_camera: gopro-hero-6
     landing_page: fullscreen
