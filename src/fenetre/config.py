@@ -194,6 +194,19 @@ def _validate_global(cfg: Dict, errors) -> Dict:
         default=5,
         min_value=0,
     )
+
+    ui_cfg = _dict(cfg.get("ui"), "global.ui", errors)
+    ui_out = {}
+    _warn_unknown_keys(
+        "global.ui", ui_cfg, {"deployment_name"}
+    )  # Add allowed keys for ui here
+    ui_out["deployment_name"] = _str(
+        ui_cfg.get("deployment_name"),
+        "global.ui.deployment_name",
+        errors,
+        default="fenetre.cam",
+    )
+    out["ui"] = ui_out
     return out
 
 

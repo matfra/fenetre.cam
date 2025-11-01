@@ -922,6 +922,7 @@ def update_cameras_metadata(cameras_configs: Dict, work_dir: str):
     updated_cameras_metadata["global"] = {
         "timelapse_file_extension": daily_cfg.get("file_extension", "webm"),
         "frequent_timelapse_file_extension": freq_cfg.get("file_extension", "mp4"),
+        "deployment_name": global_config['ui']["deployment_name"],
     }
 
     with open(json_filepath, "w") as json_file:
