@@ -46,12 +46,12 @@ mapToggleButton.addEventListener('click', () => {
         mapPanel.style.width = '0';
         listPanel.style.width = '100%';
         mapElement.style.visibility = 'hidden';
-        mapToggleButton.textContent = 'Show Map';
+        mapToggleButton.innerHTML = '🗺️';
     } else {
         mapPanel.style.width = '50%';
         listPanel.style.width = '50%';
         mapElement.style.visibility = 'visible';
-        mapToggleButton.textContent = 'Hide Map';
+        mapToggleButton.innerHTML = '📖';
         // Invalidate map size to fix rendering issues after being hidden
         setTimeout(() => map.invalidateSize(), 500);
     }
@@ -256,6 +256,24 @@ function updateAllCameras() {
         })
         .then(data => {
             document.querySelector('#list-header h1').textContent = data.global.deployment_name + ' cameras';
+
+            // --- Icon Links Logic ---
+            const mainWebsiteLink = document.getElementById('main-website-link');
+            const githubLink = document.getElementById('github-link');
+            const uiConfig = data.global.ui || {};
+
+            // Main Website Icon
+            if (uiConfig.show_main_website_icon === false || !uiConfig.main_website_url) {
+                mainWebsiteLink.style.display = 'none';
+            } else {
+                mainWebsiteLink.style.display = 'flex';
+                mainWebsiteLink.href = uiConfig.main_website_url;
+            }
+
+            // GitHub Icon
+            if (uiConfig.show_github_icon === false) {
+                githubLink.style.display = 'none';
+            }
             const cameras = data.cameras;
             const existingTitles = new Set();
 

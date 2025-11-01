@@ -48,8 +48,28 @@ body.dark-mode {
     display: flex;
     justify-content: center;
     align-items: center;
-    margin-left: 10px;
     transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+
+/* Style for new icon links */
+#controls a {
+    width: 40px;
+    height: 40px;
+    border-radius: 5px;
+    border: 1px solid #ccc;
+    cursor: pointer;
+    font-size: 20px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    text-decoration: none;
+    color: #333;
+}
+
+#github-link svg {
+    width: 22px;
+    height: 22px;
+    fill: #333;
 }
 
 body.dark-mode #theme-toggle {
@@ -59,12 +79,24 @@ body.dark-mode #theme-toggle {
 }
 
 #map-toggle {
-    padding: 0 15px;
+    width: 40px;
     height: 40px;
     border-radius: 5px;
     border: 1px solid #ccc;
     cursor: pointer;
-    font-size: 1em;
+    font-size: 20px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+body.dark-mode #controls a {
+    border-color: #555;
+    color: #e0e0e0;
+}
+
+body.dark-mode #github-link svg {
+    fill: #e0e0e0;
 }
 
 #list-header {
@@ -109,9 +141,7 @@ body.dark-mode .camera-item {
     height: 67.5px;
     object-fit: cover;
     border-radius: 4px;
-}
-.camera-header a:not(:last-child) img {
-    margin-right: 15px;
+    margin-right: 15px; /* Add spacing between thumbnail and title */
 }
 .camera-info {
     flex-grow: 1;

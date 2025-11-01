@@ -205,7 +205,27 @@ def _validate_global(cfg: Dict, errors) -> Dict:
 
     ui_cfg = _dict(cfg.get("ui"), "global.ui", errors)
     ui_out = {}
-    _warn_unknown_keys("global.ui", ui_cfg, set())  # Add allowed keys for ui here
+    _warn_unknown_keys(
+        "global.ui", ui_cfg, {"main_website_url", "show_main_website_icon", "show_github_icon"}
+    )  # Add allowed keys for ui here
+    ui_out["main_website_url"] = _str(
+        ui_cfg.get("main_website_url"),
+        "global.ui.main_website_url",
+        errors,
+        default="https://fenetre.cam",
+    )
+    ui_out["show_main_website_icon"] = _bool(
+        ui_cfg.get("show_main_website_icon"),
+        "global.ui.show_main_website_icon",
+        errors,
+        default=True,
+    )
+    ui_out["show_github_icon"] = _bool(
+        ui_cfg.get("show_github_icon"),
+        "global.ui.show_github_icon",
+        errors,
+        default=True,
+    )
     out["ui"] = ui_out
     return out
 
