@@ -424,7 +424,7 @@
             fetch('cameras.json')
                 .then(response => response.json())
                 .then(data => {
-                    document.querySelector('#left-panel h1').textContent = (data.global.ui.deployment_name || 'Camera') + ' Map';
+                    document.querySelector('#left-panel h1').textContent = (data.global.deployment_name || 'Camera') + ' Map';
                     cameraData = data;
                     const cameras = data.cameras;
                     markerCluster.clearLayers();
