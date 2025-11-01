@@ -1,5 +1,6 @@
 const themeToggle = document.getElementById('theme-toggle');
 const body = document.body;
+const mapToggleButton = document.getElementById('map-toggle');
 
 // Apply theme based on system preference or stored value
 const prefersDarkMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -21,6 +22,46 @@ themeToggle.addEventListener('click', () => {
 });
 
 const cameraListElement = document.getElementById('camera-list');
+
+// --- Map Initialization ---
+const mapPanel = document.getElementById('map-panel');
+const listPanel = document.getElementById('list-panel');
+const mapElement = document.getElementById('map');
+
+var map = L.map('map').setView([0, 0], 2);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 18,
+    minZoom: 0
+}).addTo(map);
+
+var markerCluster = L.markerClusterGroup();
+map.addLayer(markerCluster);
+
+var cameraMarkers = {}; // To store references to map markers
+
+// --- Map Toggle Functionality ---
+mapToggleButton.addEventListener('click', () => {
+    const isMapVisible = mapPanel.style.width === '50%';
+    if (isMapVisible) {
+        mapPanel.style.width = '0';
+        listPanel.style.width = '100%';
+        mapElement.style.visibility = 'hidden';
+        mapToggleButton.textContent = 'Show Map';
+    } else {
+        mapPanel.style.width = '50%';
+        listPanel.style.width = '50%';
+        mapElement.style.visibility = 'visible';
+        mapToggleButton.textContent = 'Hide Map';
+        // Invalidate map size to fix rendering issues after being hidden
+        setTimeout(() => map.invalidateSize(), 500);
+    }
+});
+
+function createPopupContent(camera, fullImageUrl) {
+    const imageUrl = fullImageUrl || '';
+    const imageTag = imageUrl ? `<img src="${imageUrl}" style="width: 280px; height: auto; border-radius: 4px; margin-bottom: 5px;">` : 'Loading image...';
+    return `${imageTag}<br><b>${camera.title}</b>`;
+}
 
 function parseTimestampFromFilename(filename) {
     try {
@@ -51,6 +92,7 @@ function createCameraListItem(camera) {
     const listItem = document.createElement('li');
     listItem.className = 'camera-item';
     listItem.dataset.title = camera.title;
+    listItem.dataset.markerId = `camera-${camera.title.replace(/\s+/g, '-')}`;
 
     listItem.innerHTML = `
         <div class="camera-header">
@@ -86,6 +128,15 @@ function createCameraListItem(camera) {
                 otherDetails.classList.remove('active');
             }
         });
+
+        // Also pan map if it's visible
+        const isMapVisible = mapPanel.style.width === '50%';
+        if (isMapVisible) {
+            const marker = cameraMarkers[listItem.dataset.markerId];
+            if (marker) {
+                markerCluster.zoomToShowLayer(marker, () => marker.openPopup());
+            }
+        }
     });
 
     return listItem;
@@ -199,12 +250,42 @@ let initialCameraExpanded = false;
 
 function updateAllCameras() {
     fetch('/cameras.json')
-        .then(response => response.ok ? response.json() : Promise.reject('Network response was not ok.'))
+        .then(response => {
+            if (!response.ok) throw new Error('Network response was not ok.');
+            return response.json();
+        })
         .then(data => {
+            document.querySelector('#list-header h1').textContent = data.global.deployment_name + ' cameras';
             const cameras = data.cameras;
+            const existingTitles = new Set();
+
             cameras.forEach(camera => updateCamera(camera, data));
 
-            if (!initialCameraExpanded) {
+            // Map marker logic
+            markerCluster.clearLayers();
+            cameraMarkers = {};
+            const cameraLatLngs = [];
+
+            cameras.forEach(camera => {
+                if (camera.lat && camera.lon) {
+                    const latLng = [camera.lat, camera.lon];
+                    cameraLatLngs.push(latLng);
+                    const markerId = `camera-${camera.title.replace(/\s+/g, '-')}`;
+                    const marker = L.marker(latLng);
+                    marker.bindPopup(createPopupContent(camera));
+                    cameraMarkers[markerId] = marker;
+                    markerCluster.addLayer(marker);
+                }
+            });
+
+            // Auto-zoom map to fit all markers
+            if (cameraLatLngs.length > 0) {
+                const bounds = L.latLngBounds(cameraLatLngs);
+                map.fitBounds(bounds, { padding: [50, 50] });
+            }
+
+            // Auto-expand camera from URL param
+            if (!initialCameraExpanded && cameras.length > 0) {
                 const urlParams = new URLSearchParams(window.location.search);
                 const cameraNameToExpand = urlParams.get('camera');
                 if (cameraNameToExpand) {
@@ -212,6 +293,11 @@ function updateAllCameras() {
                     if (listItem) {
                         const details = listItem.querySelector('.camera-details');
                         details.classList.add('active');
+                        listItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+                        // Wait for CSS transition before checking other details
+                        setTimeout(() => {
+                        }, 500);
                         initialCameraExpanded = true;
                     }
                 }
@@ -224,5 +310,4 @@ function updateAllCameras() {
 }
 
 updateAllCameras();
-setInterval(updateAllCameras, 60000);
-
+setInterval(updateAllCameras, 60000); // Refresh every 60 seconds

@@ -3,13 +3,31 @@
 <head>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml">
     <title>Camera List</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.Default.css" />
+    <link rel="stylesheet" href="list.css">
     <link rel="stylesheet" href="list.css">
 </head>
 <body>
-    <h1>Camera List</h1>
-    <button id="theme-toggle">☀️</button>
-    <ul id="camera-list"></ul>
+    <div id="main-container">
+        <div id="map-panel">
+            <div id="map"></div>
+        </div>
+        <div id="list-panel">
+            <div id="list-header">
+                <h1>Camera List</h1>
+                <div id="controls">
+                    <button id="map-toggle">Show Map</button>
+                    <button id="theme-toggle">☀️</button>
+                </div>
+            </div>
+            <ul id="camera-list"></ul>
+        </div>
+    </div>
 
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.markercluster/dist/leaflet.markercluster.js"></script>
     <script src="list.js"></script>
 </body>
 </html>
