@@ -58,7 +58,6 @@ from fenetre.camera_utils import (
 )
 from fenetre.config import config_load
 from fenetre.daylight import run_end_of_day
-from fenetre.gopro_utility import GoProUtilityThread, format_gopro_sd_card
 from fenetre.postprocess import postprocess, publish_metrics_from_exif_dict
 from fenetre.timelapse import (
     add_to_timelapse_queue,
@@ -68,6 +67,17 @@ from fenetre.timelapse import (
     remove_from_timelapse_queue,
 )
 from fenetre.ui_utils import copy_public_html_files
+
+_GOPRO_BLE_AVAILABLE = True
+try:
+    from fenetre.gopro_utility import GoProUtilityThread, format_gopro_sd_card
+except ModuleNotFoundError as e:
+    if e.name and e.name.startswith("bleak"):
+        GoProUtilityThread = None  # type: ignore[assignment]
+        format_gopro_sd_card = None  # type: ignore[assignment]
+        _GOPRO_BLE_AVAILABLE = False
+    else:
+        raise
 
 from io import BytesIO
 import json
@@ -941,9 +951,8 @@ def main(argv):
 
     setup_logging()
 
-
     with open(FENETRE_PID_FILE, "w") as f:
-            f.write(str(os.getpid()))
+        f.write(str(os.getpid()))
     logger.info(f"PID {os.getpid()} written to {FENETRE_PID_FILE}")
 
     global exit_event
@@ -953,8 +962,8 @@ def main(argv):
     signal.signal(signal.SIGHUP, handle_sighup)
     signal.signal(signal.SIGINT, signal_handler_exit)  # Graceful exit on Ctrl+C
     signal.signal(
-            signal.SIGTERM, signal_handler_exit
-        )  # Graceful exit on kill/systemd stop
+        signal.SIGTERM, signal_handler_exit
+    )  # Graceful exit on kill/systemd stop
 
     # Initialize global sleep_intervals (important for camera threads)
     global sleep_intervals
@@ -982,7 +991,6 @@ def main(argv):
         open(timelapse_queue_file, "a").close()  # Create the file if it does not exist
     get_queue_size_and_set_metric(timelapse_queue_file, timelapse_queue_lock)
 
-
     logger.info("Disk management thread will start in 10s...")
     interruptible_sleep(10, exit_event)
 
@@ -992,7 +1000,6 @@ def main(argv):
     disk_management_thread_global.start()
     logger.info(f"Starting thread {disk_management_thread_global.name}")
 
-
     logger.info("Archive thread will start in 10s...")
     interruptible_sleep(10, exit_event)
     archive_thread_global = Thread(
@@ -1000,7 +1007,6 @@ def main(argv):
     )
     archive_thread_global.start()
     logger.info(f"Starting thread {archive_thread_global.name}")
-
 
     logger.info("Frequent timelapse thread will start in 10s...")
     interruptible_sleep(10, exit_event)
@@ -1261,15 +1267,23 @@ def manage_camera_threads():
 
                     # The GoProUtilityThread is only for Hero 11 (OpenGoPro) models
                     if gopro_model in {"hero11", "open_gopro"}:
-                        gopro_utility_thread = GoProUtilityThread(
-                            gopro_instance, cam_name, cam_conf, exit_event
-                        )
-                        gopro_utility_thread.start()
-                        if cam_name not in active_camera_threads:
-                            active_camera_threads[cam_name] = {}
-                        active_camera_threads[cam_name][
-                            "gopro_utility"
-                        ] = gopro_utility_thread
+                        if not _GOPRO_BLE_AVAILABLE or GoProUtilityThread is None:
+                            logger.warning(
+                                "Camera %s uses GoPro model '%s' but Bluetooth support "
+                                "is disabled. Install the 'gopro' extra to enable it.",
+                                cam_name,
+                                gopro_model,
+                            )
+                        else:
+                            gopro_utility_thread = GoProUtilityThread(
+                                gopro_instance, cam_name, cam_conf, exit_event
+                            )
+                            gopro_utility_thread.start()
+                            if cam_name not in active_camera_threads:
+                                active_camera_threads[cam_name] = {}
+                            active_camera_threads[cam_name][
+                                "gopro_utility"
+                            ] = gopro_utility_thread
 
                     active_camera_threads.setdefault(cam_name, {})[
                         "gopro_instance"
