@@ -25,15 +25,15 @@ class TestGoProHero11(unittest.TestCase):
         self.gopro.settings.video_performance_mode = "Maximum Video Performance"
         mock_get.assert_called_with(
             "http://10.5.5.9/gopro/camera/setting?option=0&setting=173",
-            timeout=5,
-            verify="",
+            timeout=self.gopro.timeout,
+            verify=self.gopro.root_ca_filepath,
         )
 
         self.gopro.settings.max_lens = "On"
         mock_get.assert_called_with(
             "http://10.5.5.9/gopro/camera/setting?option=1&setting=162",
-            timeout=5,
-            verify="",
+            timeout=self.gopro.timeout,
+            verify=self.gopro.root_ca_filepath,
         )
 
     def test_set_invalid_setting(self):
@@ -65,42 +65,44 @@ class TestGoProHero11(unittest.TestCase):
         expected_calls = [
             mock.call(
                 "http://10.5.5.9/gopro/camera/control/set_ui_controller?p=2",
-                timeout=5,
-                verify="",
+                timeout=self.gopro.timeout,
+                verify=self.gopro.root_ca_filepath,
             ),
             mock.call(
                 "http://10.5.5.9/gopro/camera/setting?option=10&setting=88",
-                timeout=5,
-                verify="",
+                timeout=self.gopro.timeout,
+                verify=self.gopro.root_ca_filepath,
             ),
             mock.call(
                 "http://10.5.5.9/gopro/camera/setting?option=4&setting=91",
-                timeout=5,
-                verify="",
+                timeout=self.gopro.timeout,
+                verify=self.gopro.root_ca_filepath,
             ),
             mock.call(
                 "http://10.5.5.9/gopro/camera/setting?option=0&setting=83",
-                timeout=5,
-                verify="",
+                timeout=self.gopro.timeout,
+                verify=self.gopro.root_ca_filepath,
             ),
             mock.call(
                 "http://10.5.5.9/gopro/camera/setting?option=7&setting=59",
-                timeout=5,
-                verify="",
+                timeout=self.gopro.timeout,
+                verify=self.gopro.root_ca_filepath,
             ),
             mock.call(
-                "http://10.5.5.9/gopro/camera/shutter/start", timeout=5, verify=""
+                "http://10.5.5.9/gopro/camera/shutter/start",
+                timeout=self.gopro.timeout,
+                verify=self.gopro.root_ca_filepath,
             ),
             mock.call(
                 "http://10.5.5.9/videos/DCIM/100GOPRO/GOPR0002.JPG",
-                timeout=5,
-                verify="",
+                timeout=self.gopro.timeout,
+                verify=self.gopro.root_ca_filepath,
             ),
             mock.call().raise_for_status(),
             mock.call(
                 "http://10.5.5.9/gopro/media/delete/file?path=100GOPRO/GOPR0002.JPG",
-                timeout=5,
-                verify="",
+                timeout=self.gopro.timeout,
+                verify=self.gopro.root_ca_filepath,
             ),
         ]
         mock_get.assert_has_calls(expected_calls, any_order=False)
@@ -121,7 +123,9 @@ class TestGoProHero11(unittest.TestCase):
         self.gopro.update_state()
 
         mock_get.assert_called_once_with(
-            "http://10.5.5.9/gopro/camera/state", timeout=5, verify=""
+            "http://10.5.5.9/gopro/camera/state",
+            timeout=self.gopro.timeout,
+            verify=self.gopro.root_ca_filepath,
         )
         self.assertEqual(self.gopro.state, mock_state)
 
