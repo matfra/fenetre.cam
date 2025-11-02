@@ -2,23 +2,25 @@ const themeToggle = document.getElementById('theme-toggle');
 const body = document.body;
 const mapToggleButton = document.getElementById('map-toggle');
 
+function syncThemeToggleIcon() {
+    themeToggle.classList.toggle('dark-mode-active', body.classList.contains('dark-mode'));
+}
+
 // Apply theme based on system preference or stored value
 const prefersDarkMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
 const storedTheme = localStorage.getItem('theme');
 
 if (storedTheme === 'dark' || (storedTheme === null && prefersDarkMode)) {
     body.classList.add('dark-mode');
-    themeToggle.textContent = '🌙';
-} else {
-    themeToggle.textContent = '☀️';
 }
+syncThemeToggleIcon();
 
 // Toggle theme on button click
 themeToggle.addEventListener('click', () => {
     body.classList.toggle('dark-mode');
     const theme = body.classList.contains('dark-mode') ? 'dark' : 'light';
     localStorage.setItem('theme', theme);
-    themeToggle.textContent = theme === 'dark' ? '🌙' : '☀️';
+    syncThemeToggleIcon();
 });
 
 const cameraListElement = document.getElementById('camera-list');
@@ -46,12 +48,12 @@ mapToggleButton.addEventListener('click', () => {
         mapPanel.style.width = '0';
         listPanel.style.width = '100%';
         mapElement.style.visibility = 'hidden';
-        mapToggleButton.innerHTML = '🗺️';
+        mapToggleButton.classList.remove('map-open');
     } else {
         mapPanel.style.width = '50%';
         listPanel.style.width = '50%';
         mapElement.style.visibility = 'visible';
-        mapToggleButton.innerHTML = '📖';
+        mapToggleButton.classList.add('map-open');
         // Invalidate map size to fix rendering issues after being hidden
         setTimeout(() => map.invalidateSize(), 500);
     }
@@ -271,7 +273,9 @@ function updateAllCameras() {
             }
 
             // GitHub Icon
-            if (uiConfig.show_github_icon === false) {
+            if (uiConfig.show_github_icon) {
+                githubLink.style.display = 'flex';
+            } else {
                 githubLink.style.display = 'none';
             }
             const cameras = data.cameras;
