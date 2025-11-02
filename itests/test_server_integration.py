@@ -46,7 +46,7 @@ class ServerIntegrationTest(unittest.TestCase):
             self.skipTest(f"Socket operations not permitted in this environment: {exc}")
 
         self.config_data = {
-            "global": {"work_dir": self.work_dir},
+            "global": {"timezone": "UTC", "work_dir": self.work_dir},
             "http_server": {
                 "enabled": True,
                 "listen": f"127.0.0.1:{self.port}",
