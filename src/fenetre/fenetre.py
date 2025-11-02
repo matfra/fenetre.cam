@@ -679,7 +679,6 @@ def server_run():
 def stop_http_server():
     global http_server_instance, http_server_thread_global
     if http_server_instance:
-        logger.info("Attempting to shut down HTTP server...")
         http_server_instance.shutdown()
         http_server_instance.server_close()
         http_server_instance = None
