@@ -215,6 +215,7 @@ def _validate_global(cfg: Dict, errors) -> Dict:
             "show_main_website_icon",
             "show_github_icon",
             "show_map_by_default",
+            "linked_deployments",
         },
     )  # Add allowed keys for ui here
     ui_out["fullscreen_camera"] = _str(
@@ -253,12 +254,47 @@ def _validate_global(cfg: Dict, errors) -> Dict:
         errors,
         default=False,
     )
+    linked_cfg = ui_cfg.get("linked_deployments", [])
+    linked_out = []
+    if linked_cfg is None:
+        linked_cfg = []
+    if isinstance(linked_cfg, list):
+        for idx, entry in enumerate(linked_cfg):
+            entry_path = f"global.ui.linked_deployments[{idx}]"
+            if not isinstance(entry, dict):
+                errors.append(
+                    f"{entry_path}: expected mapping, got {type(entry).__name__}"
+                )
+                continue
+            base_url = _str(entry.get("base_url"), f"{entry_path}.base_url", errors)
+            if not base_url:
+                continue
+            normalized = {"base_url": base_url}
+            if entry.get("name") is not None:
+                name = _str(entry.get("name"), f"{entry_path}.name", errors)
+                if name:
+                    normalized["name"] = name
+            if entry.get("cameras_json_url") is not None:
+                cameras_json_url = _str(
+                    entry.get("cameras_json_url"),
+                    f"{entry_path}.cameras_json_url",
+                    errors,
+                )
+                if cameras_json_url:
+                    normalized["cameras_json_url"] = cameras_json_url
+            linked_out.append(normalized)
+    else:
+        errors.append(
+            f"global.ui.linked_deployments: expected list, got {type(linked_cfg).__name__}"
+        )
+        linked_out = []
+    ui_out["linked_deployments"] = linked_out
     out["ui"] = ui_out
     return out
 
 
 def _validate_http(cfg: Dict, errors) -> Dict:
-    allowed = {"enabled", "listen"}
+    allowed = {"enabled", "listen", "allow_cors", "cors_allow_origin"}
     _warn_unknown_keys("http_server", cfg, allowed)
     out = {}
     out["enabled"] = _bool(
@@ -266,6 +302,15 @@ def _validate_http(cfg: Dict, errors) -> Dict:
     )
     out["listen"] = _str(
         cfg.get("listen"), "http_server.listen", errors, default="0.0.0.0:8888"
+    )
+    out["allow_cors"] = _bool(
+        cfg.get("allow_cors"), "http_server.allow_cors", errors, default=True
+    )
+    out["cors_allow_origin"] = _str(
+        cfg.get("cors_allow_origin"),
+        "http_server.cors_allow_origin",
+        errors,
+        default="https://dev.fenetre.cam",
     )
     return out
 

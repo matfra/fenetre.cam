@@ -656,10 +656,32 @@ def get_ssim_for_area(
     return structural_similarity(image1_np, image2_np, data_range=255)
 
 
+class FenetreHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
+    def end_headers(self):
+        if server_config.get("allow_cors"):
+            allow_origin = server_config.get("cors_allow_origin") or "*"
+            self.send_header("Access-Control-Allow-Origin", allow_origin)
+            self.send_header("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS")
+            self.send_header(
+                "Access-Control-Allow-Headers", "Origin, Range, Content-Type, Accept"
+            )
+            self.send_header(
+                "Access-Control-Expose-Headers", "Content-Length, Content-Range"
+            )
+        super().end_headers()
+
+    def do_OPTIONS(self):
+        if server_config.get("allow_cors"):
+            self.send_response(204)
+            self.end_headers()
+        else:
+            self.send_error(405, "Method Not Allowed")
+
+
 def server_run():
     server_class = http.server.ThreadingHTTPServer
     handler_class = partial(
-        http.server.SimpleHTTPRequestHandler, directory=global_config["work_dir"]
+        FenetreHTTPRequestHandler, directory=global_config["work_dir"]
     )
 
     listen_str = server_config.get("listen", "0.0.0.0:8888")

@@ -53,6 +53,7 @@ let latestMarkerBounds = null;
 const markerBoundsFitOptions = { padding: [50, 50] };
 let mapVisible = false;
 let mapVisibilityInitialized = false;
+let remoteFetchGeneration = 0;
 
 function applyMapTheme(isDark) {
     const desiredLayer = isDark ? darkTileLayer : lightTileLayer;
@@ -68,6 +69,73 @@ var markerCluster = L.markerClusterGroup();
 map.addLayer(markerCluster);
 
 var cameraMarkers = {}; // To store references to map markers
+
+function slugify(value, fallback) {
+    const base = (value || '').toString().toLowerCase().trim();
+    const slug = base.replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    return slug || fallback;
+}
+
+function joinUrl(base, path) {
+    if (!path) {
+        return base;
+    }
+    if (/^https?:\/\//i.test(path)) {
+        return path;
+    }
+    const baseNormalized = base.replace(/\/+$/, '');
+    const pathNormalized = path.replace(/^\/+/, '');
+    return `${baseNormalized}/${pathNormalized}`;
+}
+
+function buildAbsoluteUrl(base, maybeRelative) {
+    if (!maybeRelative) {
+        return null;
+    }
+    if (/^https?:\/\//i.test(maybeRelative)) {
+        return maybeRelative;
+    }
+    if (maybeRelative.startsWith('//')) {
+        return `${window.location.protocol}${maybeRelative}`;
+    }
+    return joinUrl(base, maybeRelative);
+}
+
+function clearRemoteCameraItems() {
+    document.querySelectorAll('.camera-item.remote-camera').forEach((item) => {
+        item.remove();
+    });
+}
+
+function buildRemoteCameraUrl(baseUrl, remoteCameraUrl, cameraSlug) {
+    const defaultListUrl = joinUrl(baseUrl, 'list.html');
+    const absoluteRemoteUrl = buildAbsoluteUrl(baseUrl, remoteCameraUrl);
+    if (!absoluteRemoteUrl) {
+        return `${defaultListUrl}?camera=${encodeURIComponent(cameraSlug)}`;
+    }
+
+    try {
+        const url = new URL(absoluteRemoteUrl);
+        url.searchParams.set('camera', cameraSlug);
+        return url.toString();
+    } catch (e) {
+        return `${defaultListUrl}?camera=${encodeURIComponent(cameraSlug)}`;
+    }
+}
+
+function mergeBoundsWithLatLngs(latLngs) {
+    if (!latLngs || latLngs.length === 0) {
+        return;
+    }
+    const remoteBounds = L.latLngBounds(latLngs);
+    if (latestMarkerBounds) {
+        latestMarkerBounds.extend(remoteBounds.getSouthWest());
+        latestMarkerBounds.extend(remoteBounds.getNorthEast());
+    } else {
+        latestMarkerBounds = remoteBounds;
+    }
+    map.fitBounds(latestMarkerBounds, markerBoundsFitOptions);
+}
 
 function openMap() {
     if (mapVisible) {
@@ -186,6 +254,151 @@ function createCameraListItem(camera) {
     });
 
     return listItem;
+}
+
+function createRemotePopupContent(deployment, camera, openUrl) {
+    const deploymentLabel = deployment.displayName;
+    return `<b>${camera.title}</b><br><a href="${openUrl}" target="_blank" rel="noopener">Open on ${deploymentLabel}</a>`;
+}
+
+function addRemoteCameraListItem(camera, deployment, markerId, openUrl, imageUrl) {
+    const listItem = document.createElement('li');
+    listItem.className = 'camera-item remote-camera';
+    listItem.dataset.markerId = markerId;
+    listItem.dataset.deployment = deployment.key;
+
+    const header = document.createElement('div');
+    header.className = 'camera-header';
+
+    if (imageUrl) {
+        const img = document.createElement('img');
+        img.src = imageUrl;
+        img.alt = `${camera.title} thumbnail`;
+        header.appendChild(img);
+    }
+
+    const info = document.createElement('div');
+    info.className = 'camera-info';
+
+    const nameEl = document.createElement('div');
+    nameEl.className = 'camera-name';
+    nameEl.textContent = camera.title;
+    info.appendChild(nameEl);
+
+    const deploymentEl = document.createElement('div');
+    deploymentEl.className = 'last-picture-time';
+    deploymentEl.textContent = `Remote: ${deployment.displayName}`;
+    info.appendChild(deploymentEl);
+
+    header.appendChild(info);
+
+    const openLink = document.createElement('a');
+    openLink.className = 'remote-open-link';
+    openLink.href = openUrl;
+    openLink.target = '_blank';
+    openLink.rel = 'noopener';
+    openLink.textContent = `Open on ${deployment.displayName}`;
+    header.appendChild(openLink);
+
+    listItem.appendChild(header);
+
+    listItem.addEventListener('click', (event) => {
+        if (event.target.closest('.remote-open-link')) {
+            return;
+        }
+        if (mapVisible) {
+            const marker = cameraMarkers[markerId];
+            if (marker) {
+                markerCluster.zoomToShowLayer(marker, () => marker.openPopup());
+            }
+        }
+    });
+
+    cameraListElement.appendChild(listItem);
+    return listItem;
+}
+
+function integrateRemoteDeployment(deployment, remoteData) {
+    if (!remoteData || !Array.isArray(remoteData.cameras)) {
+        return;
+    }
+    const remoteCameras = remoteData.cameras;
+    const latLngs = [];
+    remoteCameras.forEach((camera, index) => {
+        const cameraSlug = slugify(camera.title, `camera-${index}`);
+        const markerId = `remote-${deployment.key}-${cameraSlug}-${index}`;
+        const openUrl = buildRemoteCameraUrl(deployment.baseUrl, camera.url, cameraSlug);
+        const imageCandidate = camera.thumbnail_url || camera.image;
+        const imageUrl = buildAbsoluteUrl(deployment.baseUrl, imageCandidate);
+        addRemoteCameraListItem(camera, deployment, markerId, openUrl, imageUrl);
+
+        const lat = camera.lat != null ? parseFloat(camera.lat) : null;
+        const lon = camera.lon != null ? parseFloat(camera.lon) : null;
+        if (Number.isFinite(lat) && Number.isFinite(lon)) {
+            const latLng = L.latLng(lat, lon);
+            const marker = L.marker(latLng);
+            marker.bindPopup(createRemotePopupContent(deployment, camera, openUrl));
+            markerCluster.addLayer(marker);
+            cameraMarkers[markerId] = marker;
+            latLngs.push(latLng);
+        }
+    });
+    mergeBoundsWithLatLngs(latLngs);
+}
+
+function refreshLinkedDeployments(linkedDeployments) {
+    const generation = ++remoteFetchGeneration;
+    clearRemoteCameraItems();
+    if (!Array.isArray(linkedDeployments) || linkedDeployments.length === 0) {
+        return;
+    }
+    const seenKeys = new Set();
+    linkedDeployments.forEach((deployment, index) => {
+        const baseUrl = deployment.base_url;
+        if (!baseUrl) {
+            return;
+        }
+        const displayName = deployment.name || baseUrl;
+        let key = slugify(displayName, `deployment-${index}`);
+        while (seenKeys.has(key)) {
+            key = `${key}-${index}`;
+        }
+        seenKeys.add(key);
+
+        const camerasPath = deployment.cameras_json_url || 'cameras.json';
+        const camerasUrl = buildAbsoluteUrl(baseUrl, camerasPath);
+        const normalizedDeployment = {
+            key,
+            displayName,
+            baseUrl,
+            camerasUrl,
+        };
+
+        fetch(normalizedDeployment.camerasUrl)
+            .then((response) => {
+                if (!response.ok) {
+                    throw new Error(`Failed to load remote cameras from ${normalizedDeployment.camerasUrl}`);
+                }
+                return response.json();
+            })
+            .then((remoteData) => {
+                if (generation !== remoteFetchGeneration) {
+                    return;
+                }
+                const resolvedName = remoteData?.global?.deployment_name;
+                const deploymentForIntegration = {
+                    ...normalizedDeployment,
+                    displayName: resolvedName || normalizedDeployment.displayName,
+                };
+                integrateRemoteDeployment(deploymentForIntegration, remoteData);
+            })
+            .catch((error) => {
+                if (generation !== remoteFetchGeneration) {
+                    return;
+                }
+                console.error(`Failed to pull remote deployment '${displayName}':`, error);
+            });
+    });
 }
 
 function updateCamera(camera, cameraData) {
@@ -328,6 +541,7 @@ function updateAllCameras() {
                 }
                 mapVisibilityInitialized = true;
             }
+            refreshLinkedDeployments(uiConfig.linked_deployments || []);
             const cameras = data.cameras;
             const existingTitles = new Set();
 

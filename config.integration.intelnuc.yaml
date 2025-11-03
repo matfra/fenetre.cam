@@ -97,6 +97,9 @@ global:
     show_main_website_icon: true
     show_map_by_default: true
     show_github_icon: true
+    linked_deployments: 
+      - base_url: https://isitfoggy.com
+      - base_url: http://blackpi.275bur.net:8888/
   work_dir: /srv/fenetre/data
 http_server:
   enabled: true

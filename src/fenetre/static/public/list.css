@@ -281,6 +281,28 @@ body.dark-mode .camera-details .links a {
 body.dark-mode .camera-details .links a:hover {
     background-color: #003d80;
 }
+.camera-item.remote-camera .remote-open-link {
+    display: inline-block;
+    background-color: #007bff;
+    color: #fff;
+    padding: 8px 12px;
+    text-decoration: none;
+    border-radius: 4px;
+    font-size: 0.9em;
+    margin-left: auto;
+    white-space: nowrap;
+    transition: background-color 0.3s ease;
+}
+.camera-item.remote-camera .remote-open-link:hover {
+    background-color: #0056b3;
+}
+body.dark-mode .camera-item.remote-camera .remote-open-link {
+    background-color: #0056b3;
+    color: #e0e0e0;
+}
+body.dark-mode .camera-item.remote-camera .remote-open-link:hover {
+    background-color: #003d80;
+}
 
 @media (orientation: landscape) {
     .camera-details {
