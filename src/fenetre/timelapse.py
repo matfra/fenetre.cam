@@ -290,14 +290,12 @@ def add_to_timelapse_queue(
 def get_queue_size_and_set_metric(timelapse_queue_file: str, lock: threading.Lock):
     """Reads the queue file and sets the initial value for the metric."""
     with lock:
-        try:
-            with open(timelapse_queue_file, "r") as f:
-                lines = f.readlines()
-                metric_timelapse_queue_size.set(len(lines))
-                logging.info(f"Initial timelapse queue size: {len(lines)}")
-        except FileNotFoundError:
-            metric_timelapse_queue_size.set(0)
-            logging.info("Initial timelapse queue size: 0 (file not found)")
+        with open(timelapse_queue_file, "r") as f:
+            lines = f.readlines()
+            metric_timelapse_queue_size.set(len(lines))
+            backlog_length = len(lines)
+            if backlog_length > 0:
+                logging.info(f"Timelapse backlog size: {len(lines)}")
 
 
 def get_next_from_timelapse_queue(

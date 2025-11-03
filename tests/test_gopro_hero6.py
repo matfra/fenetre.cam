@@ -23,7 +23,9 @@ class TestGoProHero6(unittest.TestCase):
 
         self.gopro.update_state()
 
-        mock_get.assert_called_once_with("http://10.5.5.9/status", timeout=5)
+        mock_get.assert_called_once_with(
+            "http://10.5.5.9/status", timeout=self.gopro.timeout
+        )
         self.assertEqual(self.gopro.state, {"status": "ok"})
 
     @mock.patch("fenetre.gopro.GoProHero6._get_latest_file")
@@ -45,13 +47,18 @@ class TestGoProHero6(unittest.TestCase):
         self.assertEqual(content, b"test_jpeg_content")
 
         expected_calls = [
-            mock.call("http://10.5.5.9/gp/gpControl/command/mode?p=1", timeout=5),
-            mock.call("http://10.5.5.9/gp/gpControl/command/shutter?p=1", timeout=5),
-            mock.call("http://10.5.5.9/videos/DCIM/100GOPRO/GOPR0002.JPG", timeout=5),
+            mock.call(
+                "http://10.5.5.9/gp/gpControl/command/shutter?p=1",
+                timeout=self.gopro.timeout,
+            ),
+            mock.call(
+                "http://10.5.5.9/videos/DCIM/100GOPRO/GOPR0002.JPG",
+                timeout=self.gopro.timeout,
+            ),
             mock.call().raise_for_status(),
             mock.call(
                 "http://10.5.5.9/gp/gpControl/command/storage/delete?p=100GOPRO/GOPR0002.JPG",
-                timeout=5,
+                timeout=self.gopro.timeout,
             ),
         ]
         # We can't check the calls to raise_for_status, so we filter them out
@@ -68,13 +75,13 @@ class TestGoProHero6(unittest.TestCase):
         self.gopro.settings.photo_resolution = "12mp_wide"
         mock_get.assert_called_with(
             "http://10.5.5.9/gp/gpControl/setting/17/0",
-            timeout=5,
+            timeout=self.gopro.timeout,
         )
 
         self.gopro.settings.protune = "on"
         mock_get.assert_called_with(
             "http://10.5.5.9/gp/gpControl/setting/21/1",
-            timeout=5,
+            timeout=self.gopro.timeout,
         )
 
     def test_set_invalid_setting(self):

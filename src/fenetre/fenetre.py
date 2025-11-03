@@ -58,7 +58,6 @@ from fenetre.camera_utils import (
 )
 from fenetre.config import config_load
 from fenetre.daylight import run_end_of_day
-from fenetre.gopro_utility import GoProUtilityThread, format_gopro_sd_card
 from fenetre.postprocess import postprocess, publish_metrics_from_exif_dict
 from fenetre.timelapse import (
     add_to_timelapse_queue,
@@ -68,6 +67,17 @@ from fenetre.timelapse import (
     remove_from_timelapse_queue,
 )
 from fenetre.ui_utils import copy_public_html_files
+
+_GOPRO_BLE_AVAILABLE = True
+try:
+    from fenetre.gopro_utility import GoProUtilityThread, format_gopro_sd_card
+except ModuleNotFoundError as e:
+    if e.name and e.name.startswith("bleak"):
+        GoProUtilityThread = None  # type: ignore[assignment]
+        format_gopro_sd_card = None  # type: ignore[assignment]
+        _GOPRO_BLE_AVAILABLE = False
+    else:
+        raise
 
 from io import BytesIO
 import json
@@ -667,7 +677,7 @@ def server_run():
     httpd = server_class(server_address, handler_class)
     global http_server_instance
     http_server_instance = httpd
-    logger.info(f"HTTP server instance {http_server_instance} started.")
+    logger.debug(f"HTTP server instance {http_server_instance} started.")
     try:
         httpd.serve_forever()
     except Exception as e:
@@ -680,7 +690,6 @@ def server_run():
 def stop_http_server():
     global http_server_instance, http_server_thread_global
     if http_server_instance:
-        logger.info("Attempting to shut down HTTP server...")
         http_server_instance.shutdown()
         http_server_instance.server_close()
         http_server_instance = None
@@ -706,7 +715,7 @@ def run_admin_server_func(
 
     global admin_server_instance_global
     try:
-        logger.info("Starting admin server")
+        logger.info(f"Starting admin server on {listeners}")
         waitress_serve(flask_app, listen=listeners, threads=4, _quiet=False)
     except SystemExit:
         logger.info("admin server shutting down (SystemExit caught).")
@@ -943,19 +952,9 @@ def main(argv):
 
     setup_logging()
 
-    if FLAGS.debug:
-        logging.getLogger().setLevel(logging.DEBUG)
-        logger.info("Debug logging enabled via command line flag.")
-
-    # Write PID to file
-    try:
-        with open(FENETRE_PID_FILE, "w") as f:
-            f.write(str(os.getpid()))
-        logger.info(f"PID {os.getpid()} written to {FENETRE_PID_FILE}")
-    except IOError as e:
-        logger.error(f"Failed to write PID file: {e}", exc_info=True)
-        # Depending on strictness, might exit or just warn
-        # For now, warn and continue. Reload via PID signal won't work.
+    with open(FENETRE_PID_FILE, "w") as f:
+        f.write(str(os.getpid()))
+    logger.info(f"PID {os.getpid()} written to {FENETRE_PID_FILE}")
 
     global exit_event
     exit_event = threading.Event()
@@ -963,23 +962,13 @@ def main(argv):
     # Setup signal handling for SIGHUP for config reload and SIGINT/SIGTERM for graceful exit
     signal.signal(signal.SIGHUP, handle_sighup)
     signal.signal(signal.SIGINT, signal_handler_exit)  # Graceful exit on Ctrl+C
-    #    signal.signal(
-    #        signal.SIGTERM, signal_handler_exit
-    #    )  # Graceful exit on kill/systemd stop
+    signal.signal(
+        signal.SIGTERM, signal_handler_exit
+    )  # Graceful exit on kill/systemd stop
 
     # Initialize global sleep_intervals (important for camera threads)
     global sleep_intervals
     sleep_intervals = {}
-
-    load_and_apply_configuration(initial_load=True)  # Uses FLAGS.config by default
-
-    global timelapse_queue_file
-    timelapse_queue_file = os.path.join(
-        global_config.get("work_dir"), "timelapse_queue.txt"
-    )
-    if not os.path.exists(timelapse_queue_file):
-        open(timelapse_queue_file, "a").close()  # Create the file if it does not exist
-    get_queue_size_and_set_metric(timelapse_queue_file, timelapse_queue_lock)
 
     # These queues are global and should persist across reloads if fenetre.py itself isn't restarted.
     # If reload implies restarting these loops, then re-initialization might be needed in reload_configuration_logic
@@ -988,36 +977,61 @@ def main(argv):
     archive_q = deque()
     frequent_timelapse_q = deque()
 
-    # Timelapse and Daylight threads are started here.
-    # Consider if they need to be managed (restarted) on config changes.
-    # For now, they use global_config, which gets updated.
-    # If their core behavior (e.g., ffmpeg_options) changes, a restart might be cleaner.
-    # However, these are long-running loops processing queues; restarting them might be disruptive.
-    # Let's assume for now that updating global_config is sufficient for them.
+    # All threads are started here. We don't start all at the same time to prevent cluttering the stdout and hiding some potentially useful warnings.
     global timelapse_thread_global, daylight_thread_global, archive_thread_global, frequent_timelapse_loop_thread_global
+
+    # This starts the camera threads.
+    load_and_apply_configuration(initial_load=True)  # Uses FLAGS.config by default
+
+    global timelapse_queue_file
+    timelapse_queue_file = os.path.join(
+        global_config.get("work_dir"), "timelapse_queue.txt"
+    )
+
+    if not os.path.exists(timelapse_queue_file):
+        open(timelapse_queue_file, "a").close()  # Create the file if it does not exist
+    get_queue_size_and_set_metric(timelapse_queue_file, timelapse_queue_lock)
+
+    logger.info("Disk management thread will start in 10s...")
+    interruptible_sleep(10, exit_event)
+
+    disk_management_thread_global = Thread(
+        target=disk_management_loop, daemon=True, name="disk_management_loop"
+    )
+    disk_management_thread_global.start()
+    logger.info(f"Starting thread {disk_management_thread_global.name}")
+
+    logger.info("Archive thread will start in 10s...")
+    interruptible_sleep(10, exit_event)
+    archive_thread_global = Thread(
+        target=archive_loop, daemon=True, name="archive_loop"
+    )
+    archive_thread_global.start()
+    logger.info(f"Starting thread {archive_thread_global.name}")
+
+    logger.info("Frequent timelapse thread will start in 10s...")
+    interruptible_sleep(10, exit_event)
     frequent_timelapse_loop_thread_global = Thread(
         target=frequent_timelapse_loop, daemon=True, name="frequent_timelapse_loop"
     )
     frequent_timelapse_loop_thread_global.start()
     logger.info(f"Starting thread {frequent_timelapse_loop_thread_global.name}")
 
+    logger.info("Timelapse thread will start in 10s...")
+    interruptible_sleep(10, exit_event)
     timelapse_thread_global = Thread(
         target=timelapse_loop, daemon=True, name="timelapse_loop"
     )
     timelapse_thread_global.start()
     logger.info(f"Starting thread {timelapse_thread_global.name}")
 
+    logger.info("Daylight thread will start in 10s...")
+    interruptible_sleep(10, exit_event)
     daylight_thread_global = Thread(
         target=daylight_loop, daemon=True, name="daylight_loop"
     )
     daylight_thread_global.start()
     logger.info(f"Starting thread {daylight_thread_global.name}")
-
-    archive_thread_global = Thread(
-        target=archive_loop, daemon=True, name="archive_loop"
-    )
-    archive_thread_global.start()
-    logger.info(f"Starting thread {archive_thread_global.name}")
 
     if timelapse_config.get("frequent_timelapse"):
         frequent_timelapse_scheduler_thread_global = Thread(
@@ -1031,12 +1045,6 @@ def main(argv):
         )
     else:
         logger.info("Frequent timelapse scheduler is disabled.")
-
-    disk_management_thread_global = Thread(
-        target=disk_management_loop, daemon=True, name="disk_management_loop"
-    )
-    disk_management_thread_global.start()
-    logger.info(f"Starting thread {disk_management_thread_global.name}")
 
     try:
         while not exit_event.is_set():
@@ -1260,15 +1268,23 @@ def manage_camera_threads():
 
                     # The GoProUtilityThread is only for Hero 11 (OpenGoPro) models
                     if gopro_model in {"hero11", "open_gopro"}:
-                        gopro_utility_thread = GoProUtilityThread(
-                            gopro_instance, cam_name, cam_conf, exit_event
-                        )
-                        gopro_utility_thread.start()
-                        if cam_name not in active_camera_threads:
-                            active_camera_threads[cam_name] = {}
-                        active_camera_threads[cam_name][
-                            "gopro_utility"
-                        ] = gopro_utility_thread
+                        if not _GOPRO_BLE_AVAILABLE or GoProUtilityThread is None:
+                            logger.warning(
+                                "Camera %s uses GoPro model '%s' but Bluetooth support "
+                                "is disabled. Install the 'gopro' extra to enable it.",
+                                cam_name,
+                                gopro_model,
+                            )
+                        else:
+                            gopro_utility_thread = GoProUtilityThread(
+                                gopro_instance, cam_name, cam_conf, exit_event
+                            )
+                            gopro_utility_thread.start()
+                            if cam_name not in active_camera_threads:
+                                active_camera_threads[cam_name] = {}
+                            active_camera_threads[cam_name][
+                                "gopro_utility"
+                            ] = gopro_utility_thread
 
                     active_camera_threads.setdefault(cam_name, {})[
                         "gopro_instance"

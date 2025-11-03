@@ -24,10 +24,39 @@ body.dark-mode {
     transition: width 0.5s ease;
     border-right: 1px solid #ccc;
 }
+body.dark-mode #map-panel {
+    border-right: 1px solid #333;
+}
 
 #map {
     height: 100%;
     visibility: hidden;
+}
+body.dark-mode #map {
+    background-color: #0f0f0f;
+}
+body.dark-mode .leaflet-container {
+    background: #0f0f0f;
+}
+body.dark-mode .leaflet-bar a {
+    background: #1f1f1f;
+    color: #e0e0e0;
+    border-color: #333;
+}
+body.dark-mode .leaflet-bar a:hover {
+    background: #2a2a2a;
+}
+body.dark-mode .marker-cluster-small,
+body.dark-mode .marker-cluster-medium,
+body.dark-mode .marker-cluster-large {
+    background-color: rgba(70, 70, 70, 0.6);
+    color: #f0f0f0;
+}
+body.dark-mode .marker-cluster-small div,
+body.dark-mode .marker-cluster-medium div,
+body.dark-mode .marker-cluster-large div {
+    background-color: rgba(40, 40, 40, 0.9);
+    color: inherit;
 }
 
 #list-panel {
@@ -48,7 +77,35 @@ body.dark-mode {
     display: flex;
     justify-content: center;
     align-items: center;
+    color: #333;
     transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+
+#controls button .icon {
+    width: 24px;
+    height: 24px;
+    display: none;
+}
+
+#map-toggle .icon-map,
+#theme-toggle .icon-sun {
+    display: block;
+}
+
+#map-toggle.map-open .icon-map {
+    display: none;
+}
+
+#map-toggle.map-open .icon-list {
+    display: block;
+}
+
+#theme-toggle.dark-mode-active .icon-sun {
+    display: none;
+}
+
+#theme-toggle.dark-mode-active .icon-moon {
+    display: block;
 }
 
 /* Style for new icon links */
@@ -72,6 +129,10 @@ body.dark-mode {
     fill: #333;
 }
 
+#github-link {
+    display: none;
+}
+
 body.dark-mode #theme-toggle {
     background-color: #333;
     color: #e0e0e0;
@@ -88,6 +149,7 @@ body.dark-mode #theme-toggle {
     display: flex;
     justify-content: center;
     align-items: center;
+    color: #333;
 }
 
 body.dark-mode #controls a {
@@ -219,6 +281,19 @@ body.dark-mode .camera-details .links a {
 body.dark-mode .camera-details .links a:hover {
     background-color: #003d80;
 }
+
+@media (orientation: landscape) {
+    .camera-details {
+        max-height: calc(100vh - 240px);
+        overflow-y: auto;
+    }
+
+    .camera-details img {
+        max-height: calc(100vh - 380px);
+        object-fit: contain;
+    }
+}
+
 @media (max-width: 600px) {
     .camera-header img { width: 80px; height: 45px; }
     .camera-details .links a {

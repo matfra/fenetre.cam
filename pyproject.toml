@@ -4,22 +4,29 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "fenetre"
-version = "0.1.0"
+version = "0.9.0"
 dependencies = [
     "pytz",
     "pyyaml",
     "absl-py",
-    "logzero",
     "numpy",
     "astral",
     "Flask",
     "requests",
-    "bleak",
     "mozjpeg-lossless-optimization",
     "waitress",
     "prometheus-client",
     "pyexiv2",
     "scikit-image",
+    "Pillow",
+    "cairosvg",
+    "piexif",
+]
+
+[project.optional-dependencies]
+gopro = [
+    "bleak",
+    "beautifulsoup4",
 ]
 
 [project.scripts]
