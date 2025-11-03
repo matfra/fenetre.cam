@@ -408,6 +408,7 @@ def snap(camera_name, camera_config: Dict):
 
         # Capture picture from a URL. Useful for public cams or CCTV
         url = camera_config.get("url")
+        timeout = camera_config.get("timeout_s")
         if url is not None:
             ua = global_config.get("user_agent", "")
             return get_pic_from_url(
