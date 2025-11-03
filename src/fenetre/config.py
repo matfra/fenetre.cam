@@ -206,8 +206,29 @@ def _validate_global(cfg: Dict, errors) -> Dict:
     ui_cfg = _dict(cfg.get("ui"), "global.ui", errors)
     ui_out = {}
     _warn_unknown_keys(
-        "global.ui", ui_cfg, {"main_website_url", "show_main_website_icon", "show_github_icon"}
+        "global.ui",
+        ui_cfg,
+        {
+            "landing_page",
+            "fullscreen_camera",
+            "main_website_url",
+            "show_main_website_icon",
+            "show_github_icon",
+            "show_map_by_default",
+        },
     )  # Add allowed keys for ui here
+    ui_out["fullscreen_camera"] = _str(
+        ui_cfg.get("fullscreen_camera"),
+        "global.ui.fullscreen_camera",
+        errors,
+        default=None,
+    )
+    ui_out["landing_page"] = _str(
+        ui_cfg.get("landing_page"),
+        "global.ui.landing_page",
+        errors,
+        default="list",
+    )
     ui_out["main_website_url"] = _str(
         ui_cfg.get("main_website_url"),
         "global.ui.main_website_url",
@@ -225,6 +246,12 @@ def _validate_global(cfg: Dict, errors) -> Dict:
         "global.ui.show_github_icon",
         errors,
         default=True,
+    )
+    ui_out["show_map_by_default"] = _bool(
+        ui_cfg.get("show_map_by_default"),
+        "global.ui.show_map_by_default",
+        errors,
+        default=False,
     )
     out["ui"] = ui_out
     return out

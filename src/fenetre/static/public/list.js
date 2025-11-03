@@ -51,6 +51,8 @@ const map = L.map('map', {
 let activeTileLayer = initialTileLayer;
 let latestMarkerBounds = null;
 const markerBoundsFitOptions = { padding: [50, 50] };
+let mapVisible = false;
+let mapVisibilityInitialized = false;
 
 function applyMapTheme(isDark) {
     const desiredLayer = isDark ? darkTileLayer : lightTileLayer;
@@ -67,26 +69,40 @@ map.addLayer(markerCluster);
 
 var cameraMarkers = {}; // To store references to map markers
 
+function openMap() {
+    if (mapVisible) {
+        return;
+    }
+    mapVisible = true;
+    mapPanel.style.width = '50%';
+    listPanel.style.width = '50%';
+    mapElement.style.visibility = 'visible';
+    mapToggleButton.classList.add('map-open');
+    setTimeout(() => {
+        map.invalidateSize();
+        if (latestMarkerBounds) {
+            map.fitBounds(latestMarkerBounds, markerBoundsFitOptions);
+        }
+    }, 500);
+}
+
+function closeMap() {
+    if (!mapVisible) {
+        return;
+    }
+    mapVisible = false;
+    mapPanel.style.width = '0';
+    listPanel.style.width = '100%';
+    mapElement.style.visibility = 'hidden';
+    mapToggleButton.classList.remove('map-open');
+}
+
 // --- Map Toggle Functionality ---
 mapToggleButton.addEventListener('click', () => {
-    const isMapVisible = mapPanel.style.width === '50%';
-    if (isMapVisible) {
-        mapPanel.style.width = '0';
-        listPanel.style.width = '100%';
-        mapElement.style.visibility = 'hidden';
-        mapToggleButton.classList.remove('map-open');
+    if (mapVisible) {
+        closeMap();
     } else {
-        mapPanel.style.width = '50%';
-        listPanel.style.width = '50%';
-        mapElement.style.visibility = 'visible';
-        mapToggleButton.classList.add('map-open');
-        // Invalidate map size to fix rendering issues after being hidden
-        setTimeout(() => {
-            map.invalidateSize();
-            if (latestMarkerBounds) {
-                map.fitBounds(latestMarkerBounds, markerBoundsFitOptions);
-            }
-        }, 500);
+        openMap();
     }
 });
 
@@ -161,8 +177,7 @@ function createCameraListItem(camera) {
         });
 
         // Also pan map if it's visible
-        const isMapVisible = mapPanel.style.width === '50%';
-        if (isMapVisible) {
+        if (mapVisible) {
             const marker = cameraMarkers[listItem.dataset.markerId];
             if (marker) {
                 markerCluster.zoomToShowLayer(marker, () => marker.openPopup());
@@ -306,6 +321,12 @@ function updateAllCameras() {
                 githubLink.style.display = 'flex';
             } else {
                 githubLink.style.display = 'none';
+            }
+            if (!mapVisibilityInitialized) {
+                if (uiConfig.show_map_by_default) {
+                    openMap();
+                }
+                mapVisibilityInitialized = true;
             }
             const cameras = data.cameras;
             const existingTitles = new Set();

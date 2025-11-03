@@ -94,6 +94,9 @@ global:
   ui:
     fullscreen_camera: gopro-hero-6
     landing_page: fullscreen
+    show_main_website_icon: true
+    show_map_by_default: true
+    show_github_icon: true
   work_dir: /srv/fenetre/data
 http_server:
   enabled: true

@@ -928,10 +928,12 @@ def update_cameras_metadata(cameras_configs: Dict, work_dir: str):
 
     daily_cfg = timelapse_config.get("daily_timelapse", {}) or {}
     freq_cfg = timelapse_config.get("frequent_timelapse", {}) or {}
+    ui_public = dict(global_config.get("ui", {}))
     updated_cameras_metadata["global"] = {
         "timelapse_file_extension": daily_cfg.get("file_extension", "webm"),
         "frequent_timelapse_file_extension": freq_cfg.get("file_extension", "mp4"),
         "deployment_name": global_config["deployment_name"],
+        "ui": ui_public,
     }
 
     with open(json_filepath, "w") as json_file:
