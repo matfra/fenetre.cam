@@ -21,6 +21,7 @@ themeToggle.addEventListener('click', () => {
     const theme = body.classList.contains('dark-mode') ? 'dark' : 'light';
     localStorage.setItem('theme', theme);
     syncThemeToggleIcon();
+    applyMapTheme(theme === 'dark');
 });
 
 const cameraListElement = document.getElementById('camera-list');
@@ -30,11 +31,36 @@ const mapPanel = document.getElementById('map-panel');
 const listPanel = document.getElementById('list-panel');
 const mapElement = document.getElementById('map');
 
-var map = L.map('map').setView([0, 0], 2);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+const lightTileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 18,
-    minZoom: 0
-}).addTo(map);
+    minZoom: 0,
+    attribution: '&copy; OpenStreetMap contributors'
+});
+
+const darkTileLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    maxZoom: 18,
+    minZoom: 0,
+    subdomains: 'abcd',
+    attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
+});
+
+const initialTileLayer = body.classList.contains('dark-mode') ? darkTileLayer : lightTileLayer;
+const map = L.map('map', {
+    layers: [initialTileLayer]
+}).setView([0, 0], 2);
+let activeTileLayer = initialTileLayer;
+let latestMarkerBounds = null;
+const markerBoundsFitOptions = { padding: [50, 50] };
+
+function applyMapTheme(isDark) {
+    const desiredLayer = isDark ? darkTileLayer : lightTileLayer;
+    if (desiredLayer === activeTileLayer) {
+        return;
+    }
+    map.addLayer(desiredLayer);
+    map.removeLayer(activeTileLayer);
+    activeTileLayer = desiredLayer;
+}
 
 var markerCluster = L.markerClusterGroup();
 map.addLayer(markerCluster);
@@ -55,14 +81,17 @@ mapToggleButton.addEventListener('click', () => {
         mapElement.style.visibility = 'visible';
         mapToggleButton.classList.add('map-open');
         // Invalidate map size to fix rendering issues after being hidden
-        setTimeout(() => map.invalidateSize(), 500);
+        setTimeout(() => {
+            map.invalidateSize();
+            if (latestMarkerBounds) {
+                map.fitBounds(latestMarkerBounds, markerBoundsFitOptions);
+            }
+        }, 500);
     }
 });
 
-function createPopupContent(camera, fullImageUrl) {
-    const imageUrl = fullImageUrl || '';
-    const imageTag = imageUrl ? `<img src="${imageUrl}" style="width: 280px; height: auto; border-radius: 4px; margin-bottom: 5px;">` : 'Loading image...';
-    return `${imageTag}<br><b>${camera.title}</b>`;
+function createPopupContent(camera) {
+    return `<b>${camera.title}</b>`;
 }
 
 function parseTimestampFromFilename(filename) {
@@ -302,8 +331,10 @@ function updateAllCameras() {
 
             // Auto-zoom map to fit all markers
             if (cameraLatLngs.length > 0) {
-                const bounds = L.latLngBounds(cameraLatLngs);
-                map.fitBounds(bounds, { padding: [50, 50] });
+                latestMarkerBounds = L.latLngBounds(cameraLatLngs);
+                map.fitBounds(latestMarkerBounds, markerBoundsFitOptions);
+            } else {
+                latestMarkerBounds = null;
             }
 
             // Auto-expand camera from URL param
