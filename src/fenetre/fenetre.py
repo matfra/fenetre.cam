@@ -67,6 +67,7 @@ from fenetre.timelapse import (
     remove_from_timelapse_queue,
 )
 from fenetre.ui_utils import copy_public_html_files
+from fenetre.mqtt import MQTTManager
 
 _GOPRO_BLE_AVAILABLE = True
 try:
@@ -108,6 +109,19 @@ admin_server_instance_global = None
 exit_event = threading.Event()
 timelapse_queue_file = None
 timelapse_queue_lock = threading.Lock()
+mqtt_manager: Optional[MQTTManager] = None
+
+
+def configure_mqtt_manager(global_cfg: Dict) -> None:
+    global mqtt_manager
+    if mqtt_manager:
+        mqtt_manager.stop()
+        mqtt_manager = None
+
+    mqtt_cfg = global_cfg.get("mqtt") or {}
+    if mqtt_cfg.get("enabled"):
+        deployment_name = global_cfg.get("deployment_name", "fenetre.cam")
+        mqtt_manager = MQTTManager(deployment_name, mqtt_cfg)
 
 
 def interruptible_sleep(
@@ -400,6 +414,8 @@ def snap(camera_name, camera_config: Dict):
     clear_camera_gauges()
     camera_online_metric = metric_camera_online.labels(camera_name=camera_name)
     camera_online_metric.set(0.0)
+    if mqtt_manager:
+        mqtt_manager.publish_camera_state(camera_name, False)
 
     # This is the capture function which is the only place in this snap thread where we have image source type specific info and logic.
     def capture(mode: str) -> Image.Image:
@@ -505,6 +521,8 @@ def snap(camera_name, camera_config: Dict):
             camera_name=camera_name
         ).set_to_current_time()
         camera_online_metric.set(1.0)
+        if mqtt_manager:
+            mqtt_manager.publish_camera_state(camera_name, True)
 
         # Now we update the links for the frontend/UI
         update_latest_link(previous_pic_fullpath)
@@ -1122,6 +1140,7 @@ def load_and_apply_configuration(initial_load=False, config_file_override=None):
             log_backup_count=global_config.get("log_backup_count", 5),
         )
         apply_module_levels(global_config.get("logging_levels", {}))
+        configure_mqtt_manager(global_config)
 
         try:
             from .admin_server import app as imported_flask_app
@@ -1166,6 +1185,7 @@ def load_and_apply_configuration(initial_load=False, config_file_override=None):
         global_config = new_global_config
         admin_server_config = new_admin_server_config
         timelapse_config = new_timelapse_config
+        configure_mqtt_manager(global_config)
 
     # Update cameras_config and manage camera threads
     cameras_config = new_cameras_config
@@ -1206,6 +1226,8 @@ def manage_camera_threads():
             ):
                 thread_info["gopro_utility"].stop()
                 thread_info["gopro_utility"].join(timeout=5)
+            if mqtt_manager:
+                mqtt_manager.publish_camera_state(cam_name, False)
             threads_to_remove.append(cam_name)
 
     for cam_name in threads_to_remove:
@@ -1396,6 +1418,11 @@ def shutdown_application():
 
     # Stop Config Server
     stop_admin_server()
+
+    global mqtt_manager
+    if mqtt_manager:
+        mqtt_manager.stop()
+        mqtt_manager = None
 
     # Stop Timelapse and Daylight threads
     global timelapse_thread_global, daylight_thread_global

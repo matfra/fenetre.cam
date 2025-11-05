@@ -1,6 +1,7 @@
 import logging
 import os
 import difflib
+import re
 from typing import Dict, Tuple, Optional
 
 import yaml
@@ -116,6 +117,7 @@ def _validate_global(cfg: Dict, errors) -> Dict:
         "log_backup_count",
         "ui",
         "deployment_name",
+        "mqtt",
     }
     _warn_unknown_keys("global", cfg, allowed)
 
@@ -202,6 +204,11 @@ def _validate_global(cfg: Dict, errors) -> Dict:
         errors,
         default="fenetre.cam",
     )
+
+    deployment_name = out.get("deployment_name") or "fenetre.cam"
+    sanitized_deployment_name = re.sub(r"[^A-Za-z0-9_-]", "_", deployment_name)
+    if not sanitized_deployment_name:
+        sanitized_deployment_name = "fenetre"
 
     ui_cfg = _dict(cfg.get("ui"), "global.ui", errors)
     ui_out = {}
@@ -290,6 +297,58 @@ def _validate_global(cfg: Dict, errors) -> Dict:
         linked_out = []
     ui_out["linked_deployments"] = linked_out
     out["ui"] = ui_out
+
+    mqtt_cfg = _dict(cfg.get("mqtt"), "global.mqtt", errors)
+    mqtt_out = {}
+    _warn_unknown_keys(
+        "global.mqtt",
+        mqtt_cfg,
+        {
+            "enabled",
+            "host",
+            "port",
+            "username",
+            "password",
+            "base_topic",
+            "discovery_prefix",
+        },
+    )
+    mqtt_out["enabled"] = _bool(
+        mqtt_cfg.get("enabled"), "global.mqtt.enabled", errors, default=False
+    )
+    mqtt_out["host"] = _str(
+        mqtt_cfg.get("host"), "global.mqtt.host", errors, default="localhost"
+    )
+    mqtt_out["port"] = _int(
+        mqtt_cfg.get("port"),
+        "global.mqtt.port",
+        errors,
+        default=1883,
+        min_value=1,
+        max_value=65535,
+    )
+    mqtt_out["username"] = _str(
+        mqtt_cfg.get("username"),
+        "global.mqtt.username",
+        errors,
+        default=f"fenetre_{sanitized_deployment_name}",
+    )
+    mqtt_out["password"] = _str(
+        mqtt_cfg.get("password"), "global.mqtt.password", errors
+    )
+    mqtt_out["base_topic"] = _str(
+        mqtt_cfg.get("base_topic"),
+        "global.mqtt.base_topic",
+        errors,
+        default=f"fenetre/{sanitized_deployment_name}",
+    )
+    mqtt_out["discovery_prefix"] = _str(
+        mqtt_cfg.get("discovery_prefix"),
+        "global.mqtt.discovery_prefix",
+        errors,
+        default="homeassistant",
+    )
+    out["mqtt"] = mqtt_out
     return out
 
 

@@ -82,8 +82,8 @@ cameras:
 global:
   log_dir: /srv/fenetre/logs
   logging_level: INFO
-    #logging_levels:
-    #  gopro: DEBUG
+  logging_levels:
+#    fenetre.mqtt: DEBUG
   storage_management:
     check_interval_s: 300
     dry_run: false
@@ -101,6 +101,14 @@ global:
       - base_url: https://isitfoggy.com
       - base_url: http://blackpi.275bur.net:8888/
   work_dir: /srv/fenetre/data
+  mqtt:
+    enabled: true
+    host: localhost
+    port: 1883
+    username: fenetre_fenetre.cam
+    password: null
+    base_topic: fenetre/fenetre.cam
+    discovery_prefix: homeassistant
 http_server:
   enabled: true
   listen: 0.0.0.0:8888

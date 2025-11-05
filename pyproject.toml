@@ -14,6 +14,7 @@ dependencies = [
     "Flask",
     "requests",
     "mozjpeg-lossless-optimization",
+    "paho-mqtt",
     "waitress",
     "prometheus-client",
     "pyexiv2",

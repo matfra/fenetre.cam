@@ -12,6 +12,14 @@ global: #Requires app restart
     dry_run: true
     check_interval_s: 300
     work_dir_max_size_GB: 10
+  mqtt:
+    enabled: false
+    host: localhost
+    port: 1883
+    username: fenetre_fenetre_cam
+    password: null
+    base_topic: fenetre/fenetre_cam
+    discovery_prefix: homeassistant
   ui:
     landing_page: "list" # list, map, camera, fullscreen
     fullscreen_camera: "a-cool-http-cam-with-clouds"
