@@ -10,6 +10,7 @@ cameras:
         - /gopro/camera/presets/load?id=65536 # Single photo day
         - /gopro/camera/setting?option=3&setting=125 # Superphoto for better HDR and constrast
     night_settings:
+      trigger_exposure_composite_value: 1.5
       urlpaths_commands:
         - /gopro/camera/presets/load?id=65539 # Night photo
     gopro_model: hero11 # Required now that we support multiple gopros. Should work for any Hero9+
