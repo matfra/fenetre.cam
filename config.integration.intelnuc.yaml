@@ -4,7 +4,7 @@ admin_server:
 cameras:
   gopro-hero-6:
     day_settings:
-      trigger_exposure_composite_value: 2 # Composite value is ISO * exposure time. 3 = 100 * 0.03s
+      trigger_exposure_composite_value: 1.0 # Composite value is ISO * exposure time. 3 = 100 * 0.03s
       # Command reference here: https://github.com/KonradIT/goprowifihack and https://gopro.github.io/OpenGoPro/http
       urlpaths_commands: 
 #        - /gp/gpControl/command/mode?p=1
@@ -20,7 +20,7 @@ cameras:
         - /gp/gpControl/setting/25/1 # ISO Max: 400
         - /gp/gpControl/setting/97/0
     night_settings:
-      trigger_exposure_composite_value: 3 
+      trigger_exposure_composite_value: 2.0 
       urlpaths_commands:
         - /gp/gpControl/command/sub_mode?mode=1&sub_mode=2 # Night photo mode
         - /gp/gpControl/setting/19/0 # Exposure time for NightPhoto: Auto
@@ -31,7 +31,7 @@ cameras:
         - /gp/gpControl/setting/24/2 # ISO Max: 200
         - /gp/gpControl/setting/25/2 # Sharpness: low
     astro_settings:
-      trigger_exposure_composite_value: 1986 # max value in day : 10 * 199. Min value in night: 20 * 99 ISO = 1980
+      trigger_exposure_composite_value: 1986.0 # max value in day : 10 * 199. Min value in night: 20 * 99 ISO = 1980
       urlpaths_commands:
         - /gp/gpControl/setting/19/5 # Exposure time for NightPhoto: 20s
         - /gp/gpControl/setting/21/1 # ProTune on
@@ -82,18 +82,33 @@ cameras:
 global:
   log_dir: /srv/fenetre/logs
   logging_level: INFO
-    #logging_levels:
-    #  gopro: DEBUG
+  logging_levels:
+#    fenetre.mqtt: DEBUG
   storage_management:
     check_interval_s: 300
     dry_run: false
     enabled: true
     work_dir_max_size_GB: 30
   timezone: America/Los_Angeles
+  deployment_name: dev.fenetre.cam
   ui:
     fullscreen_camera: gopro-hero-6
     landing_page: fullscreen
+    show_main_website_icon: true
+    show_map_by_default: true
+    show_github_icon: true
+    linked_deployments: 
+      - base_url: https://isitfoggy.com
+      - base_url: http://blackpi.275bur.net:8888/
   work_dir: /srv/fenetre/data
+  mqtt:
+    enabled: true
+    host: localhost
+    port: 1883
+    username: fenetre_fenetre.cam
+    password: null
+    base_topic: fenetre/fenetre.cam
+    discovery_prefix: homeassistant
 http_server:
   enabled: true
   listen: 0.0.0.0:8888

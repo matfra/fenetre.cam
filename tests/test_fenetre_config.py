@@ -3,13 +3,14 @@ import os
 # Add project root to allow importing fenetre
 import sys
 import tempfile
+from types import SimpleNamespace
 import unittest
 from unittest.mock import MagicMock, patch
 
 import yaml
 
 # Import the functions/classes to be tested
-from fenetre.config import config_load
+from fenetre.config import ConfigError, config_load
 from fenetre.fenetre import load_and_apply_configuration
 
 
@@ -74,7 +75,11 @@ class FenetreConfigTestCase(unittest.TestCase):
 
     def test_config_load_success(self):
         test_data = {
-            "global": {"setting": "global_val", "work_dir": self.mock_work_dir},
+            "global": {
+                "setting": "global_val",
+                "work_dir": self.mock_work_dir,
+                "timezone": "UTC",
+            },
             "http_server": {"listen": "0.0.0.0:8080"},
             "cameras": {"cam1": {"url": "http://cam1"}},
         }
@@ -84,14 +89,21 @@ class FenetreConfigTestCase(unittest.TestCase):
             config_path
         )
 
-        self.assertEqual(global_conf, test_data["global"])
-        self.assertEqual(server_conf, test_data["http_server"])
-        self.assertEqual(cameras_conf, test_data["cameras"])
-        self.assertEqual(admin_server_conf, {})
+        self.assertEqual(global_conf["work_dir"], self.mock_work_dir)
+        self.assertEqual(global_conf["timezone"], "UTC")
+        self.assertEqual(server_conf["listen"], test_data["http_server"]["listen"])
+        self.assertTrue(server_conf["enabled"])
+        self.assertIn("cam1", cameras_conf)
+        self.assertEqual(cameras_conf["cam1"]["url"], "http://cam1")
+        self.assertTrue(admin_server_conf["enabled"])
 
     def test_config_dualstack_load_success(self):
         test_data = {
-            "global": {"setting": "global_val", "work_dir": self.mock_work_dir},
+            "global": {
+                "setting": "global_val",
+                "work_dir": self.mock_work_dir,
+                "timezone": "UTC",
+            },
             "http_server": {"listen": "0.0.0.0:8080 [::]:8080"},
             "cameras": {"cam1": {"url": "http://cam1"}},
         }
@@ -101,14 +113,21 @@ class FenetreConfigTestCase(unittest.TestCase):
             config_path
         )
 
-        self.assertEqual(global_conf, test_data["global"])
-        self.assertEqual(server_conf, test_data["http_server"])
-        self.assertEqual(cameras_conf, test_data["cameras"])
-        self.assertEqual(admin_server_conf, {})
+        self.assertEqual(global_conf["work_dir"], self.mock_work_dir)
+        self.assertEqual(global_conf["timezone"], "UTC")
+        self.assertEqual(server_conf["listen"], test_data["http_server"]["listen"])
+        self.assertTrue(server_conf["enabled"])
+        self.assertIn("cam1", cameras_conf)
+        self.assertEqual(cameras_conf["cam1"]["url"], "http://cam1")
+        self.assertTrue(admin_server_conf["enabled"])
 
     def test_config_load_missing_sections(self):
         test_data = {
-            "global": {"setting": "global_val"}
+            "global": {
+                "setting": "global_val",
+                "work_dir": self.mock_work_dir,
+                "timezone": "UTC",
+            }
             # http_server and cameras are missing
         }
         config_path = self._create_temp_config_file(test_data)
@@ -117,10 +136,13 @@ class FenetreConfigTestCase(unittest.TestCase):
             config_path
         )
 
-        self.assertEqual(global_conf, test_data["global"])
-        self.assertEqual(server_conf, {})  # Should default to empty dict
+        self.assertEqual(global_conf["timezone"], "UTC")
+        self.assertEqual(global_conf["work_dir"], self.mock_work_dir)
+        self.assertTrue(server_conf["enabled"])
+        self.assertEqual(server_conf["listen"], "0.0.0.0:8888")
         self.assertEqual(cameras_conf, {})  # Should default to empty dict
-        self.assertEqual(admin_server_conf, {})
+        self.assertTrue(admin_server_conf["enabled"])
+        self.assertEqual(admin_server_conf["listen"], "0.0.0.0:8889 [::]:8889")
 
     @patch("fenetre.config.logger")
     def test_config_load_file_not_found(self, mock_config_logging):
@@ -171,6 +193,8 @@ class FenetreConfigTestCase(unittest.TestCase):
         fenetre_module.exit_event = MagicMock()
         fenetre_module.exit_event.is_set.return_value = False
 
+        fenetre_module.FLAGS = SimpleNamespace(config=config_path)
+
         # Call with config_file_override
         load_and_apply_configuration(
             initial_load=True, config_file_override=config_path
@@ -203,7 +227,8 @@ class FenetreConfigTestCase(unittest.TestCase):
         # 1. cam1_watchdog (target=create_and_start_and_watch_thread)
         # 2. cam2_watchdog (target=create_and_start_and_watch_thread)
         # 3. http_server (target=server_run)
-        self.assertEqual(MockThread.call_count, 3)
+        # 4. admin_server (target=run_admin_server_func)
+        self.assertEqual(MockThread.call_count, 4)
 
         # Check calls for GoProUtilityThread
         self.assertEqual(MockGoProThread.call_count, 1)
@@ -307,6 +332,8 @@ class FenetreConfigTestCase(unittest.TestCase):
         config_path_reloaded = self._create_temp_config_file(reloaded_data)
         # mock_flags_instance.config = config_path_reloaded # No longer needed
 
+        fenetre_module.FLAGS = SimpleNamespace(config=config_path_reloaded)
+
         load_and_apply_configuration(
             initial_load=False, config_file_override=config_path_reloaded
         )  # Apply reloaded config
@@ -397,6 +424,24 @@ class FenetreConfigTestCase(unittest.TestCase):
         self.assertEqual(ss_config["sunrise_offset_end_minutes"], 30)  # default
         self.assertEqual(ss_config["sunset_offset_start_minutes"], 30)  # default
         self.assertEqual(ss_config["sunset_offset_end_minutes"], 60)  # default
+
+    @patch("fenetre.config.logger")
+    def test_config_load_sanitization_warning(self, mock_logger):
+        test_data = {
+            "global": {"work_dir": self.mock_work_dir, "timezone": "UTC"},
+            "http_server": {
+                "enabled": "not-a-boolean",  # Invalid value
+                "listen": "0.0.0.0:8080",
+                "extra_key": "should be ignored",
+            },
+            "cameras": {},
+        }
+        config_path = self._create_temp_config_file(test_data)
+
+        with self.assertRaises(ConfigError):
+            config_load(config_path)
+
+        self.assertTrue(mock_logger.error.called)
 
 
 if __name__ == "__main__":

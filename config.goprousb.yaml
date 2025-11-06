@@ -42,7 +42,7 @@ cameras:
       overlay_width: 1000
       padding: 5
       position: top_center
-      sun_arc_color: rgba(255, 165, 0, 0.65)
+      sun_arc_color: rgba(255, 125, 0, 0.65)
       type: sun_path
     - angle: 180
       type: rotate
@@ -63,6 +63,7 @@ global:
     enabled: true
     work_dir_max_size_GB: 400
   sunrise_sunset_interval_s: 10
+  deployment_name: sf.fenetre.cam
   timezone: America/Los_Angeles
   ui:
     fullscreen_camera: gopro-hero-11

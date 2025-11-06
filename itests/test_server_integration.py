@@ -10,9 +10,14 @@ from contextlib import closing
 from prometheus_client import REGISTRY
 
 # Add project root to allow importing fenetre
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from src.fenetre.fenetre import load_and_apply_configuration, shutdown_application, exit_event
+from src.fenetre.fenetre import (
+    load_and_apply_configuration,
+    shutdown_application,
+    exit_event,
+)
+
 
 class ServerIntegrationTest(unittest.TestCase):
 
@@ -32,20 +37,23 @@ class ServerIntegrationTest(unittest.TestCase):
             f.write(self.test_content)
 
         # Find a free port
-        with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
-            s.bind(('', 0))
-            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            self.port = s.getsockname()[1]
+        try:
+            with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
+                s.bind(("", 0))
+                s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                self.port = s.getsockname()[1]
+        except PermissionError as exc:
+            self.skipTest(f"Socket operations not permitted in this environment: {exc}")
 
         self.config_data = {
-            "global": {"work_dir": self.work_dir},
+            "global": {"timezone": "UTC", "work_dir": self.work_dir},
             "http_server": {
                 "enabled": True,
                 "listen": f"127.0.0.1:{self.port}",
             },
             "cameras": {},
-            "admin_server": { "enabled": False },
-            "timelapse": { "enabled": False },
+            "admin_server": {"enabled": False},
+            "timelapse": {"enabled": False},
         }
 
         with open(self.config_path, "w") as f:
@@ -70,7 +78,6 @@ class ServerIntegrationTest(unittest.TestCase):
             if hasattr(fenetre_module, "exit_event") and fenetre_module.exit_event:
                 fenetre_module.exit_event.clear()
 
-
     def tearDown(self):
         shutdown_application()
         self.temp_dir.cleanup()
@@ -82,17 +89,23 @@ class ServerIntegrationTest(unittest.TestCase):
                 pass
 
     def test_http_server_serves_content(self):
-        load_and_apply_configuration(initial_load=True, config_file_override=self.config_path)
+        load_and_apply_configuration(
+            initial_load=True, config_file_override=self.config_path
+        )
 
         # Give the server a moment to start up
         time.sleep(1)
 
         try:
-            response = requests.get(f"http://127.0.0.1:{self.port}/test.html", timeout=5)
+            response = requests.get(
+                f"http://127.0.0.1:{self.port}/test.html", timeout=5
+            )
             self.assertEqual(response.status_code, 200)
             self.assertEqual(response.text, self.test_content)
         except requests.exceptions.ConnectionError as e:
-            self.fail(f"HTTP server did not start or is not listening. Connection error: {e}")
+            self.fail(
+                f"HTTP server did not start or is not listening. Connection error: {e}"
+            )
 
 
 if __name__ == "__main__":

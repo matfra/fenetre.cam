@@ -1,19 +1,73 @@
 body {
     font-family: Arial, sans-serif;
     margin: 0;
-    padding: 20px;
+    padding: 0;
     background-color: #f4f4f4;
     color: #333;
     transition: background-color 0.3s ease, color 0.3s ease;
+    height: 100vh;
+    overflow: hidden;
 }
 body.dark-mode {
     background-color: #121212;
     color: #e0e0e0;
 }
+
+#main-container {
+    display: flex;
+    height: 100%;
+}
+
+#map-panel {
+    width: 0;
+    height: 100vh;
+    transition: width 0.5s ease;
+    border-right: 1px solid #ccc;
+}
+body.dark-mode #map-panel {
+    border-right: 1px solid #333;
+}
+
+#map {
+    height: 100%;
+    visibility: hidden;
+}
+body.dark-mode #map {
+    background-color: #0f0f0f;
+}
+body.dark-mode .leaflet-container {
+    background: #0f0f0f;
+}
+body.dark-mode .leaflet-bar a {
+    background: #1f1f1f;
+    color: #e0e0e0;
+    border-color: #333;
+}
+body.dark-mode .leaflet-bar a:hover {
+    background: #2a2a2a;
+}
+body.dark-mode .marker-cluster-small,
+body.dark-mode .marker-cluster-medium,
+body.dark-mode .marker-cluster-large {
+    background-color: rgba(70, 70, 70, 0.6);
+    color: #f0f0f0;
+}
+body.dark-mode .marker-cluster-small div,
+body.dark-mode .marker-cluster-medium div,
+body.dark-mode .marker-cluster-large div {
+    background-color: rgba(40, 40, 40, 0.9);
+    color: inherit;
+}
+
+#list-panel {
+    width: 100%;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    transition: width 0.5s ease;
+}
+
 #theme-toggle {
-    position: fixed;
-    top: 20px;
-    right: 20px;
     width: 40px;
     height: 40px;
     border-radius: 50%;
@@ -23,7 +77,60 @@ body.dark-mode {
     display: flex;
     justify-content: center;
     align-items: center;
+    color: #333;
     transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+
+#controls button .icon {
+    width: 24px;
+    height: 24px;
+    display: none;
+}
+
+#map-toggle .icon-map,
+#theme-toggle .icon-sun {
+    display: block;
+}
+
+#map-toggle.map-open .icon-map {
+    display: none;
+}
+
+#map-toggle.map-open .icon-list {
+    display: block;
+}
+
+#theme-toggle.dark-mode-active .icon-sun {
+    display: none;
+}
+
+#theme-toggle.dark-mode-active .icon-moon {
+    display: block;
+}
+
+/* Style for new icon links */
+#controls a {
+    width: 40px;
+    height: 40px;
+    border-radius: 5px;
+    border: 1px solid #ccc;
+    cursor: pointer;
+    font-size: 20px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    text-decoration: none;
+    color: #333;
+}
+
+#github-link svg {
+    width: 22px;
+    height: 22px;
+    fill: #333;
+}
+
+#github-link {
+    display: none;
 }
 
 body.dark-mode #theme-toggle {
@@ -32,15 +139,46 @@ body.dark-mode #theme-toggle {
     border-color: #555;
 }
 
-h1 {
-    text-align: center;
+#map-toggle {
+    width: 40px;
+    height: 40px;
+    border-radius: 5px;
+    border: 1px solid #ccc;
+    cursor: pointer;
+    font-size: 20px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: #333;
 }
+
+body.dark-mode #controls a {
+    border-color: #555;
+    color: #e0e0e0;
+}
+
+body.dark-mode #github-link svg {
+    fill: #e0e0e0;
+}
+
+#list-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 20px;
+    border-bottom: 1px solid #ddd;
+}
+
+h1 {
+    margin: 0;
+}
+
 #camera-list {
     list-style-type: none;
     padding: 0;
-    margin: 0;
-    max-width: 800px;
-    margin: auto;
+    margin: 10px 20px;
+    overflow-y: auto;
+    flex-grow: 1;
 }
 .camera-item {
     background-color: #fff;
@@ -65,9 +203,7 @@ body.dark-mode .camera-item {
     height: 67.5px;
     object-fit: cover;
     border-radius: 4px;
-}
-.camera-header a:not(:last-child) img {
-    margin-right: 15px;
+    margin-right: 15px; /* Add spacing between thumbnail and title */
 }
 .camera-info {
     flex-grow: 1;
@@ -145,10 +281,47 @@ body.dark-mode .camera-details .links a {
 body.dark-mode .camera-details .links a:hover {
     background-color: #003d80;
 }
+.camera-item.remote-camera .remote-open-link {
+    display: inline-block;
+    background-color: #007bff;
+    color: #fff;
+    padding: 8px 12px;
+    text-decoration: none;
+    border-radius: 4px;
+    font-size: 0.9em;
+    margin-left: auto;
+    white-space: nowrap;
+    transition: background-color 0.3s ease;
+}
+.camera-item.remote-camera .remote-open-link:hover {
+    background-color: #0056b3;
+}
+body.dark-mode .camera-item.remote-camera .remote-open-link {
+    background-color: #0056b3;
+    color: #e0e0e0;
+}
+body.dark-mode .camera-item.remote-camera .remote-open-link:hover {
+    background-color: #003d80;
+}
+
+@media (orientation: landscape) {
+    .camera-details {
+        max-height: calc(100vh - 240px);
+        overflow-y: auto;
+    }
+
+    .camera-details img {
+        max-height: calc(100vh - 380px);
+        object-fit: contain;
+    }
+}
+
 @media (max-width: 600px) {
-    body { padding: 10px; }
     .camera-header img { width: 80px; height: 45px; }
     .camera-details .links a {
         display: block;
+    }
+    #list-header {
+        flex-direction: column;
     }
 }

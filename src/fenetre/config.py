@@ -1,5 +1,7 @@
 import logging
 import os
+import difflib
+import re
 from typing import Dict, Tuple, Optional
 
 import yaml
@@ -9,6 +11,26 @@ logger = logging.getLogger(__name__)
 
 class ConfigError(Exception):
     pass
+
+
+def _log_config_diff(section_name: str, before: Dict, after: Dict):
+    """Logs the difference between two configuration dictionaries using YAML."""
+    before_str = yaml.dump(before, sort_keys=True, default_flow_style=False, indent=2)
+    after_str = yaml.dump(after, sort_keys=True, default_flow_style=False, indent=2)
+
+    if before_str != after_str:
+        diff = difflib.unified_diff(
+            before_str.splitlines(keepends=True),
+            after_str.splitlines(keepends=True),
+            fromfile=f"{section_name}_original",
+            tofile=f"{section_name}_validated",
+        )
+        diff_str = "".join(diff)
+        logger.warning(
+            f"Configuration for '{section_name}' has been sanitized. "
+            "Some values may have been ignored, coerced, or set to defaults.\n"
+            f"Configuration diff for '{section_name}':\n{diff_str}"
+        )
 
 
 def _bool(value, path, errors, default=None):
@@ -94,6 +116,8 @@ def _validate_global(cfg: Dict, errors) -> Dict:
         "log_max_bytes",
         "log_backup_count",
         "ui",
+        "deployment_name",
+        "mqtt",
     }
     _warn_unknown_keys("global", cfg, allowed)
 
@@ -173,11 +197,163 @@ def _validate_global(cfg: Dict, errors) -> Dict:
         default=5,
         min_value=0,
     )
+
+    out["deployment_name"] = _str(
+        cfg.get("deployment_name"),
+        "global.deployment_name",
+        errors,
+        default="fenetre.cam",
+    )
+
+    deployment_name = out.get("deployment_name") or "fenetre.cam"
+    sanitized_deployment_name = re.sub(r"[^A-Za-z0-9_-]", "_", deployment_name)
+    if not sanitized_deployment_name:
+        sanitized_deployment_name = "fenetre"
+
+    ui_cfg = _dict(cfg.get("ui"), "global.ui", errors)
+    ui_out = {}
+    _warn_unknown_keys(
+        "global.ui",
+        ui_cfg,
+        {
+            "landing_page",
+            "fullscreen_camera",
+            "main_website_url",
+            "show_main_website_icon",
+            "show_github_icon",
+            "show_map_by_default",
+            "linked_deployments",
+        },
+    )  # Add allowed keys for ui here
+    ui_out["fullscreen_camera"] = _str(
+        ui_cfg.get("fullscreen_camera"),
+        "global.ui.fullscreen_camera",
+        errors,
+        default=None,
+    )
+    ui_out["landing_page"] = _str(
+        ui_cfg.get("landing_page"),
+        "global.ui.landing_page",
+        errors,
+        default="list",
+    )
+    ui_out["main_website_url"] = _str(
+        ui_cfg.get("main_website_url"),
+        "global.ui.main_website_url",
+        errors,
+        default="https://fenetre.cam",
+    )
+    ui_out["show_main_website_icon"] = _bool(
+        ui_cfg.get("show_main_website_icon"),
+        "global.ui.show_main_website_icon",
+        errors,
+        default=True,
+    )
+    ui_out["show_github_icon"] = _bool(
+        ui_cfg.get("show_github_icon"),
+        "global.ui.show_github_icon",
+        errors,
+        default=True,
+    )
+    ui_out["show_map_by_default"] = _bool(
+        ui_cfg.get("show_map_by_default"),
+        "global.ui.show_map_by_default",
+        errors,
+        default=False,
+    )
+    linked_cfg = ui_cfg.get("linked_deployments", [])
+    linked_out = []
+    if linked_cfg is None:
+        linked_cfg = []
+    if isinstance(linked_cfg, list):
+        for idx, entry in enumerate(linked_cfg):
+            entry_path = f"global.ui.linked_deployments[{idx}]"
+            if not isinstance(entry, dict):
+                errors.append(
+                    f"{entry_path}: expected mapping, got {type(entry).__name__}"
+                )
+                continue
+            base_url = _str(entry.get("base_url"), f"{entry_path}.base_url", errors)
+            if not base_url:
+                continue
+            normalized = {"base_url": base_url}
+            if entry.get("name") is not None:
+                name = _str(entry.get("name"), f"{entry_path}.name", errors)
+                if name:
+                    normalized["name"] = name
+            if entry.get("cameras_json_url") is not None:
+                cameras_json_url = _str(
+                    entry.get("cameras_json_url"),
+                    f"{entry_path}.cameras_json_url",
+                    errors,
+                )
+                if cameras_json_url:
+                    normalized["cameras_json_url"] = cameras_json_url
+            linked_out.append(normalized)
+    else:
+        errors.append(
+            f"global.ui.linked_deployments: expected list, got {type(linked_cfg).__name__}"
+        )
+        linked_out = []
+    ui_out["linked_deployments"] = linked_out
+    out["ui"] = ui_out
+
+    mqtt_cfg = _dict(cfg.get("mqtt"), "global.mqtt", errors)
+    mqtt_out = {}
+    _warn_unknown_keys(
+        "global.mqtt",
+        mqtt_cfg,
+        {
+            "enabled",
+            "host",
+            "port",
+            "username",
+            "password",
+            "base_topic",
+            "discovery_prefix",
+        },
+    )
+    mqtt_out["enabled"] = _bool(
+        mqtt_cfg.get("enabled"), "global.mqtt.enabled", errors, default=False
+    )
+    mqtt_out["host"] = _str(
+        mqtt_cfg.get("host"), "global.mqtt.host", errors, default="localhost"
+    )
+    mqtt_out["port"] = _int(
+        mqtt_cfg.get("port"),
+        "global.mqtt.port",
+        errors,
+        default=1883,
+        min_value=1,
+        max_value=65535,
+    )
+    mqtt_out["username"] = _str(
+        mqtt_cfg.get("username"),
+        "global.mqtt.username",
+        errors,
+        default=f"fenetre_{sanitized_deployment_name}",
+    )
+    mqtt_out["password"] = _str(
+        mqtt_cfg.get("password"), "global.mqtt.password", errors
+    )
+    mqtt_out["base_topic"] = _str(
+        mqtt_cfg.get("base_topic"),
+        "global.mqtt.base_topic",
+        errors,
+        default=f"fenetre/{sanitized_deployment_name}",
+    )
+    mqtt_out["discovery_prefix"] = _str(
+        mqtt_cfg.get("discovery_prefix"),
+        "global.mqtt.discovery_prefix",
+        errors,
+        default="homeassistant",
+    )
+    out["mqtt"] = mqtt_out
     return out
 
 
 def _validate_http(cfg: Dict, errors) -> Dict:
-    allowed = {"enabled", "listen"}
+    allowed = {"enabled", "listen", "allow_cors", "cors_allow_origin"}
     _warn_unknown_keys("http_server", cfg, allowed)
     out = {}
     out["enabled"] = _bool(
@@ -185,6 +361,15 @@ def _validate_http(cfg: Dict, errors) -> Dict:
     )
     out["listen"] = _str(
         cfg.get("listen"), "http_server.listen", errors, default="0.0.0.0:8888"
+    )
+    out["allow_cors"] = _bool(
+        cfg.get("allow_cors"), "http_server.allow_cors", errors, default=True
+    )
+    out["cors_allow_origin"] = _str(
+        cfg.get("cors_allow_origin"),
+        "http_server.cors_allow_origin",
+        errors,
+        default="https://dev.fenetre.cam",
     )
     return out
 
@@ -545,6 +730,12 @@ def config_load(config_file_path: str) -> Tuple[Dict, Dict, Dict, Dict, Dict]:
     global_out = _validate_global(global_cfg, errors)
     admin_out = _validate_admin(admin_cfg, errors)
     timelapse_out = _validate_timelapse(timelapse_cfg, errors)
+
+    _log_config_diff("global", global_cfg, global_out)
+    _log_config_diff("http_server", http_cfg, http_out)
+    _log_config_diff("admin_server", admin_cfg, admin_out)
+    _log_config_diff("cameras", cameras_cfg, cameras_out)
+    _log_config_diff("timelapse", timelapse_cfg, timelapse_out)
 
     if errors:
         # Be strict: better fail fast with actionable messages

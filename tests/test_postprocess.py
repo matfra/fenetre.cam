@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
 import pytz
 
-from PIL import Image
+from PIL import Image, ImageOps
 
 
 class TestPostprocess(unittest.TestCase):
@@ -193,9 +193,10 @@ class TestPostprocess(unittest.TestCase):
 
         # Make the mocked add_timestamp return the original image for this test
         mock_add_timestamp.return_value = img
-        returned_img, _ = postprocess(img, postprocessing_steps)
+        returned_img = postprocess(img, postprocessing_steps)
+        expected_img = ImageOps.exif_transpose(img)
 
-        self.assertEqual(img, returned_img)
+        self.assertEqual(returned_img.tobytes(), expected_img.tobytes())
         mock_add_timestamp.assert_called_once_with(
             img,
             text_format="%Y-%m-%d %H:%M:%S %Z",  # Default
@@ -214,9 +215,10 @@ class TestPostprocess(unittest.TestCase):
         img = self.create_test_image()
         postprocessing_steps = [{"type": "timestamp", "enabled": False, "size": 30}]
 
-        returned_img, _ = postprocess(img, postprocessing_steps)
+        returned_img = postprocess(img, postprocessing_steps)
+        expected_img = ImageOps.exif_transpose(img)
 
-        self.assertEqual(img, returned_img)
+        self.assertEqual(returned_img.tobytes(), expected_img.tobytes())
         mock_add_timestamp.assert_not_called()
 
     @patch("fenetre.postprocess.ImageDraw.Draw")
@@ -531,9 +533,9 @@ class TestPostprocess(unittest.TestCase):
 
         mock_add_text_overlay.return_value = img  # Ensure the mock returns an image
 
-        returned_img, _ = postprocess(img, postprocessing_steps)
+        returned_img = postprocess(img, postprocessing_steps)
 
-        self.assertEqual(img, returned_img)  # Check if image is returned
+        self.assertIs(img, returned_img)  # The helper returns the same image instance
         mock_add_text_overlay.assert_called_once()
 
         # Verify that _add_text_overlay was called with the correct parameters

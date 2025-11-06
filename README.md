@@ -38,6 +38,10 @@ This is mostly written in Python and it's been tested on Linux but it could run 
     ```bash
     pip install -e .
     ```
+    If you plan to control GoPro cameras over Bluetooth, install the optional GoPro extra:
+    ```bash
+    pip install -e .[gopro]
+    ```
 
 
 ## Usage
