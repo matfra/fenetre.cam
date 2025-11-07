@@ -6,6 +6,8 @@ ExecStart=/srv/fenetre.cam/venv/bin/python -m fenetre.fenetre --config=/srv/fene
 User=fenetre
 Restart=always
 Environment=TZ=America/Los_Angeles
+KillSignal=SIGINT
+
 
 [Install]
 WantedBy=multi-user.target
