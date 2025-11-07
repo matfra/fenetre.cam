@@ -67,6 +67,7 @@ from fenetre.timelapse import (
     remove_from_timelapse_queue,
 )
 from fenetre.ui_utils import copy_public_html_files
+from fenetre.cameras_metadata import write_cameras_metadata
 from fenetre.mqtt import MQTTManager
 
 _GOPRO_BLE_AVAILABLE = True
@@ -900,85 +901,14 @@ def create_and_start_and_watch_thread(
 
 
 def update_cameras_metadata(cameras_configs: Dict, work_dir: str):
-    """cameras.json is a public file describing info about the cameras used to power the map view.
-    We add to this file, never delete, but we do update the cameras if their info (i.e. coordinates) changed.
-    """
-
-    updated_cameras_metadata = {"cameras": [], "global": {}}
+    """Regenerates cameras.json, preserving metadata for removed cameras."""
     json_filepath = os.path.join(work_dir, "cameras.json")
-
-    if os.path.exists(json_filepath):
-        try:
-            with open(json_filepath, "r") as json_file:
-                cameras_public_metadata = json.load(json_file)
-
-            # Handle both old (list) and new (dict) formats
-            if isinstance(cameras_public_metadata, list):
-                logger.warning(
-                    f"Old format detected for {json_filepath}. It will be updated to the new format."
-                )
-                old_camera_list = cameras_public_metadata
-            elif isinstance(cameras_public_metadata, dict):
-                old_camera_list = cameras_public_metadata.get("cameras", [])
-            else:
-                logger.warning(
-                    f"Unrecognized format for {json_filepath}. It will be overwritten."
-                )
-                old_camera_list = []
-
-            for camera_metadata in old_camera_list:
-                if camera_metadata.get("title") not in cameras_config:
-                    logger.warning(
-                        f"Camera {camera_metadata.get('title')} is not configured anymore. "
-                        f"Delete it from {json_filepath} manually if you want to."
-                    )
-                    updated_cameras_metadata["cameras"].append(camera_metadata)
-
-        except (json.JSONDecodeError, TypeError) as e:
-            logger.warning(
-                f"Could not parse {json_filepath} or it has an invalid format. It will be overwritten. Error: {e}"
-            )
-
-    for cam in cameras_config:
-        metadata = {}
-        metadata["title"] = cam
-        metadata["url"] = f"list.html?camera={cam}"
-        metadata["fullscreen_url"] = f"fullscreen.html?camera={cam}"
-        if cameras_configs[cam].get("source") == "external_website":
-            metadata["source"] = "external_website"
-            metadata["url"] = cameras_configs[cam].get("url")
-            metadata["thumbnail_url"] = cameras_configs[cam].get("thumbnail_url")
-        else:
-            metadata["original_url"] = cameras_configs[cam].get(
-                "url"
-            ) or cameras_configs[cam].get("local_command")
-            metadata["dynamic_metadata"] = os.path.join("photos", cam, "metadata.json")
-            metadata["image"] = os.path.join("photos", cam, "latest.jpg")
-        metadata["original_url"] = cameras_config[cam].get("url") or cameras_config[
-            cam
-        ].get("local_command")
-        metadata["description"] = cameras_config[cam].get("description", "")
-        metadata["snap_interval_s"] = (
-            cameras_config[cam].get("snap_interval_s") or "dynamic"
-        )
-        metadata["dynamic_metadata"] = os.path.join("photos", cam, "metadata.json")
-        metadata["image"] = os.path.join("photos", cam, "latest.jpg")
-        metadata["lat"] = cameras_config[cam].get("lat")
-        metadata["lon"] = cameras_config[cam].get("lon")
-        updated_cameras_metadata["cameras"].append(metadata)
-
-    daily_cfg = timelapse_config.get("daily_timelapse", {}) or {}
-    freq_cfg = timelapse_config.get("frequent_timelapse", {}) or {}
-    ui_public = dict(global_config.get("ui", {}))
-    updated_cameras_metadata["global"] = {
-        "timelapse_file_extension": daily_cfg.get("file_extension", "webm"),
-        "frequent_timelapse_file_extension": freq_cfg.get("file_extension", "mp4"),
-        "deployment_name": global_config["deployment_name"],
-        "ui": ui_public,
-    }
-
-    with open(json_filepath, "w") as json_file:
-        json.dump(updated_cameras_metadata, json_file, indent=4)
+    write_cameras_metadata(
+        cameras_configs,
+        global_config or {},
+        timelapse_config or {},
+        json_filepath,
+    )
 
 
 timelapse_thread_global = None

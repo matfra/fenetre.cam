@@ -1,6 +1,7 @@
 import json  # For handling JSON input
 import os
 import signal
+from datetime import datetime
 from io import BytesIO
 
 import requests
@@ -17,6 +18,8 @@ from PIL import Image, ImageOps
 from prometheus_client import REGISTRY, Counter, Gauge, generate_latest
 from werkzeug.exceptions import BadRequest
 
+from fenetre.cameras_metadata import write_cameras_metadata
+from fenetre.config import config_load
 from fenetre.gopro import GoPro
 from fenetre.ui_utils import copy_public_html_files
 
@@ -511,6 +514,66 @@ def reload_config():
         return jsonify({"error": f"Invalid PID found in {fenetre_pid_file_path}."}), 500
     except Exception as e:
         return jsonify({"error": f"Error signaling reload: {str(e)}"}), 500
+
+
+@app.route("/api/cameras_json/rebuild", methods=["POST"])
+def rebuild_cameras_json():
+    config_file_path = app.config.get("FENETRE_CONFIG_FILE")
+    if not config_file_path:
+        return jsonify({"error": "FENETRE_CONFIG_FILE not set in app config."}), 500
+
+    try:
+        (
+            _,
+            cameras_config,
+            global_config,
+            _,
+            timelapse_config,
+        ) = config_load(config_file_path)
+    except FileNotFoundError:
+        return (
+            jsonify({"error": f"Configuration file {config_file_path} not found."}),
+            404,
+        )
+    except Exception as exc:
+        return (
+            jsonify({"error": f"Failed to load configuration: {str(exc)}"}),
+            500,
+        )
+
+    work_dir = global_config.get("work_dir")
+    if not work_dir:
+        return (
+            jsonify({"error": "work_dir not set in global configuration."}),
+            500,
+        )
+
+    cameras_json_path = os.path.join(work_dir, "cameras.json")
+    backup_path = None
+
+    try:
+        if os.path.exists(cameras_json_path):
+            timestamp = datetime.utcnow().strftime("%Y%m%dT%H%M%S")
+            backup_path = f"{cameras_json_path}.bak.{timestamp}"
+            os.replace(cameras_json_path, backup_path)
+
+        write_cameras_metadata(
+            cameras_config,
+            global_config,
+            timelapse_config,
+            cameras_json_path,
+        )
+    except Exception as exc:
+        return (
+            jsonify({"error": f"Failed to rebuild cameras.json: {str(exc)}"}),
+            500,
+        )
+
+    message = "cameras.json rebuilt successfully."
+    if backup_path:
+        message += f" Previous file saved as {os.path.basename(backup_path)}."
+
+    return jsonify({"message": message}), 200
 
 
 # The run_server() function and if __name__ == '__main__': block are removed.

@@ -82,6 +82,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const loadConfigBtn = document.getElementById('loadConfigBtn');
     const saveConfigBtn = document.getElementById('saveConfigBtn');
     const reloadAppBtn = document.getElementById('reloadAppBtn');
+    const rebuildCamerasBtn = document.getElementById('rebuildCamerasBtn');
     const syncUiBtn = document.getElementById('syncUiBtn');
     const addCameraBtn = document.getElementById('addCameraBtn'); // Get the new button
     const configFormContainer = document.getElementById('configFormContainer');
@@ -90,6 +91,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadConfigBtn.addEventListener('click', fetchAndDisplayConfig);
     saveConfigBtn.addEventListener('click', saveConfiguration);
     reloadAppBtn.addEventListener('click', reloadApplication);
+    rebuildCamerasBtn.addEventListener('click', rebuildCamerasJson);
     syncUiBtn.addEventListener('click', syncUI);
     addCameraBtn.addEventListener('click', handleAddCamera); // Add event listener
 
@@ -568,6 +570,24 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             console.error('Error sending UI sync:', error);
             setStatus(`Error sending UI sync: ${error.message}`, 'error');
+        }
+    }
+
+    async function rebuildCamerasJson() {
+        setStatus('Rebuilding cameras.json...', 'info');
+        try {
+            const response = await fetch('/api/cameras_json/rebuild', {
+                method: 'POST',
+            });
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({ error: `HTTP error! status: ${response.status}` }));
+                throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+            }
+            const result = await response.json();
+            setStatus(result.message || 'cameras.json rebuilt successfully.', 'success');
+        } catch (error) {
+            console.error('Error rebuilding cameras.json:', error);
+            setStatus(`Error rebuilding cameras.json: ${error.message}`, 'error');
         }
     }
 
