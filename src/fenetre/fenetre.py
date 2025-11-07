@@ -942,7 +942,7 @@ def update_cameras_metadata(cameras_configs: Dict, work_dir: str):
     for cam in cameras_config:
         metadata = {}
         metadata["title"] = cam
-        metadata["url"] = f"map.html?camera={cam}"
+        metadata["url"] = f"list.html?camera={cam}"
         metadata["fullscreen_url"] = f"fullscreen.html?camera={cam}"
         if cameras_configs[cam].get("source") == "external_website":
             metadata["source"] = "external_website"

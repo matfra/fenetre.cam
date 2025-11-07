@@ -43,7 +43,7 @@ def generate_index_html(work_dir: str, global_config: dict):
             )
             return
 
-    # For map.html, list.html, or fallback from fullscreen
+    # For list.html, or fallback from fullscreen
     source_filename = f"{landing_page}.html"
     source_path = os.path.join(work_dir, source_filename)
 

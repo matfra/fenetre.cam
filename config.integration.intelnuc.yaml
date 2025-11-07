@@ -92,8 +92,8 @@ global:
   timezone: America/Los_Angeles
   deployment_name: dev.fenetre.cam
   ui:
-    fullscreen_camera: gopro-hero-6
-    landing_page: fullscreen
+    #    fullscreen_camera: gopro-hero-6
+    landing_page: list
     show_main_website_icon: true
     show_map_by_default: true
     show_github_icon: true
