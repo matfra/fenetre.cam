@@ -99,6 +99,9 @@ global:
     show_github_icon: true
     linked_deployments: 
       - base_url: https://isitfoggy.com
+      - base_url: https://sfwemcams.fenetre.cam
+      - base_url: https://sfbay.fenetre.cam
+      - base_url: https://360view.club
     map_privacy_radius_m: 1000 # 1km circle shown instead of a pin; set to 0 to disable
     map_privacy_jitter_m: 500 # optional center jitter in meters (clamped to the radius)
 
