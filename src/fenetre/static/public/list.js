@@ -66,9 +66,85 @@ function applyMapTheme(isDark) {
 }
 
 var markerCluster = L.markerClusterGroup();
+var circleLayerGroup = L.layerGroup();
 map.addLayer(markerCluster);
+map.addLayer(circleLayerGroup);
 
-var cameraMarkers = {}; // To store references to map markers
+var cameraMarkers = {}; // To store references to map markers or circles
+
+function getLayerBounds(layer) {
+    if (!layer) {
+        return null;
+    }
+    if (typeof layer.getBounds === 'function') {
+        return layer.getBounds();
+    }
+    if (typeof layer.getLatLng === 'function') {
+        const latLng = layer.getLatLng();
+        return L.latLngBounds(latLng, latLng);
+    }
+    return null;
+}
+
+function extendBoundsWithLayer(layer) {
+    const layerBounds = getLayerBounds(layer);
+    if (!layerBounds) {
+        return;
+    }
+    if (latestMarkerBounds) {
+        latestMarkerBounds.extend(layerBounds.getSouthWest());
+        latestMarkerBounds.extend(layerBounds.getNorthEast());
+    } else {
+        latestMarkerBounds = layerBounds;
+    }
+}
+
+function focusCameraLayer(layer) {
+    if (!layer) {
+        return;
+    }
+    if (layer instanceof L.Marker && markerCluster.hasLayer(layer)) {
+        markerCluster.zoomToShowLayer(layer, () => layer.openPopup());
+        return;
+    }
+    const bounds = getLayerBounds(layer);
+    if (bounds) {
+        map.fitBounds(bounds, markerBoundsFitOptions);
+        if (typeof layer.openPopup === 'function') {
+            layer.openPopup();
+        }
+    }
+}
+
+function addCameraLayer(lat, lon, radiusMeters, popupHtml) {
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+        return null;
+    }
+    const coords = L.latLng(lat, lon);
+    const radius = Number.isFinite(radiusMeters) ? radiusMeters : 0;
+    let layer;
+    if (radius > 0) {
+        layer = L.circle(coords, {
+            radius,
+            color: '#3388ff',
+            fillColor: '#3388ff',
+            fillOpacity: 0.15,
+            weight: 1,
+        });
+    } else {
+        layer = L.marker(coords);
+    }
+    if (popupHtml) {
+        layer.bindPopup(popupHtml);
+    }
+    if (layer instanceof L.Marker) {
+        markerCluster.addLayer(layer);
+    } else {
+        circleLayerGroup.addLayer(layer);
+    }
+    extendBoundsWithLayer(layer);
+    return layer;
+}
 
 function slugify(value, fallback) {
     const base = (value || '').toString().toLowerCase().trim();
@@ -121,20 +197,6 @@ function buildRemoteCameraUrl(baseUrl, remoteCameraUrl, cameraSlug) {
     } catch (e) {
         return `${defaultListUrl}?camera=${encodeURIComponent(cameraSlug)}`;
     }
-}
-
-function mergeBoundsWithLatLngs(latLngs) {
-    if (!latLngs || latLngs.length === 0) {
-        return;
-    }
-    const remoteBounds = L.latLngBounds(latLngs);
-    if (latestMarkerBounds) {
-        latestMarkerBounds.extend(remoteBounds.getSouthWest());
-        latestMarkerBounds.extend(remoteBounds.getNorthEast());
-    } else {
-        latestMarkerBounds = remoteBounds;
-    }
-    map.fitBounds(latestMarkerBounds, markerBoundsFitOptions);
 }
 
 function openMap() {
@@ -246,10 +308,7 @@ function createCameraListItem(camera) {
 
         // Also pan map if it's visible
         if (mapVisible) {
-            const marker = cameraMarkers[listItem.dataset.markerId];
-            if (marker) {
-                markerCluster.zoomToShowLayer(marker, () => marker.openPopup());
-            }
+            focusCameraLayer(cameraMarkers[listItem.dataset.markerId]);
         }
     });
 
@@ -307,10 +366,7 @@ function addRemoteCameraListItem(camera, deployment, markerId, openUrl, imageUrl
             return;
         }
         if (mapVisible) {
-            const marker = cameraMarkers[markerId];
-            if (marker) {
-                markerCluster.zoomToShowLayer(marker, () => marker.openPopup());
-            }
+            focusCameraLayer(cameraMarkers[markerId]);
         }
     });
 
@@ -323,7 +379,7 @@ function integrateRemoteDeployment(deployment, remoteData) {
         return;
     }
     const remoteCameras = remoteData.cameras;
-    const latLngs = [];
+    const newLayers = [];
     remoteCameras.forEach((camera, index) => {
         const cameraSlug = slugify(camera.title, `camera-${index}`);
         const markerId = `remote-${deployment.key}-${cameraSlug}-${index}`;
@@ -334,16 +390,16 @@ function integrateRemoteDeployment(deployment, remoteData) {
 
         const lat = camera.lat != null ? parseFloat(camera.lat) : null;
         const lon = camera.lon != null ? parseFloat(camera.lon) : null;
-        if (Number.isFinite(lat) && Number.isFinite(lon)) {
-            const latLng = L.latLng(lat, lon);
-            const marker = L.marker(latLng);
-            marker.bindPopup(createRemotePopupContent(deployment, camera, openUrl));
-            markerCluster.addLayer(marker);
-            cameraMarkers[markerId] = marker;
-            latLngs.push(latLng);
+        const radius = camera.map_radius_m != null ? parseFloat(camera.map_radius_m) : 0;
+        const layer = addCameraLayer(lat, lon, radius, createRemotePopupContent(deployment, camera, openUrl));
+        if (layer) {
+            cameraMarkers[markerId] = layer;
+            newLayers.push(layer);
         }
     });
-    mergeBoundsWithLatLngs(latLngs);
+    if (newLayers.length > 0 && latestMarkerBounds) {
+        map.fitBounds(latestMarkerBounds, markerBoundsFitOptions);
+    }
 }
 
 function refreshLinkedDeployments(linkedDeployments) {
@@ -549,27 +605,23 @@ function updateAllCameras() {
 
             // Map marker logic
             markerCluster.clearLayers();
+            circleLayerGroup.clearLayers();
             cameraMarkers = {};
-            const cameraLatLngs = [];
+            latestMarkerBounds = null;
 
             cameras.forEach(camera => {
-                if (camera.lat && camera.lon) {
-                    const latLng = [camera.lat, camera.lon];
-                    cameraLatLngs.push(latLng);
-                    const markerId = `camera-${camera.title.replace(/\s+/g, '-')}`;
-                    const marker = L.marker(latLng);
-                    marker.bindPopup(createPopupContent(camera));
-                    cameraMarkers[markerId] = marker;
-                    markerCluster.addLayer(marker);
+                const lat = camera.lat != null ? parseFloat(camera.lat) : null;
+                const lon = camera.lon != null ? parseFloat(camera.lon) : null;
+                const radius = camera.map_radius_m != null ? parseFloat(camera.map_radius_m) : 0;
+                const markerId = `camera-${camera.title.replace(/\s+/g, '-')}`;
+                const layer = addCameraLayer(lat, lon, radius, createPopupContent(camera));
+                if (layer) {
+                    cameraMarkers[markerId] = layer;
                 }
             });
 
-            // Auto-zoom map to fit all markers
-            if (cameraLatLngs.length > 0) {
-                latestMarkerBounds = L.latLngBounds(cameraLatLngs);
+            if (latestMarkerBounds) {
                 map.fitBounds(latestMarkerBounds, markerBoundsFitOptions);
-            } else {
-                latestMarkerBounds = null;
             }
 
             // Auto-expand camera from URL param

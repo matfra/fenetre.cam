@@ -223,6 +223,8 @@ def _validate_global(cfg: Dict, errors) -> Dict:
             "show_github_icon",
             "show_map_by_default",
             "linked_deployments",
+            "map_privacy_radius_m",
+            "map_privacy_jitter_m",
         },
     )  # Add allowed keys for ui here
     ui_out["fullscreen_camera"] = _str(
@@ -260,6 +262,20 @@ def _validate_global(cfg: Dict, errors) -> Dict:
         "global.ui.show_map_by_default",
         errors,
         default=False,
+    )
+    ui_out["map_privacy_radius_m"] = _float(
+        ui_cfg.get("map_privacy_radius_m"),
+        "global.ui.map_privacy_radius_m",
+        errors,
+        default=1000.0,
+        min_value=0.0,
+    )
+    ui_out["map_privacy_jitter_m"] = _float(
+        ui_cfg.get("map_privacy_jitter_m"),
+        "global.ui.map_privacy_jitter_m",
+        errors,
+        default=500.0,
+        min_value=0.0,
     )
     linked_cfg = ui_cfg.get("linked_deployments", [])
     linked_out = []
@@ -622,6 +638,20 @@ def _validate_cameras(cfg: Dict, errors) -> Dict:
                 errors,
                 min_value=-180,
                 max_value=180,
+            )
+        if cam.get("map_privacy_radius_m") is not None:
+            cam_out["map_privacy_radius_m"] = _float(
+                cam.get("map_privacy_radius_m"),
+                f"cameras.{name}.map_privacy_radius_m",
+                errors,
+                min_value=0.0,
+            )
+        if cam.get("map_privacy_jitter_m") is not None:
+            cam_out["map_privacy_jitter_m"] = _float(
+                cam.get("map_privacy_jitter_m"),
+                f"cameras.{name}.map_privacy_jitter_m",
+                errors,
+                min_value=0.0,
             )
         ss_cfg = _dict(
             cam.get("sunrise_sunset"), f"cameras.{name}.sunrise_sunset", errors
