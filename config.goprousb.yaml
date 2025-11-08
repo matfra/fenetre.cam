@@ -63,7 +63,7 @@ global:
     enabled: true
     work_dir_max_size_GB: 400
   sunrise_sunset_interval_s: 10
-  deployment_name: sf.fenetre.cam
+  deployment_name: isitfoggy.com
   timezone: America/Los_Angeles
   ui:
     fullscreen_camera: gopro-hero-11
