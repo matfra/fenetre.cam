@@ -7,6 +7,7 @@ import subprocess
 import threading
 from io import TextIOWrapper
 from typing import Optional
+import shutil
 
 from PIL import Image
 
@@ -118,6 +119,8 @@ def create_timelapse(
 
     timelapse_filename = os.path.basename(dir) + "." + file_extension
     timelapse_filepath = os.path.join(dir, timelapse_filename)
+    base, ext = os.path.splitext(timelapse_filename)
+    tmp_timelapse_filepath = os.path.join(dir, f".{base}.tmp{ext}")
 
     logger.info(
         f"Encoding {images_count} images to {timelapse_filepath} at {framerate} fps"
@@ -155,6 +158,8 @@ def create_timelapse(
         os.makedirs(tmp_dir, exist_ok=True)
     if os.path.exists(timelapse_filepath) and not overwrite:
         raise FileExistsError(timelapse_filepath)
+    if os.path.exists(tmp_timelapse_filepath):
+        os.remove(tmp_timelapse_filepath)
 
     ffmpeg_cmd = [
         # Lower priority
@@ -209,7 +214,7 @@ def create_timelapse(
             second_pass_cmd = ffmpeg_cmd + [
                 "-pass",
                 "2",
-                os.path.abspath(timelapse_filepath),
+                os.path.abspath(tmp_timelapse_filepath),
             ]
             logger.info(f"Running ffmpeg second pass: {' '.join(second_pass_cmd)}")
             if not dry_run:
@@ -221,7 +226,7 @@ def create_timelapse(
                     stderr=ffmpeg_log_stream,
                 )
     else:
-        final_cmd = ffmpeg_cmd + [os.path.abspath(timelapse_filepath)]
+        final_cmd = ffmpeg_cmd + [os.path.abspath(tmp_timelapse_filepath)]
         logger.info(f"Running ffmpeg: {' '.join(final_cmd)}")
         if not dry_run:
             subprocess.run(
@@ -233,6 +238,14 @@ def create_timelapse(
             )
     if isinstance(ffmpeg_log_stream, TextIOWrapper):
         ffmpeg_log_stream.close()
+
+    if not dry_run:
+        if (
+            os.path.exists(tmp_timelapse_filepath)
+            and os.path.getsize(tmp_timelapse_filepath) > 0
+        ):
+            logger.info(f"Moving {tmp_timelapse_filepath} to {timelapse_filepath}")
+            shutil.move(tmp_timelapse_filepath, timelapse_filepath)
 
     if os.path.exists(timelapse_filepath) and os.path.getsize(timelapse_filepath) > 0:
         # Update cameras.json if timelapse was created successfully
