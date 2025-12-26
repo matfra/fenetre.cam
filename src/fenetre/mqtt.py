@@ -24,6 +24,7 @@ class MQTTManager:
         self._discovery_prefix = str(
             mqtt_config.get("discovery_prefix", "homeassistant")
         )
+        self._reconnect_delay = int(mqtt_config.get("reconnect_delay", 10))
 
     def publish_camera_state(self, camera_name: str, online: bool) -> None:
         if not self._ensure_client():
@@ -88,6 +89,9 @@ class MQTTManager:
             port = int(self._config.get("port", 1883))
             self._availability_topic = f"{self._base_topic}/availability"
             client.will_set(self._availability_topic, payload="offline", retain=True)
+            client.on_connect = self._on_connect
+            client.on_disconnect = self._on_disconnect
+            client.reconnect_delay_set(self._reconnect_delay)
             client.enable_logger(logger)
 
             try:
@@ -105,6 +109,24 @@ class MQTTManager:
                 logger.warning("MQTT availability publish failed: %s", exc)
             self._client = client
             return True
+
+    def _on_connect(self, client, userdata, flags, rc):
+        if rc == 0:
+            logger.info("MQTT connected successfully.")
+            try:
+                if self._availability_topic:
+                    client.publish(self._availability_topic, payload="online", retain=True)
+            except Exception as exc:
+                logger.warning("MQTT availability publish failed on connect: %s", exc)
+        else:
+            logger.error(f"MQTT connection failed with code {rc}")
+
+    def _on_disconnect(self, client, userdata, rc):
+        if rc != 0:
+            logger.warning(
+                "MQTT disconnected with result code %s. Will try to reconnect automatically.",
+                rc,
+            )
 
     def _publish_discovery(self, camera_name: str, camera_id: str) -> None:
         if not self._client:

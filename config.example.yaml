@@ -20,6 +20,7 @@ global: #Requires app restart
     password: null
     base_topic: fenetre/fenetre_cam
     discovery_prefix: homeassistant
+    reconnect_delay: 10
   ui:
     landing_page: "list" # list, map, camera, fullscreen
     fullscreen_camera: "a-cool-http-cam-with-clouds"
