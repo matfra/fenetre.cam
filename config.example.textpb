@@ -1,0 +1,132 @@
+# Example config for the Android app (textpb).
+
+global {
+  work_dir: "/data/data/cam.fenetre/files"
+  log_dir: "/data/data/cam.fenetre/files/logs"
+  logging_level: LOG_LEVEL_INFO
+  logging_levels { key: "fenetre.postprocess" value: LOG_LEVEL_WARNING }
+  timezone: "America/Los_Angeles"
+  storage_management {
+    enabled: true
+    dry_run: true
+    check_interval_s: 300
+    work_dir_max_size_gb: 10
+  }
+  log_max_bytes: 10000000
+  log_backup_count: 5
+  deployment_name: "fenetre.android"
+  mqtt {
+    enabled: false
+    host: "localhost"
+    port: 1883
+    username: "fenetre_android"
+    password: ""
+    base_topic: "fenetre/fenetre_android"
+    discovery_prefix: "homeassistant"
+    reconnect_delay_s: 10
+  }
+  ui {
+    landing_page: LANDING_PAGE_LIST
+    fullscreen_camera: "phone-cam"
+    main_website_url: "https://fenetre.cam"
+    show_main_website_icon: true
+    show_github_icon: true
+    show_map_by_default: false
+    linked_deployments { base_url: "https://fenetre.cam" }
+    map_privacy_radius_m: 1000
+    map_privacy_jitter_m: 500
+  }
+}
+
+timelapse {
+  frequent_timelapse {
+    enabled: true
+    ffmpeg_2pass: false
+    ffmpeg_options: "-c:v libx264 -preset veryfast -crf 24"
+    file_extension: "mp4"
+    framerate: 30
+    interval_s: 1200
+  }
+  daily_timelapse {
+    enabled: true
+    framerate: 60
+    ffmpeg_options: "-c:v libvpx-vp9 -b:v 0 -crf 30 -deadline best"
+    ffmpeg_2pass: true
+    file_extension: "webm"
+  }
+}
+
+http_server {
+  enabled: true
+  listen: "0.0.0.0:8888"
+  allow_cors: true
+  cors_allow_origin: "*"
+}
+
+admin_server {
+  enabled: true
+  listen: "0.0.0.0:8889"
+}
+
+cameras {
+  display_name: "Phone Camera"
+  description: "Main camera on device"
+  android_camerax {
+    camera_id: ""
+  }
+  timeout_s: 60
+  ssim_setpoint: 0.9
+  ssim_area: "0.0,0.1,1.0,0.7"
+  sky_area: "0.0,0.05,1.0,0.3"
+  lat: 37.7749
+  lon: -122.4194
+  map_privacy_radius_m: 1000
+  map_privacy_jitter_m: 500
+  sunrise_sunset {
+    enabled: true
+    interval_s: 10
+    sunrise_offset_start_minutes: 60
+    sunrise_offset_end_minutes: 30
+    sunset_offset_start_minutes: 30
+    sunset_offset_end_minutes: 60
+  }
+  day_settings { trigger_exposure_composite_value: 2.0 }
+  night_settings { trigger_exposure_composite_value: 3.0 }
+  astro_settings { trigger_exposure_composite_value: 2000.0 }
+  postprocessing {
+    crop { area: "0,0,1920,1080" }
+  }
+  postprocessing {
+    resize { width: 1280 height: 720 }
+  }
+  postprocessing {
+    awb {}
+  }
+  postprocessing {
+    timestamp {
+      enabled: true
+      position: "bottom_right"
+      size: 24
+      color: "white"
+      format: "%Y-%m-%d %H:%M:%S %Z"
+    }
+  }
+  postprocessing {
+    sun_path {
+      enabled: true
+      overlay_width: 800
+      position: "top_center"
+      padding: 20
+      major_bar_width: 2
+      minor_bar_width: 1
+      overlay_rect_width: 5
+      overlay_border_width: 2
+      overlay_border_color: "white"
+      overlay_rect_height_ratio: 1.0
+      major_bar_color: "darkgrey"
+      minor_bar_color: "lightgrey"
+      background_color: "transparent"
+      sun_arc_color: "rgba(255, 255, 0, 0.5)"
+    }
+  }
+}
