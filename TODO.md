@@ -47,7 +47,7 @@
 
 ### Admin interface.
 - [BUG] Crop preview is broken (not to scale)
-- ssim and sky area should be defiend on the crop preview since they happen after crop
+- ssim and sky area should be defined on the crop preview since they happen after crop
 - Add the ability to pin a picture to a hall of fame
 
 ### Postprocessing
@@ -58,7 +58,8 @@
 
 ### Raspberry Pi specific:
 - Implement native libcamera python functions instead of relying on libcamera-still
-- Try out a raspberry pi zero with a low dependency deployment
+- Make an install script specifically for Raspberry pi zero
+- RAW mode with stacking. Skyline with different level of exposure for astro + city.
 
 ### Performance/Optimization
 - Try to reduce the write on disk to the absolute strict minimum (like on thr original isitfoggy.com implementation)
@@ -68,6 +69,4 @@
 - Add integration test simulating a few days worth of pictures
 
 ### Metrics
-
-
 - Cleanup: remove optional gather_metrics postprocessing step; metrics collection is now systematic.
