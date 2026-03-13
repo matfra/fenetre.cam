@@ -5,12 +5,11 @@ from typing import Optional
 import logging.handlers
 
 import requests
-
+from fenetre.utils import GoProRequest
 from fenetre.gopro_state_map import GoProEnums
 
 
 logger = logging.getLogger(__name__)
-
 
 def GoPro(gopro_model="hero11", **kwargs):
     model = (gopro_model or "hero11").lower()
@@ -147,6 +146,7 @@ class _GoProModernBase:
         timezone=None,
         gopro_usb=False,
         camera_config={},
+        iface=None,
     ):
         self.ip_address = ip_address
         self.timeout = timeout
@@ -160,6 +160,7 @@ class _GoProModernBase:
         self.gopro_usb = gopro_usb
         self.log_dir = log_dir
         self.camera_config = camera_config
+        self.iface = iface
 
         if self.root_ca:
             import tempfile
@@ -223,9 +224,7 @@ class _GoProModernBase:
     def update_state(self):
         url = f"{self.scheme}://{self.ip_address}/gopro/camera/state"
         try:
-            response = requests.get(
-                url, timeout=self.timeout, verify=self.root_ca_filepath
-            )
+            response = self._make_gopro_request(url_path='/gopro/camera/state')
             response.raise_for_status()
             self.state = response.json()
         except requests.RequestException as e:
@@ -259,22 +258,15 @@ class _GoProModernBase:
         self,
         url_path: str,
         expected_response_code: int = 200,
+        max_retries=5, backoff=1
     ):
         """Helper function to make HTTP requests to GoPro with common parameters."""
-        url = f"{self.scheme}://{self.ip_address}{url_path}"
-        r = requests.get(url, timeout=self.timeout, verify=self.root_ca_filepath)
-        self._log_request_response(url, r)
-        if r.status_code != expected_response_code:
-            raise RuntimeError(
-                f"Expected response code {expected_response_code} but got {r.status_code}. Request URL: {url}"
-            )
-        return r
+        r = GoProRequest(scheme=self.scheme, ip_address=self.ip_address, iface=self.iface, root_ca_filepath=self.root_ca_filepath)
+        return r.get(url_path=url_path, expected_response_code=expected_response_code, max_retries=max_retries, backoff=backoff)
 
     def _get_latest_file(self):
-        media_list_url = f"{self.scheme}://{self.ip_address}/gopro/media/list"
-        resp = requests.get(
-            media_list_url, timeout=self.timeout, verify=self.root_ca_filepath
-        )
+        media_list_url = f"/gopro/media/list"
+        resp = self._make_gopro_request(media_list_url)
         self._log_request_response(media_list_url, resp)
         resp.raise_for_status()
         data = resp.json()
@@ -311,16 +303,9 @@ class _GoProModernBase:
         self._make_gopro_request(
             "/gopro/camera/control/set_ui_controller?p=2"
         )  # Only for gopro 10+
-        # self.settings.control_mode = "pro" # Only for gopro 11+
-        self.settings.lcd_brightness = 10
-        self.settings.led = "All Off"
-        self.settings.gps = "Off"
-        self.settings.auto_power_down = "30 Min"
 
-        trigger_url = f"{self.scheme}://{self.ip_address}/gopro/camera/shutter/start"
-        r = requests.get(
-            trigger_url, timeout=self.timeout, verify=self.root_ca_filepath
-        )
+        trigger_url = f"/gopro/camera/shutter/start"
+        r = self._make_gopro_request(trigger_url)
         self._log_request_response(trigger_url, r)
 
         start_time = time.time()
@@ -344,10 +329,8 @@ class _GoProModernBase:
                 raise
             time.sleep(0.5)
 
-        photo_url = f"{self.scheme}://{self.ip_address}/videos/DCIM/{latest_dir_after}/{latest_file_after}"
-        photo_resp = requests.get(
-            photo_url, timeout=self.timeout, verify=self.root_ca_filepath
-        )
+        photo_url = f"/videos/DCIM/{latest_dir_after}/{latest_file_after}"
+        photo_resp = self._make_gopro_request(photo_url)
         photo_resp.raise_for_status()
 
         if output_file:
@@ -458,20 +441,14 @@ class GoProHero6:
         self,
         url_path: str,
         expected_response_code: int = 200,
+        max_retries=5, backoff=1
     ):
         """Helper function to make HTTP requests to GoPro with common parameters."""
-        url = f"{self.scheme}://{self.ip_address}{url_path}"
-        r = requests.get(url, timeout=self.timeout)
-        # self._log_request_response(url, r) # TODO
-        if r.status_code != expected_response_code:
-            raise RuntimeError(
-                f"Expected response code {expected_response_code} but got {r.status_code}. Request URL: {url}"
-            )
-        return r
+        r = GoProRequest(scheme=self.scheme, ip_address=self.ip_address, iface=self.iface)
+        return r.get(url_path, expected_response_code, max_retries, backoff)
 
     def _get_latest_file(self):
-        media_list_url = f"{self.scheme}://{self.ip_address}/gp/gpMediaList"
-        resp = requests.get(media_list_url, timeout=self.timeout)
+        resp = self._make_gopro_request('/gp/gpMediaList')
         self._log_request_response(media_list_url, resp)
         resp.raise_for_status()
         data = resp.json()
@@ -492,9 +469,8 @@ class GoProHero6:
         return latest_dir, latest_file
 
     def update_state(self):
-        url = f"{self.scheme}://{self.ip_address}/status"
         try:
-            response = requests.get(url, timeout=self.timeout)
+            response = self._make_gopro_request('/status')
             response.raise_for_status()
             self.state = response.json()
         except requests.RequestException as e:
@@ -540,7 +516,7 @@ class GoProHero6:
             time.sleep(0.5)
 
         photo_url = f"{self.scheme}://{self.ip_address}/videos/DCIM/{latest_dir_after}/{latest_file_after}"
-        photo_resp = requests.get(photo_url, timeout=self.timeout)
+        photo_resp = self._make_gopro_request(f"/videos/DCIM/{latest_dir_after}/{latest_file_after}")
         photo_resp.raise_for_status()
 
         if output_file:

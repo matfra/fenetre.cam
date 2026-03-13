@@ -721,6 +721,7 @@ def _validate_cameras(cfg: Dict, errors) -> Dict:
             "bluetooth_retry_delay_s",
             "gopro_usb",
             "name",
+            "iface"
         ):
             if k in cam:
                 cam_out[k] = cam[k]
