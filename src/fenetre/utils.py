@@ -31,10 +31,10 @@ class GoProRequest():
         pool_kwargs['socket_options'] = _socket_options()
         return super().init_poolmanager(*args, **pool_kwargs)
 
-  def log_request(self, what, content):
+  def log_request(self, what, content=None):
     if logging.getLogger().getEffectiveLevel() > logging.DEBUG:
       c = content
-      if c.len() > 512:
+      if c and c.len() > 512:
         c = "length: " + str(c.len())
 
       logger.error(f"{what}: content:{c}")
