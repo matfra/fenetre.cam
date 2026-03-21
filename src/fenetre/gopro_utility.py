@@ -291,6 +291,11 @@ def _get_gopro_state(ip_address: str, root_ca: Optional[str] = None) -> Dict:
         logger.error(f"Failed to get GoPro state from {ip_address}: {e}")
         return {{}}
 
+def _enable_usb_mode(ip_address: str):
+    url = f"http://{ip_address}/gopro/camera/control/wired_usb?p=1"
+    logger.info("Enabling USB mode")
+    requests.get(url)
+
 
 class GoProUtilityThread(threading.Thread):
     def __init__(
@@ -347,6 +352,8 @@ class GoProUtilityThread(threading.Thread):
                             logger.info(
                                 f"IP connectivity to {self.gopro_ip} is now OK."
                             )
+                            if self.gopro_usb:
+                                _enable_usb_mode(self.gopro_ip)
                             break  # Exit the polling loop if connected
                         logger.debug(
                             f"Still no IP connectivity to {self.gopro_ip}. Retrying check in {self.poll_interval_s}s..."

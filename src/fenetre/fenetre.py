@@ -1240,6 +1240,7 @@ def manage_camera_threads():
                         lon=cam_conf.get("lon"),
                         timezone=global_config.get("timezone"),
                         gopro_model=gopro_model,
+                        gopro_usb=cam_conf.get("gopro_usb"),
                     )
 
                     # The GoProUtilityThread is only for Hero 11 (OpenGoPro) models
