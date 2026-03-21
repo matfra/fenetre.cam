@@ -1,0 +1,236 @@
+syntax = "proto3";
+
+package fenetre.android;
+
+option java_multiple_files = true;
+option java_package = "cam.fenetre.config";
+
+message AppConfig {
+  GlobalConfig global = 1;
+  TimelapseConfig timelapse = 2;
+  HttpServerConfig http_server = 3;
+  AdminServerConfig admin_server = 4;
+  repeated CameraConfig cameras = 5;
+}
+
+enum LogLevel {
+  LOG_LEVEL_UNSPECIFIED = 0;
+  LOG_LEVEL_DEBUG = 1;
+  LOG_LEVEL_INFO = 2;
+  LOG_LEVEL_WARNING = 3;
+  LOG_LEVEL_ERROR = 4;
+  LOG_LEVEL_CRITICAL = 5;
+}
+
+message GlobalConfig {
+  string work_dir = 1; // Required; base directory for all output.
+  string log_dir = 2; // Optional; if empty, file logging is disabled.
+  LogLevel logging_level = 3; // Default: LOG_LEVEL_INFO.
+  map<string, LogLevel> logging_levels = 4; // Per-module overrides by module name.
+  string timezone = 5; // Required IANA timezone, e.g. "America/Los_Angeles".
+  StorageManagementConfig storage_management = 6;
+  int64 log_max_bytes = 7; // Default: 10_000_000.
+  int32 log_backup_count = 8; // Default: 5.
+  string deployment_name = 9; // Used in UI metadata and MQTT prefixes.
+  MqttConfig mqtt = 10;
+  UiConfig ui = 11;
+}
+
+message StorageManagementConfig {
+  bool enabled = 1; // Default: false.
+  bool dry_run = 2; // Default: true; if true, no deletions occur.
+  int32 check_interval_s = 3; // Default: 300; min 1.
+  int32 work_dir_max_size_gb = 4; // Default: 10; min 1.
+}
+
+message MqttConfig {
+  bool enabled = 1; // Default: false.
+  string host = 2; // Default: "localhost".
+  int32 port = 3; // Default: 1883.
+  string username = 4;
+  string password = 5;
+  string base_topic = 6; // Default: "fenetre/fenetre_cam".
+  string discovery_prefix = 7; // Default: "homeassistant".
+  int32 reconnect_delay_s = 8; // Default: 10.
+}
+
+message UiConfig {
+  LandingPage landing_page = 1; // Default: LANDING_PAGE_LIST.
+  string fullscreen_camera = 2; // Camera key used when landing_page=FULLSCREEN.
+  string main_website_url = 3; // Default: "https://fenetre.cam".
+  bool show_main_website_icon = 4; // Default: true.
+  bool show_github_icon = 5; // Default: true.
+  bool show_map_by_default = 6; // Default: false.
+  repeated LinkedDeployment linked_deployments = 7;
+  double map_privacy_radius_m = 8; // Default: 0; 0 disables obfuscation.
+  double map_privacy_jitter_m = 9; // Default: map_privacy_radius_m.
+}
+
+enum LandingPage {
+  LANDING_PAGE_UNSPECIFIED = 0;
+  LANDING_PAGE_LIST = 1;
+  LANDING_PAGE_MAP = 2;
+  LANDING_PAGE_CAMERA = 3;
+  LANDING_PAGE_FULLSCREEN = 4;
+}
+
+message LinkedDeployment {
+  string base_url = 1;
+}
+
+message TimelapseConfig {
+  FrequentTimelapseConfig frequent_timelapse = 1;
+  DailyTimelapseConfig daily_timelapse = 2;
+}
+
+message FrequentTimelapseConfig {
+  bool enabled = 1; // Default: true.
+  bool ffmpeg_2pass = 2; // Default: false.
+  string ffmpeg_options = 3; // Optional; encoder-specific flags.
+  string file_extension = 4; // Default: "mp4".
+  int32 framerate = 5; // Default: 30.
+  int32 interval_s = 6; // Default: 1200.
+}
+
+message DailyTimelapseConfig {
+  bool enabled = 1; // Default: true.
+  int32 framerate = 2; // Default: 60; min 1.
+  string ffmpeg_options = 3; // Optional; encoder-specific flags.
+  bool ffmpeg_2pass = 4; // Default: false.
+  string file_extension = 5; // Default: "webm".
+}
+
+message HttpServerConfig {
+  bool enabled = 1; // Default: true.
+  string listen = 2; // Default: "0.0.0.0:8888".
+  bool allow_cors = 3; // Default: true.
+  string cors_allow_origin = 4; // Default: "https://dev.fenetre.cam".
+}
+
+message AdminServerConfig {
+  bool enabled = 1; // Default: true.
+  string listen = 2; // Default: "0.0.0.0:8889 [::]:8889".
+}
+
+message CameraConfig {
+  bool disabled = 1; // Default: false.
+  string display_name = 2;
+  string description = 3;
+  oneof source {
+    AndroidCameraXConfig android_camerax = 4;
+    UrlPhotoSource url_photo = 5;
+    UrlVideoSource url_video = 6;
+    LocalCommandPhotoSource local_command_photo = 7;
+  }
+  int32 timeout_s = 8; // Default: 60; min 1.
+  double ssim_setpoint = 9; // Default: 0.85; range 0.0-1.0.
+  string ssim_area = 10; // "x1,y1,x2,y2"; ratios <=1.0 or absolute pixels.
+  string sky_area = 11; // "x1,y1,x2,y2"; ratios <=1.0 or absolute pixels.
+  double lat = 12; // Optional; required for sunrise/sunset and sun-path overlay.
+  double lon = 13; // Optional; required for sunrise/sunset and sun-path overlay.
+  double map_privacy_radius_m = 14; // Optional; overrides UiConfig.map_privacy_radius_m.
+  double map_privacy_jitter_m = 15; // Optional; clamped to map_privacy_radius_m.
+  SunriseSunsetConfig sunrise_sunset = 16;
+  DayNightSettings day_settings = 17;
+  DayNightSettings night_settings = 18;
+  DayNightSettings astro_settings = 19;
+  int32 snap_interval_s = 20; // If set, overrides SSIM-based interval.
+  int32 work_dir_max_size_gb = 21; // Optional per-camera cap.
+  repeated PostProcessingStep postprocessing = 22;
+}
+
+message AndroidCameraXConfig {
+  string camera_id = 1; // Optional; uses device default if empty.
+}
+
+message UrlPhotoSource {
+  string url = 1;
+}
+
+message UrlVideoSource {
+  string url = 1;
+}
+
+message LocalCommandPhotoSource {
+  string command = 1;
+}
+
+message SunriseSunsetConfig {
+  bool enabled = 1; // Default: false.
+  int32 interval_s = 2; // Default: 10; min 1.
+  int32 sunrise_offset_start_minutes = 3; // Default: 60.
+  int32 sunrise_offset_end_minutes = 4; // Default: 30.
+  int32 sunset_offset_start_minutes = 5; // Default: 30.
+  int32 sunset_offset_end_minutes = 6; // Default: 60.
+}
+
+message DayNightSettings {
+  double trigger_exposure_composite_value = 1; // Exposure time (s) * ISO; min 0.
+}
+
+message PostProcessingStep {
+  oneof step {
+    CropStep crop = 1;
+    ResizeStep resize = 2;
+    RotateStep rotate = 3;
+    AutoWhiteBalanceStep awb = 4;
+    TimestampStep timestamp = 5;
+    TextStep text = 6;
+    SunPathStep sun_path = 7;
+  }
+}
+
+message CropStep {
+  string area = 1; // "x1,y1,x2,y2"; ratios <=1.0 or absolute pixels.
+}
+
+message ResizeStep {
+  int32 width = 1; // Optional; if unset, inferred from height.
+  int32 height = 2; // Optional; if unset, inferred from width.
+}
+
+message RotateStep {
+  int32 angle = 1; // Degrees; clockwise.
+}
+
+message AutoWhiteBalanceStep {}
+
+message TimestampStep {
+  bool enabled = 1; // Default: false.
+  string format = 2; // Default: "%Y-%m-%d %H:%M:%S %Z".
+  string position = 3; // e.g. top_left, bottom_right, or "x,y".
+  int32 size = 4; // Default: 24.
+  string color = 5; // Named color or RGB tuple string.
+  string font_path = 6;
+  string background_color = 7; // Named color, RGB tuple, or rgba().
+  int32 background_padding = 8; // Default: 2.
+  string custom_text = 9;
+}
+
+message TextStep {
+  bool enabled = 1; // Default: false.
+  string text_content = 2;
+  string position = 3; // e.g. top_left, bottom_right, or "x,y".
+  int32 size = 4; // Default: 24.
+  string color = 5; // Named color or RGB tuple string.
+  string font_path = 6;
+  string background_color = 7; // Named color, RGB tuple, or rgba().
+  int32 background_padding = 8; // Default: 2.
+}
+
+message SunPathStep {
+  bool enabled = 1; // Default: false.
+  int32 overlay_width = 2; // Default: image width.
+  string position = 3; // top_left, top_center, top_right, bottom_*.
+  int32 padding = 4; // Default: 10.
+  int32 major_bar_width = 5; // Default: 1.
+  int32 minor_bar_width = 6; // Default: 1.
+  string major_bar_color = 7; // Default: "darkgrey".
+  string minor_bar_color = 8; // Default: "lightgrey".
+  string background_color = 9; // Default: "transparent".
+  string sun_arc_color = 10; // Default: "rgba(255, 255, 0, 0.5)".
+  int32 overlay_rect_width = 11; // Default: 5.
+  int32 overlay_border_width = 12; // Default: 2.
+  string overlay_border_color = 13; // Default: "white".
+  double overlay_rect_height_ratio = 14; // Default: 1.0.
+}

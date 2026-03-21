@@ -12,12 +12,14 @@ import time
 from typing import Any, Awaitable, Callable, Dict, Optional, TypeVar
 
 import requests
+
 from bleak import BleakClient, BleakScanner
 from bleak.backends.characteristic import BleakGATTCharacteristic
 from bleak.backends.device import BLEDevice as BleakDevice
 
 from fenetre.admin_server import gopro_setting_gauge, gopro_state_gauge
 from fenetre.gopro_state_map import GoProEnums
+from fenetre.utils import GoProRequest
 
 T = TypeVar("T")
 
@@ -25,7 +27,6 @@ GOPRO_BASE_UUID = "b5f9{}-aa8d-11e3-9046-0002a5d5c51b"
 noti_handler_T = Callable[[BleakGATTCharacteristic, bytearray], Awaitable[None]]
 
 logger = logging.getLogger(__name__)
-
 
 def get_human_readable_state(state: Dict) -> Dict:
     """
@@ -275,28 +276,6 @@ def format_gopro_sd_card(ip_address: str):
     requests.get(url)
 
 
-def _get_gopro_state(ip_address: str, root_ca: Optional[str] = None) -> Dict:
-    """
-    Get the current state of the GoPro camera.
-    This function retrieves the camera's state via HTTP GET request.
-    """
-    scheme = "https" if root_ca else "http"
-    url = f"{scheme}://{ip_address}/gopro/camera/state"
-
-    try:
-        response = requests.get(url, timeout=5, verify=root_ca or False)
-        response.raise_for_status()
-        return response.json()
-    except requests.RequestException as e:
-        logger.error(f"Failed to get GoPro state from {ip_address}: {e}")
-        return {{}}
-
-def _enable_usb_mode(ip_address: str):
-    url = f"http://{ip_address}/gopro/camera/control/wired_usb?p=1"
-    logger.info("Enabling USB mode")
-    requests.get(url)
-
-
 class GoProUtilityThread(threading.Thread):
     def __init__(
         self,
@@ -317,12 +296,20 @@ class GoProUtilityThread(threading.Thread):
         self.gopro_ip = camera_config.get("gopro_ip")
         self.gopro_ble_identifier = camera_config.get("gopro_ble_identifier")
         self.bluetooth_adapter = camera_config.get("bluetooth_adapter")
+        self.iface = camera_config.get("iface")
         self.poll_interval_s = camera_config.get("gopro_utility_poll_interval_s", 10)
         self.bluetooth_retry_delay_s = camera_config.get(
             "gopro_bluetooth_retry_delay_s", 180
         )  # Default to 3 minutes
         self._ble_client = None  # To store the BleakClient instance
         self.gopro_usb = camera_config.get("gopro_usb", False)
+
+
+    def _enable_usb_mode(ip_address: str):
+        url = f"http://{ip_address}/gopro/camera/control/wired_usb?p=1"
+        logger.info("Enabling USB mode")
+        requests.get(url)
+
 
     def run(self):
         logger.info(f"Starting GoPro utility thread for {self.gopro_ip}")
@@ -454,15 +441,18 @@ class GoProUtilityThread(threading.Thread):
             logger.error(f"Failed to send BLE keepalive: {e}")
 
     def _check_ip_connectivity(self) -> bool:
-        try:
-            # Attempt to connect to the GoPro's HTTP port (default 80)
-            with socket.create_connection((self.gopro_ip, 80), timeout=2):
-                return True
-        except (socket.timeout, ConnectionRefusedError, OSError) as e:
-            logger.debug(f"TCP connection to {self.gopro_ip}:80 failed: {e}")
-            return False
-        except Exception as e:
-            logger.error(
-                f"Error checking IP connectivity to {self.gopro_ip} with TCP: {e}"
-            )
-            return False
+      url = "/gopro/camera/state"
+
+      logger.debug(f"Checking IP connectivity for: {self.iface} {self.gopro_ip}")
+      try:
+        r = GoProRequest(scheme='http', ip_address=self.gopro_ip, iface=self.iface)
+        response = r.get(url_path=url)
+        if response.status_code != 502:
+          logger.debug(f"Connectivity OK for: {self.iface} {self.gopro_ip}")
+          return True
+        logger.warning(f"No connectivity for: iface={self.iface} {self.gopro_ip}: {response}")
+      except Exception as e:
+        logger.error(
+              f"Error checking IP connectivity to {self.iface} {self.gopro_ip} with TCP: {e}"
+        )
+      return False

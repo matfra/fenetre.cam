@@ -179,7 +179,6 @@ def get_pic_from_url(
     camera_config: Dict = None,
     global_config: Dict = None,
 ) -> Image.Image:
-
     if camera_config is None:
         camera_config = {}
     if global_config is None:
@@ -1226,6 +1225,7 @@ def manage_camera_threads():
                 from .gopro import GoPro
 
                 gopro_ip = cam_conf.get("gopro_ip")
+                iface = cam_conf.get("iface")
                 if not gopro_ip:
                     logger.error(
                         f"Camera {cam_name} specifies gopro_model '{gopro_model}' but no gopro_ip."
@@ -1241,10 +1241,11 @@ def manage_camera_threads():
                         timezone=global_config.get("timezone"),
                         gopro_model=gopro_model,
                         gopro_usb=cam_conf.get("gopro_usb"),
+                        iface=iface
                     )
 
                     # The GoProUtilityThread is only for Hero 11 (OpenGoPro) models
-                    if gopro_model in {"hero11", "open_gopro"}:
+                    if gopro_model in {"hero11", "hero9", "open_gopro"}:
                         if not _GOPRO_BLE_AVAILABLE or GoProUtilityThread is None:
                             logger.warning(
                                 "Camera %s uses GoPro model '%s' but Bluetooth support "

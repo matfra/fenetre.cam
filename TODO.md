@@ -19,6 +19,11 @@
 ### Known bugs
  - During Daylight saving fall back, pictures between 1 and 2 AM get interleaved
 
+### GoPro specifics
+ - Add a signal for when the state of the sd card (state 33) is bad.
+ - See if it's possible to run without SD card
+ - Use official OpenGoPro API and goprowifihack libraries
+
 ### Daylight
 - On the daylight.html, there should be a top banner saying: average color of the sky for {camera_name}. Also a link to come back to the camera view
 
@@ -42,15 +47,19 @@
 
 ### Admin interface.
 - [BUG] Crop preview is broken (not to scale)
-- ssim and sky area should be defiend on the crop preview since they happen after crop
+- ssim and sky area should be defined on the crop preview since they happen after crop
 - Add the ability to pin a picture to a hall of fame
 
 ### Postprocessing
 - Add an option for alternative data display on that overlay (solar power, EXIF infos, temperature, humidity). Based on the output of any command, orany URL? or a custom Python function ?
 
+### Random ideas
+- Rainbow detector with distance calculation based
+
 ### Raspberry Pi specific:
 - Implement native libcamera python functions instead of relying on libcamera-still
-- Try out a raspberry pi zero with a low dependency deployment
+- Make an install script specifically for Raspberry pi zero
+- RAW mode with stacking. Skyline with different level of exposure for astro + city.
 
 ### Performance/Optimization
 - Try to reduce the write on disk to the absolute strict minimum (like on thr original isitfoggy.com implementation)
@@ -60,4 +69,4 @@
 - Add integration test simulating a few days worth of pictures
 
 ### Metrics
-
+- Cleanup: remove optional gather_metrics postprocessing step; metrics collection is now systematic.
