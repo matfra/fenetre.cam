@@ -6,6 +6,7 @@ Most of the code here is copied from tutorial modules at https://github.com/gopr
 import asyncio
 import enum
 import logging
+import netifaces
 import socket
 import threading
 import time
@@ -441,18 +442,20 @@ class GoProUtilityThread(threading.Thread):
             logger.error(f"Failed to send BLE keepalive: {e}")
 
     def _check_ip_connectivity(self) -> bool:
-      url = "/gopro/camera/state"
-
-      logger.debug(f"Checking IP connectivity for: {self.iface} {self.gopro_ip}")
-      try:
-        r = GoProRequest(scheme='http', ip_address=self.gopro_ip, iface=self.iface)
-        response = r.get(url_path=url)
-        if response.status_code != 502:
-          logger.debug(f"Connectivity OK for: {self.iface} {self.gopro_ip}")
-          return True
-        logger.warning(f"No connectivity for: iface={self.iface} {self.gopro_ip}: {response}")
-      except Exception as e:
-        logger.error(
-              f"Error checking IP connectivity to {self.iface} {self.gopro_ip} with TCP: {e}"
-        )
-      return False
+        logger.debug(f"Checking IP connectivity for: {self.iface} {self.gopro_ip}")
+        try:
+            if self.iface:
+                addrs = netifaces.ifaddresses(self.iface)
+                if netifaces.AF_INET in addrs:
+                    logger.debug(f"Connectivity OK for: {self.iface}")
+                    return True
+                logger.warning(f"No connectivity for: iface={self.iface}")
+            else:
+                with socket.create_connection((self.gopro_ip, 8080), timeout=1):
+                    logger.debug(f"Connectivity OK for: {self.gopro_ip}")
+                    return True
+        except Exception as e:
+            logger.error(
+                f"Error checking IP connectivity to {self.iface} {self.gopro_ip}: {e}"
+            )
+        return False
