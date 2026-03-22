@@ -1,0 +1,22 @@
+global:
+  timezone: UTC
+  work_dir: __WORK_DIR__
+
+http_server:
+  enabled: false
+
+admin_server:
+  enabled: false
+
+timelapse:
+  enabled: false
+
+cameras:
+  fake_landscape:
+    local_command: __LOCAL_COMMAND__
+    timeout_s: 10
+    snap_interval_s: 3600
+    gather_metrics: false
+    ssim_setpoint: 0.85
+    lat: 48.8566
+    lon: 2.3522
