@@ -34,10 +34,10 @@ class GoProRequest():
   def log_request(self, what, content=None):
     if logging.getLogger().getEffectiveLevel() > logging.DEBUG:
       c = content
-      if c and c.len() > 512:
-        c = "length: " + str(c.len())
+      if c and len(c) > 512:
+        c = "length: " + str(len(c))
 
-      logger.error(f"{what}: content:{c}")
+      logger.debug(f"{what}: content:{c}")
 
   def get(self, url_path: str, expected_response_code: int = 200, max_retries=1, backoff=0.5):
       r = requests.Response()

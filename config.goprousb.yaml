@@ -3,21 +3,21 @@ admin_server:
   listen: 0.0.0.0:8889 [::]:8889
 cameras:
   gopro-hero-11:
-    gopro_ble_identifier: 9756
     day_settings:
       trigger_exposure_composite_value: 0.5
       urlpaths_commands:
-        - /gopro/camera/presets/load?id=65536 # Single photo day
-        - /gopro/camera/setting?option=3&setting=125 # Superphoto for better HDR and constrast
-    night_settings:
-      trigger_exposure_composite_value: 1.5
-      urlpaths_commands:
-        - /gopro/camera/presets/load?id=65539 # Night photo
-    gopro_model: hero11 # Required now that we support multiple gopros. Should work for any Hero9+
-    gopro_ip: 172.27.156.51 # In USB: 172.2B.1CD.51 where ABCD is the camera ID
+      - /gopro/camera/presets/load?id=65536
+      - /gopro/camera/setting?option=3&setting=125
+    gopro_ble_identifier: 9756
+    gopro_ip: 172.27.156.51
+    gopro_model: hero11
     gopro_usb: true
     lat: 37.75676
     lon: -122.44577
+    night_settings:
+      trigger_exposure_composite_value: 1.5
+      urlpaths_commands:
+      - /gopro/camera/presets/load?id=65539
     postprocessing:
     - area: 139,892,5568,3254
       type: crop
@@ -51,11 +51,12 @@ cameras:
     - enabled: true
       type: gather_metrics
     sky_area: 0.000,0.000,0.986,0.500
-    ssim_area: 0.000,0.263,0.746,0.779
+    ssim_area: 0.049,0.667,0.755,0.994
     ssim_setpoint: 0.9
     sunrise_sunset:
       enabled: true
 global:
+  deployment_name: isitfoggy.com
   log_dir: /srv/fenetre/logs
   storage_management:
     check_interval_s: 60
@@ -63,7 +64,6 @@ global:
     enabled: true
     work_dir_max_size_GB: 400
   sunrise_sunset_interval_s: 10
-  deployment_name: isitfoggy.com
   timezone: America/Los_Angeles
   ui:
     fullscreen_camera: gopro-hero-11
@@ -72,13 +72,13 @@ global:
 http_server:
   enabled: false
 timelapse:
-  daily_timelapse: # Enabled if this key is present
-    ffmpeg_2pass: true  # Default
-    ffmpeg_options: -c:v libvpx-vp9 -b:v 7M  # Default
-    file_extension: webm # Default
-    framerate: 60 # Default 
-  frequent_timelapse: # Enabled if this key is present
-    ffmpeg_2pass: false  # Default
+  daily_timelapse:
+    ffmpeg_2pass: true
+    ffmpeg_options: -c:v libvpx-vp9 -b:v 7M
+    file_extension: webm
+    framerate: 60
+  frequent_timelapse:
+    ffmpeg_2pass: false
     file_extension: mp4
-    framerate: 30  # Default
-    interval_s: 1200  # Default
+    framerate: 30
+    interval_s: 1200

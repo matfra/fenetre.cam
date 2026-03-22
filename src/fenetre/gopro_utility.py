@@ -305,6 +305,13 @@ class GoProUtilityThread(threading.Thread):
         self._ble_client = None  # To store the BleakClient instance
         self.gopro_usb = camera_config.get("gopro_usb", False)
 
+
+    def _enable_usb_mode(ip_address: str):
+        url = f"http://{ip_address}/gopro/camera/control/wired_usb?p=1"
+        logger.info("Enabling USB mode")
+        requests.get(url)
+
+
     def run(self):
         logger.info(f"Starting GoPro utility thread for {self.gopro_ip}")
         while not self.exit_event.is_set():
@@ -333,6 +340,8 @@ class GoProUtilityThread(threading.Thread):
                             logger.info(
                                 f"IP connectivity to {self.gopro_ip} is now OK."
                             )
+                            if self.gopro_usb:
+                                _enable_usb_mode(self.gopro_ip)
                             break  # Exit the polling loop if connected
                         logger.debug(
                             f"Still no IP connectivity to {self.gopro_ip}. Retrying check in {self.poll_interval_s}s..."
@@ -433,17 +442,17 @@ class GoProUtilityThread(threading.Thread):
             logger.error(f"Failed to send BLE keepalive: {e}")
 
     def _check_ip_connectivity(self) -> bool:
-        logger.error(f"Checking IP connectivity for: {self.iface} {self.gopro_ip}")
+        logger.debug(f"Checking IP connectivity for: {self.iface} {self.gopro_ip}")
         try:
             if self.iface:
                 addrs = netifaces.ifaddresses(self.iface)
                 if netifaces.AF_INET in addrs:
-                    logger.error(f"Connectivity OK for: {self.iface}")
+                    logger.debug(f"Connectivity OK for: {self.iface}")
                     return True
-                logger.error(f"No connectivity for: iface={self.iface}")
+                logger.warning(f"No connectivity for: iface={self.iface}")
             else:
                 with socket.create_connection((self.gopro_ip, 8080), timeout=1):
-                    logger.error(f"Connectivity OK for: {self.gopro_ip}")
+                    logger.debug(f"Connectivity OK for: {self.gopro_ip}")
                     return True
         except Exception as e:
             logger.error(
