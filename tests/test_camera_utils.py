@@ -1,5 +1,33 @@
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
+import sys
+
+# Mock external dependencies before importing anything from fenetre
+sys.modules["pyexiv2"] = MagicMock()
+sys.modules["piexif"] = MagicMock()
+sys.modules["requests"] = MagicMock()
+sys.modules["requests.adapters"] = MagicMock()
+sys.modules["requests.sessions"] = MagicMock()
+sys.modules["urllib3"] = MagicMock()
+sys.modules["urllib3.poolmanager"] = MagicMock()
+sys.modules["cairosvg"] = MagicMock()
+sys.modules["numpy"] = MagicMock()
+sys.modules["pytz"] = MagicMock()
+sys.modules["skimage"] = MagicMock()
+sys.modules["skimage.exposure"] = MagicMock()
+sys.modules["astral"] = MagicMock()
+sys.modules["astral.sun"] = MagicMock()
+sys.modules["yaml"] = MagicMock()
+sys.modules["prometheus_client"] = MagicMock()
+sys.modules["flask"] = MagicMock()
+sys.modules["waitress"] = MagicMock()
+sys.modules["werkzeug"] = MagicMock()
+sys.modules["werkzeug.exceptions"] = MagicMock()
+sys.modules["mozjpeg_lossless_optimization"] = MagicMock()
+sys.modules["paho"] = MagicMock()
+sys.modules["paho.mqtt"] = MagicMock()
+sys.modules["paho.mqtt.client"] = MagicMock()
+sys.modules["netifaces"] = MagicMock()
 
 from fenetre.camera_utils import get_day_night_from_exif
 
@@ -99,6 +127,27 @@ class GetDayNightFromExifTests(unittest.TestCase):
         mock_logger.error.assert_called_with(
             "If you specify day settings, you must also specify night settings."
         )
+
+    def test_switches_to_night_from_astro_when_too_bright(self):
+        config = {
+            **self.base_config,
+            "astro_settings": {
+                "trigger_exposure_composite_value": 2000,
+                "max_brightness": 200,
+            },
+        }
+        exif_dict = {"iso": 400, "exposure_time": 10}  # composite = 4000 (still astro)
+
+        with patch("fenetre.camera_utils.Image.open") as mock_open:
+            with patch("fenetre.camera_utils.ImageStat.Stat") as mock_stat:
+                mock_img = mock_open.return_value.__enter__.return_value
+                mock_stat.return_value.mean = [250]  # Too bright
+
+                result = get_day_night_from_exif(
+                    exif_dict, config, "astro", image_path="fake.jpg"
+                )
+
+        self.assertEqual(result, "night")
 
 
 if __name__ == "__main__":

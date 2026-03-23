@@ -86,7 +86,6 @@ import json
 import numpy as np
 from waitress import serve as waitress_serve
 
-
 logger = logging.getLogger(__name__)
 
 # Define flags at module level
@@ -538,7 +537,7 @@ def snap(camera_name, camera_config: Dict):
             logger.debug(f"{camera_name}: Updated metadata file {metadata_path}")
 
         current_mode = get_day_night_from_exif(
-            previous_exif, camera_config, previous_mode
+            previous_exif, camera_config, previous_mode, previous_pic_fullpath
         )
         if camera_config.get("gather_metrics", True):
             update_camera_mode_metric(camera_name, previous_mode)
@@ -988,13 +987,17 @@ def main(argv):
     frequent_timelapse_loop_thread_global.start()
     logger.info(f"Starting thread {frequent_timelapse_loop_thread_global.name}")
 
-    logger.info("Timelapse thread will start in 10s...")
-    interruptible_sleep(10, exit_event)
-    timelapse_thread_global = Thread(
-        target=timelapse_loop, daemon=True, name="timelapse_loop"
-    )
-    timelapse_thread_global.start()
-    logger.info(f"Starting thread {timelapse_thread_global.name}")
+    daily_cfg = timelapse_config.get("daily_timelapse", {}) or {}
+    if daily_cfg.get("enabled", True):
+        logger.info("Timelapse thread will start in 10s...")
+        interruptible_sleep(10, exit_event)
+        timelapse_thread_global = Thread(
+            target=timelapse_loop, daemon=True, name="timelapse_loop"
+        )
+        timelapse_thread_global.start()
+        logger.info(f"Starting thread {timelapse_thread_global.name}")
+    else:
+        logger.info("Daily timelapse is disabled.")
 
     logger.info("Daylight thread will start in 10s...")
     interruptible_sleep(10, exit_event)
@@ -1241,7 +1244,7 @@ def manage_camera_threads():
                         timezone=global_config.get("timezone"),
                         gopro_model=gopro_model,
                         gopro_usb=cam_conf.get("gopro_usb"),
-                        iface=iface
+                        iface=iface,
                     )
 
                     # The GoProUtilityThread is only for Hero 11 (OpenGoPro) models
@@ -1541,9 +1544,11 @@ def daylight_loop():
                     f"Running daylight in {daily_pic_dir} with sky_area {sky_area}"
                 )
                 run_end_of_day(camera_name, daily_pic_dir, sky_area)
-                add_to_timelapse_queue(
-                    daily_pic_dir, timelapse_queue_file, timelapse_queue_lock
-                )
+                daily_cfg = timelapse_config.get("daily_timelapse", {}) or {}
+                if daily_cfg.get("enabled", True):
+                    add_to_timelapse_queue(
+                        daily_pic_dir, timelapse_queue_file, timelapse_queue_lock
+                    )
                 archive_q.append(daily_pic_dir)
             except Exception as e:
                 logger.warning(f"Could not process daylight for {daily_pic_dir}: {e}")
