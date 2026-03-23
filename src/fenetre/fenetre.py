@@ -537,7 +537,7 @@ def snap(camera_name, camera_config: Dict):
             logger.debug(f"{camera_name}: Updated metadata file {metadata_path}")
 
         current_mode = get_day_night_from_exif(
-            previous_exif, camera_config, previous_mode
+            previous_exif, camera_config, previous_mode, previous_pic_fullpath
         )
         if camera_config.get("gather_metrics", True):
             update_camera_mode_metric(camera_name, previous_mode)
