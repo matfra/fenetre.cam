@@ -341,7 +341,7 @@ class GoProUtilityThread(threading.Thread):
                                 f"IP connectivity to {self.gopro_ip} is now OK."
                             )
                             if self.gopro_usb:
-                                _enable_usb_mode(self.gopro_ip)
+                                self._enable_usb_mode(self.gopro_ip)
                             break  # Exit the polling loop if connected
                         logger.debug(
                             f"Still no IP connectivity to {self.gopro_ip}. Retrying check in {self.poll_interval_s}s..."
