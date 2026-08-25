@@ -10,23 +10,23 @@ global:
     work_dir_max_size_GB: 30
   timezone: America/Los_Angeles
   deployment_name: fenetre.cam
-  user_agent: "Your friendly neighbor at sfbay.fenetre.cam"
   ui:
     landing_page: list
     show_main_website_icon: true
     show_map_by_default: true
     show_github_icon: true
     linked_deployments: 
-      - name: isitfoggy.com
-        base_url: https://isitfoggy.com
-      - name: 360view.club
-        base_url: https://360view.club
-      - name: dev.fenetre.cam
-        base_url: https://dev.fenetre.cam
-      - name: camaredn.fenetre.cam
-        base_url: https://camaredn.fenetre.cam
-      - name: sfbay.fenetre.cam
-        base_url: https://sfbay.fenetre.cam
+      - base_url: https://isitfoggy.com
+      - base_url: https://baybridge.fenetre.cam
+      - base_url: https://p6p.fenetre.cam
+        use_remote_name: false
+        name: dev phone for fenetre-android
+      - base_url: https://360view.club
+      - base_url: https://sfbay.fenetre.cam
+      - base_url: https://dev.fenetre.cam
+      - base_url: https://camaredn.fenetre.cam
+      - base_url: https://s20.fenetre.cam
+      - base_url: https://aredncameras.aredn805.net
     map_privacy_radius_m: 1000 # 1km circle shown instead of a pin; set to 0 to disable
     map_privacy_jitter_m: 500 # optional center jitter in meters (clamped to the radius)
   work_dir: /srv/fenetre-main/data
