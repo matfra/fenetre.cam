@@ -5,20 +5,20 @@ Takes pictures periodically, build timelapses, archive the footage and share it 
 
 ## Features
 - Support taking pictures from:
-  - Raspberry Pi camera, GoPro Hero 9+, local command or any URL)
-  - GoPro Hero 9+ via Bluetooth + WiFi with https://gopro.github.io/OpenGoPro/
   - Raspberry Pi camera (tested with v2 and HQ)
+  - GoPro Hero 9+ via Bluetooth + WiFi with https://gopro.github.io/OpenGoPro/
   - any local command yielding an image format supported by PIL https://pillow.readthedocs.io/en/latest/reference/features.html#features-module
 - Fixed interval or dynamic intervals (sunrise, sunset or fast changing landscape)
 - Continuous timelapses (every 20 minutes) + daily high quality ones.
-- Daylight browser to browser years of footage easily.
+- Daylight browser to navigate years of footage easily. (i.e. https://zero.isitfoggy.com/daylight2.html)
 - Produces a fully static website, easy to self-host and put behind Cloudflare.
-- Janky admin interface to help adjust picture settings
-- Premetheus exporter to collect metrics for monitoring
+- Admin interface to help adjust picture settings
+- Prometheus exporter to collect metrics for monitoring
+- MQTT integration for Home Assistant
 
 ## Installation
 
-This is mostly written in Python and it's been tested on Linux but it could run on MacOS and Windows too.
+This is mostly written in Python and it's been tested on Linux but it might run on MacOS and Windows too.
 
 
 1.  **Clone the repository:**
