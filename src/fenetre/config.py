@@ -329,6 +329,12 @@ def _validate_global(cfg: Dict, errors) -> Dict:
                 )
                 if cameras_json_url:
                     normalized["cameras_json_url"] = cameras_json_url
+            normalized["use_remote_name"] = _bool(
+                entry.get("use_remote_name"),
+                f"{entry_path}.use_remote_name",
+                errors,
+                default=True,
+            )
             linked_out.append(normalized)
     else:
         errors.append(

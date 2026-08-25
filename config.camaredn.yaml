@@ -20,8 +20,8 @@ cameras:
     lat: 37.888
     lon: -122.268
     sky_area: 400,0,1400,400
-    ssim_area: 400,0,1400,400
-    ssim_setpoint: 0.82
+      #    ssim_area: 400,0,1400,400
+      #    ssim_setpoint: 0.82
     url: http://kn6plv-cam1.local.mesh/snap.jpeg
   orca-cam:
     lat: 37.86478
@@ -46,9 +46,10 @@ cameras:
   wa6kqb-4cam-a:
     lat: 37.9578
     lon: -122.31138
-    sky_area: 0,0,1280,300
-    ssim_area: 0,0,1280,600
-    ssim_setpoint: 0.9
+      #    sky_area: 0,0,1280,300
+      #    ssim_area: 0,0,1280,600
+    snap_interval_s: 90
+      #ssim_setpoint: 0.9
     url: http://4cam-a.local.mesh/jpg/image.jpg
 global:
   deployment_name: camaredn.fenetre.cam
@@ -57,7 +58,7 @@ global:
     check_interval_s: 300
     dry_run: false
     enabled: true
-    work_dir_max_size_GB: 200
+    work_dir_max_size_GB: 20
   sunrise_sunset_interval_s: 10
   timezone: America/Los_Angeles
   tmp_dir: /dev/shm/camaredn

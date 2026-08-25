@@ -236,6 +236,49 @@ class FenetreConfigTestCase(unittest.TestCase):
 
         self.assertEqual(timelapse_conf, {})
 
+    def test_remote_deployment_name_defaults_to_enabled(self):
+        test_data = {
+            "global": {
+                "work_dir": self.mock_work_dir,
+                "timezone": "UTC",
+                "ui": {
+                    "linked_deployments": [
+                        {"base_url": "https://remote.example"},
+                    ],
+                },
+            },
+        }
+        config_path = self._create_temp_config_file(test_data)
+
+        _, _, global_conf, _, _ = config_load(config_path)
+
+        self.assertTrue(
+            global_conf["ui"]["linked_deployments"][0]["use_remote_name"]
+        )
+
+    def test_remote_deployment_name_can_be_disabled(self):
+        test_data = {
+            "global": {
+                "work_dir": self.mock_work_dir,
+                "timezone": "UTC",
+                "ui": {
+                    "linked_deployments": [
+                        {
+                            "base_url": "https://remote.example",
+                            "use_remote_name": False,
+                        },
+                    ],
+                },
+            },
+        }
+        config_path = self._create_temp_config_file(test_data)
+
+        _, _, global_conf, _, _ = config_load(config_path)
+
+        self.assertFalse(
+            global_conf["ui"]["linked_deployments"][0]["use_remote_name"]
+        )
+
     def test_config_load_picamera2_controls(self):
         test_data = {
             "global": {"work_dir": self.mock_work_dir, "timezone": "UTC"},

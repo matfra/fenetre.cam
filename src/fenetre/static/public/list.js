@@ -177,6 +177,18 @@ function buildAbsoluteUrl(base, maybeRelative) {
     return joinUrl(base, maybeRelative);
 }
 
+function getDeploymentDisplayName(deployment) {
+    if (deployment.name) {
+        return deployment.name;
+    }
+
+    try {
+        return new URL(deployment.base_url).hostname || deployment.base_url;
+    } catch (e) {
+        return deployment.base_url;
+    }
+}
+
 function clearRemoteCameraItems() {
     document.querySelectorAll('.camera-item.remote-camera').forEach((item) => {
         item.remove();
@@ -325,8 +337,7 @@ function createCameraListItem(camera) {
 }
 
 function createRemotePopupContent(deployment, camera, openUrl) {
-    const deploymentLabel = deployment.displayName;
-    return `<b>${camera.title}</b><br><a href="${openUrl}" target="_blank" rel="noopener">Open on ${deploymentLabel}</a>`;
+    return `<b>${camera.title}</b><br><a href="${openUrl}" target="_blank" rel="noopener">Open on ${deployment.baseUrl}</a>`;
 }
 
 function addRemoteCameraListItem(camera, deployment, markerId, openUrl, imageUrl) {
@@ -365,7 +376,7 @@ function addRemoteCameraListItem(camera, deployment, markerId, openUrl, imageUrl
     openLink.href = openUrl;
     openLink.target = '_blank';
     openLink.rel = 'noopener';
-    openLink.textContent = `Open on ${deployment.displayName}`;
+    openLink.textContent = `Open on ${deployment.baseUrl}`;
     header.appendChild(openLink);
 
     listItem.appendChild(header);
@@ -423,7 +434,7 @@ function refreshLinkedDeployments(linkedDeployments) {
         if (!baseUrl) {
             return;
         }
-        const displayName = deployment.name || baseUrl;
+        const displayName = getDeploymentDisplayName(deployment);
         let key = slugify(displayName, `deployment-${index}`);
         while (seenKeys.has(key)) {
             key = `${key}-${index}`;
@@ -437,6 +448,7 @@ function refreshLinkedDeployments(linkedDeployments) {
             displayName,
             baseUrl,
             camerasUrl,
+            useRemoteName: deployment.use_remote_name !== false,
         };
 
         fetch(normalizedDeployment.camerasUrl)
@@ -450,10 +462,12 @@ function refreshLinkedDeployments(linkedDeployments) {
                 if (generation !== remoteFetchGeneration) {
                     return;
                 }
-                const resolvedName = remoteData?.global?.deployment_name;
+                const remoteName = remoteData?.global?.deployment_name;
                 const deploymentForIntegration = {
                     ...normalizedDeployment,
-                    displayName: resolvedName || normalizedDeployment.displayName,
+                    displayName: normalizedDeployment.useRemoteName && remoteName
+                        ? remoteName
+                        : normalizedDeployment.displayName,
                 };
                 integrateRemoteDeployment(deploymentForIntegration, remoteData);
             })

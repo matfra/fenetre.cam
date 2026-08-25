@@ -860,7 +860,6 @@ class FenetreHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
         else:
             self.send_error(405, "Method Not Allowed")
 
-
 def server_run():
     server_class = http.server.ThreadingHTTPServer
     handler_class = partial(
