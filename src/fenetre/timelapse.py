@@ -150,6 +150,8 @@ def create_incremental_hls_timelapse(
     dry_run: bool = False,
     ffmpeg_options: str = None,
     framerate: Optional[int] = None,
+    hls_segment_type: str = "mpegts",
+    hls_segment_extension: Optional[str] = None,
     log_max_bytes: int = 10000000,
     log_backup_count: int = 5,
 ) -> bool:
@@ -196,8 +198,11 @@ def create_incremental_hls_timelapse(
             last_image,
         )
         shutil.rmtree(legacy_segment_dir, ignore_errors=True)
-        for segment_path in glob.glob(os.path.join(dir, "segment-*.ts")):
+        for segment_path in glob.glob(os.path.join(dir, "segment-*.*")):
             os.remove(segment_path)
+        init_path = os.path.join(dir, "init.mp4")
+        if os.path.exists(init_path):
+            os.remove(init_path)
         if os.path.exists(playlist_path):
             os.remove(playlist_path)
         manifest = {"last_image": None, "segment_index": 0}
@@ -211,8 +216,11 @@ def create_incremental_hls_timelapse(
     if os.path.isdir(legacy_segment_dir):
         logger.info("Removing legacy HLS segment directory %s before rebuild", legacy_segment_dir)
         shutil.rmtree(legacy_segment_dir, ignore_errors=True)
-        for segment_path in glob.glob(os.path.join(dir, "segment-*.ts")):
+        for segment_path in glob.glob(os.path.join(dir, "segment-*.*")):
             os.remove(segment_path)
+        init_path = os.path.join(dir, "init.mp4")
+        if os.path.exists(init_path):
+            os.remove(init_path)
         if os.path.exists(playlist_path):
             os.remove(playlist_path)
         manifest = {"last_image": None, "segment_index": 0}
@@ -229,7 +237,9 @@ def create_incremental_hls_timelapse(
         os.makedirs(tmp_dir, exist_ok=True)
 
     segment_index = int(manifest.get("segment_index", 0))
-    segment_pattern = "segment-%06d.ts"
+    if not hls_segment_extension:
+        hls_segment_extension = "m4s" if hls_segment_type == "fmp4" else "ts"
+    segment_pattern = f"segment-%06d.{hls_segment_extension}"
 
     duration_per_image = 1.0 / float(framerate)
     concat_file = tempfile.NamedTemporaryFile(
@@ -281,16 +291,18 @@ def create_incremental_hls_timelapse(
                 "-hls_playlist_type",
                 "event",
                 "-hls_segment_type",
-                "mpegts",
+                hls_segment_type,
                 "-hls_flags",
                 "append_list+independent_segments+program_date_time+temp_file",
                 "-start_number",
                 str(segment_index),
                 "-hls_segment_filename",
                 segment_pattern,
-                playlist_path,
             ]
         )
+        if hls_segment_type == "fmp4":
+            final_cmd.extend(["-hls_fmp4_init_filename", "init.mp4"])
+        final_cmd.append(playlist_path)
 
         logger.info(
             "Running incremental HLS ffmpeg for %s new images into %s",
@@ -312,7 +324,9 @@ def create_incremental_hls_timelapse(
         if isinstance(ffmpeg_log_stream, TextIOWrapper):
             ffmpeg_log_stream.close()
 
-    segment_count = len(glob.glob(os.path.join(dir, "segment-*.ts")))
+    segment_count = len(
+        glob.glob(os.path.join(dir, f"segment-*.{hls_segment_extension}"))
+    )
     manifest["last_image"] = new_images[-1]
     manifest["segment_index"] = segment_count
     _write_hls_manifest(manifest_path, manifest)

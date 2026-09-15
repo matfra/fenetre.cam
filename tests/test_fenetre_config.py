@@ -11,7 +11,7 @@ import yaml
 
 # Import the functions/classes to be tested
 from fenetre.config import ConfigError, config_load
-from fenetre.fenetre import load_and_apply_configuration
+from fenetre.fenetre import _cors_allow_origin_for_request, load_and_apply_configuration
 
 
 # Minimal stub for GoProUtilityThread if fenetre.py imports it and it causes issues
@@ -97,6 +97,42 @@ class FenetreConfigTestCase(unittest.TestCase):
         self.assertEqual(cameras_conf["cam1"]["url"], "http://cam1")
         self.assertTrue(admin_server_conf["enabled"])
 
+    def test_config_load_camera_unavailable_command(self):
+        test_data = {
+            "global": {"work_dir": self.mock_work_dir, "timezone": "UTC"},
+            "cameras": {
+                "cam1": {
+                    "url": "http://cam1",
+                    "unavailable_command": "printf hello >> /tmp/cam1-unavailable",
+                    "unavailable_command_timeout_s": 7,
+                }
+            },
+        }
+        config_path = self._create_temp_config_file(test_data)
+
+        _, cameras_conf, _, _, _ = config_load(config_path)
+
+        self.assertEqual(
+            cameras_conf["cam1"]["unavailable_command"],
+            "printf hello >> /tmp/cam1-unavailable",
+        )
+        self.assertEqual(cameras_conf["cam1"]["unavailable_command_timeout_s"], 7)
+
+    def test_config_load_unavailable_command_timeout_requires_command(self):
+        test_data = {
+            "global": {"work_dir": self.mock_work_dir, "timezone": "UTC"},
+            "cameras": {
+                "cam1": {
+                    "url": "http://cam1",
+                    "unavailable_command_timeout_s": 7,
+                }
+            },
+        }
+        config_path = self._create_temp_config_file(test_data)
+
+        with self.assertRaises(ConfigError):
+            config_load(config_path)
+
     def test_config_dualstack_load_success(self):
         test_data = {
             "global": {
@@ -120,6 +156,51 @@ class FenetreConfigTestCase(unittest.TestCase):
         self.assertIn("cam1", cameras_conf)
         self.assertEqual(cameras_conf["cam1"]["url"], "http://cam1")
         self.assertTrue(admin_server_conf["enabled"])
+
+    def test_config_load_http_cors_allow_origins(self):
+        test_data = {
+            "global": {"work_dir": self.mock_work_dir, "timezone": "UTC"},
+            "http_server": {
+                "listen": "0.0.0.0:8080",
+                "cors_allow_origin": "https://fenetre.cam",
+                "cors_allow_origins": [
+                    "https://fenetre.cam",
+                    "https://dev.fenetre.cam",
+                ],
+            },
+            "cameras": {"cam1": {"url": "http://cam1"}},
+        }
+        config_path = self._create_temp_config_file(test_data)
+
+        server_conf, _, _, _, _ = config_load(config_path)
+
+        self.assertEqual(server_conf["cors_allow_origin"], "https://fenetre.cam")
+        self.assertEqual(
+            server_conf["cors_allow_origins"],
+            ["https://fenetre.cam", "https://dev.fenetre.cam"],
+        )
+
+    def test_cors_allow_origin_reflects_allowed_request_origin(self):
+        cors_config = {
+            "cors_allow_origin": "https://fenetre.cam",
+            "cors_allow_origins": [
+                "https://fenetre.cam",
+                "https://dev.fenetre.cam",
+            ],
+        }
+
+        self.assertEqual(
+            _cors_allow_origin_for_request("https://dev.fenetre.cam", cors_config),
+            "https://dev.fenetre.cam",
+        )
+        self.assertEqual(
+            _cors_allow_origin_for_request("https://other.example", cors_config),
+            None,
+        )
+        self.assertEqual(
+            _cors_allow_origin_for_request(None, cors_config),
+            "https://fenetre.cam",
+        )
 
     def test_config_load_missing_sections(self):
         test_data = {
@@ -154,6 +235,49 @@ class FenetreConfigTestCase(unittest.TestCase):
         _, _, _, _, timelapse_conf = config_load(config_path)
 
         self.assertEqual(timelapse_conf, {})
+
+    def test_remote_deployment_name_defaults_to_enabled(self):
+        test_data = {
+            "global": {
+                "work_dir": self.mock_work_dir,
+                "timezone": "UTC",
+                "ui": {
+                    "linked_deployments": [
+                        {"base_url": "https://remote.example"},
+                    ],
+                },
+            },
+        }
+        config_path = self._create_temp_config_file(test_data)
+
+        _, _, global_conf, _, _ = config_load(config_path)
+
+        self.assertTrue(
+            global_conf["ui"]["linked_deployments"][0]["use_remote_name"]
+        )
+
+    def test_remote_deployment_name_can_be_disabled(self):
+        test_data = {
+            "global": {
+                "work_dir": self.mock_work_dir,
+                "timezone": "UTC",
+                "ui": {
+                    "linked_deployments": [
+                        {
+                            "base_url": "https://remote.example",
+                            "use_remote_name": False,
+                        },
+                    ],
+                },
+            },
+        }
+        config_path = self._create_temp_config_file(test_data)
+
+        _, _, global_conf, _, _ = config_load(config_path)
+
+        self.assertFalse(
+            global_conf["ui"]["linked_deployments"][0]["use_remote_name"]
+        )
 
     def test_config_load_picamera2_controls(self):
         test_data = {
@@ -227,6 +351,29 @@ class FenetreConfigTestCase(unittest.TestCase):
         self.assertIn("frequent_timelapse", timelapse_conf)
         self.assertTrue(timelapse_conf["daily_timelapse"]["enabled"])
         self.assertTrue(timelapse_conf["frequent_timelapse"]["enabled"])
+        self.assertEqual(
+            timelapse_conf["frequent_timelapse"]["hls_segment_type"], "mpegts"
+        )
+
+    def test_config_load_frequent_timelapse_fmp4_segments(self):
+        test_data = {
+            "global": {"work_dir": self.mock_work_dir, "timezone": "UTC"},
+            "cameras": {"cam1": {"url": "http://cam1"}},
+            "timelapse": {
+                "frequent_timelapse": {
+                    "output_format": "hls",
+                    "hls_segment_type": "fmp4",
+                    "hls_segment_extension": "m4s",
+                }
+            },
+        }
+        config_path = self._create_temp_config_file(test_data)
+
+        _, _, _, _, timelapse_conf = config_load(config_path)
+
+        frequent_conf = timelapse_conf["frequent_timelapse"]
+        self.assertEqual(frequent_conf["hls_segment_type"], "fmp4")
+        self.assertEqual(frequent_conf["hls_segment_extension"], "m4s")
 
     @patch("fenetre.config.logger")
     def test_config_load_file_not_found(self, mock_config_logging):

@@ -209,6 +209,66 @@ def log_camera_error(camera_name: str, error_message: str, global_config: Dict):
     camera_logger.error(error_message)
 
 
+def run_camera_unavailable_command(
+    camera_name: str, camera_config: Dict, reason: str
+) -> None:
+    command = camera_config.get("unavailable_command")
+    if not command:
+        return
+
+    timeout_s = camera_config.get("unavailable_command_timeout_s", 30)
+    env = os.environ.copy()
+    env["FENETRE_CAMERA_NAME"] = camera_name
+    env["FENETRE_UNAVAILABLE_REASON"] = reason
+
+    try:
+        logger.warning(
+            "%s: Running unavailable command after camera became unavailable: %s",
+            camera_name,
+            command,
+        )
+        result = subprocess.run(
+            command,
+            shell=True,
+            timeout=timeout_s,
+            env=env,
+            capture_output=True,
+            text=True,
+        )
+    except subprocess.TimeoutExpired:
+        logger.error(
+            "%s: Unavailable command timed out after %ss: %s",
+            camera_name,
+            timeout_s,
+            command,
+        )
+        return
+    except Exception:
+        logger.error(
+            "%s: Failed to run unavailable command: %s",
+            camera_name,
+            command,
+            exc_info=True,
+        )
+        return
+
+    if result.returncode != 0:
+        logger.error(
+            "%s: Unavailable command failed with exit code %s. stdout=%r stderr=%r",
+            camera_name,
+            result.returncode,
+            result.stdout,
+            result.stderr,
+        )
+    else:
+        logger.info(
+            "%s: Unavailable command completed successfully. stdout=%r stderr=%r",
+            camera_name,
+            result.stdout,
+            result.stderr,
+        )
+
+
 def get_pic_from_url(
     url: str,
     timeout: int,
@@ -761,11 +821,29 @@ def get_ssim_for_area(
     return structural_similarity(image1_np, image2_np, data_range=255)
 
 
+def _cors_allow_origin_for_request(request_origin, cors_config):
+    allow_origins = cors_config.get("cors_allow_origins") or []
+    if "*" in allow_origins:
+        return "*"
+    if request_origin and request_origin in allow_origins:
+        return request_origin
+    if not request_origin:
+        return cors_config.get("cors_allow_origin") or (
+            allow_origins[0] if allow_origins else "*"
+        )
+    return None
+
+
 class FenetreHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
     def end_headers(self):
         if server_config.get("allow_cors"):
-            allow_origin = server_config.get("cors_allow_origin") or "*"
-            self.send_header("Access-Control-Allow-Origin", allow_origin)
+            allow_origin = _cors_allow_origin_for_request(
+                self.headers.get("Origin"), server_config
+            )
+            if allow_origin:
+                self.send_header("Access-Control-Allow-Origin", allow_origin)
+                if allow_origin != "*":
+                    self.send_header("Vary", "Origin")
             self.send_header("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS")
             self.send_header(
                 "Access-Control-Allow-Headers", "Origin, Range, Content-Type, Accept"
@@ -781,7 +859,6 @@ class FenetreHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
         else:
             self.send_error(405, "Method Not Allowed")
-
 
 def server_run():
     server_class = http.server.ThreadingHTTPServer
@@ -928,6 +1005,14 @@ def create_and_start_and_watch_thread(
             return  # Exit the watchdog loop for this camera
 
         if not thread_instance or not thread_instance.is_alive():
+            if thread_instance and camera_name_for_management:
+                cam_conf = cameras_config.get(camera_name_for_management, {})
+                run_camera_unavailable_command(
+                    camera_name_for_management,
+                    cam_conf,
+                    f"thread {name} stopped unexpectedly",
+                )
+
             # Prune old thread reference from active_camera_threads if it matches this watchdog's managed camera
             if (
                 camera_name_for_management
@@ -1527,6 +1612,14 @@ def frequent_timelapse_loop():
             }
             if timelapse_settings.get("framerate"):
                 timelapse_args["framerate"] = timelapse_settings.get("framerate")
+            if timelapse_settings.get("hls_segment_type"):
+                timelapse_args["hls_segment_type"] = timelapse_settings.get(
+                    "hls_segment_type"
+                )
+            if timelapse_settings.get("hls_segment_extension"):
+                timelapse_args["hls_segment_extension"] = timelapse_settings.get(
+                    "hls_segment_extension"
+                )
 
             if output_format == "hls":
                 result = run_serialized_background_job(
@@ -1587,7 +1680,8 @@ def cleanup_frequent_timelapse_artifacts(
     if frequent_timelapse_config.get("output_format") == "hls":
         remove_file(os.path.join(day_dir, f"{base_name}.m3u8"))
         remove_file(os.path.join(day_dir, f".{base_name}.hls-manifest.json"))
-        for segment_path in glob.glob(os.path.join(day_dir, "segment-*.ts")):
+        remove_file(os.path.join(day_dir, "init.mp4"))
+        for segment_path in glob.glob(os.path.join(day_dir, "segment-*.*")):
             remove_file(segment_path)
 
         legacy_segment_dir = os.path.join(day_dir, f"{base_name}.segments")

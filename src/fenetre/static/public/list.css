@@ -123,9 +123,39 @@ body.dark-mode .marker-cluster-large div {
     color: #333;
 }
 
+#main-website-link svg,
 #github-link svg {
     width: 22px;
     height: 22px;
+}
+
+.icon-world-map .map-water {
+    fill: #e9f4fb;
+    stroke: currentColor;
+    stroke-width: 1.5;
+}
+
+.icon-world-map .map-grid {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1;
+    stroke-linecap: round;
+    opacity: 0.55;
+}
+
+.icon-world-map .map-land {
+    fill: #2f6f4f;
+}
+
+body.dark-mode .icon-world-map .map-water {
+    fill: #172533;
+}
+
+body.dark-mode .icon-world-map .map-land {
+    fill: #8fcf9d;
+}
+
+#github-link svg {
     fill: #333;
 }
 

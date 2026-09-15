@@ -329,6 +329,12 @@ def _validate_global(cfg: Dict, errors) -> Dict:
                 )
                 if cameras_json_url:
                     normalized["cameras_json_url"] = cameras_json_url
+            normalized["use_remote_name"] = _bool(
+                entry.get("use_remote_name"),
+                f"{entry_path}.use_remote_name",
+                errors,
+                default=True,
+            )
             linked_out.append(normalized)
     else:
         errors.append(
@@ -439,7 +445,13 @@ def _validate_global(cfg: Dict, errors) -> Dict:
 
 
 def _validate_http(cfg: Dict, errors) -> Dict:
-    allowed = {"enabled", "listen", "allow_cors", "cors_allow_origin"}
+    allowed = {
+        "enabled",
+        "listen",
+        "allow_cors",
+        "cors_allow_origin",
+        "cors_allow_origins",
+    }
     _warn_unknown_keys("http_server", cfg, allowed)
     out = {}
     out["enabled"] = _bool(
@@ -457,6 +469,23 @@ def _validate_http(cfg: Dict, errors) -> Dict:
         errors,
         default="https://dev.fenetre.cam",
     )
+    origins = cfg.get("cors_allow_origins")
+    if origins is None:
+        out["cors_allow_origins"] = [out["cors_allow_origin"]]
+    elif isinstance(origins, list):
+        parsed_origins = []
+        for idx, origin in enumerate(origins):
+            parsed_origin = _str(
+                origin, f"http_server.cors_allow_origins[{idx}]", errors
+            )
+            if parsed_origin:
+                parsed_origins.append(parsed_origin)
+        out["cors_allow_origins"] = parsed_origins
+    else:
+        errors.append(
+            f"http_server.cors_allow_origins: expected list, got {type(origins).__name__}"
+        )
+        out["cors_allow_origins"] = []
     return out
 
 
@@ -515,6 +544,18 @@ def _validate_timelapse(cfg: Dict, errors) -> Dict:
             "timelapse.frequent_timelapse.file_extension",
             errors,
             default="mp4",
+        )
+        ft_out["hls_segment_type"] = _str(
+            ft.get("hls_segment_type"),
+            "timelapse.frequent_timelapse.hls_segment_type",
+            errors,
+            default="mpegts",
+            choices={"mpegts", "fmp4"},
+        )
+        ft_out["hls_segment_extension"] = _str(
+            ft.get("hls_segment_extension"),
+            "timelapse.frequent_timelapse.hls_segment_extension",
+            errors,
         )
         ft_out["framerate"] = _int(
             ft.get("framerate"),
@@ -742,6 +783,23 @@ def _validate_cameras(cfg: Dict, errors) -> Dict:
             errors,
             default=True,
         )
+        if cam.get("unavailable_command") is not None:
+            cam_out["unavailable_command"] = _str(
+                cam.get("unavailable_command"),
+                f"cameras.{name}.unavailable_command",
+                errors,
+            )
+            cam_out["unavailable_command_timeout_s"] = _int(
+                cam.get("unavailable_command_timeout_s"),
+                f"cameras.{name}.unavailable_command_timeout_s",
+                errors,
+                default=30,
+                min_value=1,
+            )
+        elif cam.get("unavailable_command_timeout_s") is not None:
+            errors.append(
+                f"cameras.{name}.unavailable_command_timeout_s: unavailable_command is required"
+            )
 
         # SSIM controls
         cam_out["ssim_setpoint"] = _float(

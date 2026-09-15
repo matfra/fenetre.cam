@@ -2,13 +2,14 @@ admin_server:
   enabled: true
   listen: 0.0.0.0:5804 [::]:5804
 cameras:
-  #  k6pvj-sweeney-ridge:
-  #    lat: 37.60898
-  #    lon: -122.45759
-  #    sky_area: 400,0,1920,250
-  #    ssim_area: 400,0,1920,250
-  #    ssim_setpoint: 0.85
-  #    url: http://uvc-g3-flex-4a6d.local.mesh/snap.jpeg
+  k6pvj-sweeney-ridge:
+    lat: 37.60898
+    lon: -122.45759
+    sky_area: 400,0,1920,250
+    ssim_area: 400,0,1920,250
+    ssim_setpoint: 0.85
+    unavailable_command: "printf 'hello world\\n' >> /tmp/fenetre-sweeney-ridge-unavailable.txt"
+    url: http://uvc-g3-flex-4a6d.local.mesh/snap.jpeg
   #  kj6weg-fishcam:
   #    lat: 37.86519
   #    lon: -122.22125
@@ -19,8 +20,8 @@ cameras:
     lat: 37.888
     lon: -122.268
     sky_area: 400,0,1400,400
-    ssim_area: 400,0,1400,400
-    ssim_setpoint: 0.82
+      #    ssim_area: 400,0,1400,400
+      #    ssim_setpoint: 0.82
     url: http://kn6plv-cam1.local.mesh/snap.jpeg
   orca-cam:
     lat: 37.86478
@@ -45,17 +46,19 @@ cameras:
   wa6kqb-4cam-a:
     lat: 37.9578
     lon: -122.31138
-    sky_area: 0,0,1280,300
-    ssim_area: 0,0,1280,600
-    ssim_setpoint: 0.9
+      #    sky_area: 0,0,1280,300
+      #    ssim_area: 0,0,1280,600
+    snap_interval_s: 90
+      #ssim_setpoint: 0.9
     url: http://4cam-a.local.mesh/jpg/image.jpg
 global:
+  deployment_name: camaredn.fenetre.cam
   log_dir: /srv/camaredn/logs
   storage_management:
     check_interval_s: 300
     dry_run: false
     enabled: true
-    work_dir_max_size_GB: 200
+    work_dir_max_size_GB: 20
   sunrise_sunset_interval_s: 10
   timezone: America/Los_Angeles
   tmp_dir: /dev/shm/camaredn
@@ -67,11 +70,17 @@ global:
 http_server:
   enabled: true
   listen: 0.0.0.0:5802
+  cors_allow_origin: https://fenetre.cam
+  cors_allow_origins:
+    - https://fenetre.cam
+    - https://dev.fenetre.cam
 timelapse:
   frequent_timelapse:
     enabled: true
     ffmpeg_2pass: false
-    ffmpeg_options: -vaapi_device /dev/dri/renderD128 -vf format=nv12,hwupload -c:v h264_vaapi -qp 24 -movflags +faststart
+    ffmpeg_options: -c:v libvpx-vp9 -b:v 5M -maxrate 8M -bufsize 16M -deadline good -cpu-used 4 -row-mt 1 -g 60 -keyint_min 60 -force_key_frames expr:gte(t,n_forced*2)
     file_extension: mp4
+    hls_segment_type: fmp4
+    hls_segment_extension: m4s
     output_format: hls
     interval_s: 1200

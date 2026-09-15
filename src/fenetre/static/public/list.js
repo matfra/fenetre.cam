@@ -177,6 +177,33 @@ function buildAbsoluteUrl(base, maybeRelative) {
     return joinUrl(base, maybeRelative);
 }
 
+function addCacheBuster(url, version) {
+    if (!url) {
+        return url;
+    }
+
+    try {
+        const versionedUrl = new URL(url);
+        versionedUrl.searchParams.set('_', version);
+        return versionedUrl.toString();
+    } catch (e) {
+        const separator = url.includes('?') ? '&' : '?';
+        return `${url}${separator}_=${encodeURIComponent(version)}`;
+    }
+}
+
+function getDeploymentDisplayName(deployment) {
+    if (deployment.name) {
+        return deployment.name;
+    }
+
+    try {
+        return new URL(deployment.base_url).hostname || deployment.base_url;
+    } catch (e) {
+        return deployment.base_url;
+    }
+}
+
 function clearRemoteCameraItems() {
     document.querySelectorAll('.camera-item.remote-camera').forEach((item) => {
         item.remove();
@@ -325,8 +352,7 @@ function createCameraListItem(camera) {
 }
 
 function createRemotePopupContent(deployment, camera, openUrl) {
-    const deploymentLabel = deployment.displayName;
-    return `<b>${camera.title}</b><br><a href="${openUrl}" target="_blank" rel="noopener">Open on ${deploymentLabel}</a>`;
+    return `<b>${camera.title}</b><br><a href="${openUrl}" target="_blank" rel="noopener">Open on ${deployment.baseUrl}</a>`;
 }
 
 function addRemoteCameraListItem(camera, deployment, markerId, openUrl, imageUrl) {
@@ -365,7 +391,7 @@ function addRemoteCameraListItem(camera, deployment, markerId, openUrl, imageUrl
     openLink.href = openUrl;
     openLink.target = '_blank';
     openLink.rel = 'noopener';
-    openLink.textContent = `Open on ${deployment.displayName}`;
+    openLink.textContent = `Open on ${deployment.baseUrl}`;
     header.appendChild(openLink);
 
     listItem.appendChild(header);
@@ -383,7 +409,7 @@ function addRemoteCameraListItem(camera, deployment, markerId, openUrl, imageUrl
     return listItem;
 }
 
-function integrateRemoteDeployment(deployment, remoteData) {
+function integrateRemoteDeployment(deployment, remoteData, thumbnailVersion) {
     if (!remoteData || !Array.isArray(remoteData.cameras)) {
         return;
     }
@@ -394,7 +420,10 @@ function integrateRemoteDeployment(deployment, remoteData) {
         const markerId = `remote-${deployment.key}-${cameraSlug}-${index}`;
         const openUrl = buildRemoteCameraUrl(deployment.baseUrl, camera.url, cameraSlug);
         const imageCandidate = camera.thumbnail_url || camera.image;
-        const imageUrl = buildAbsoluteUrl(deployment.baseUrl, imageCandidate);
+        const imageUrl = addCacheBuster(
+            buildAbsoluteUrl(deployment.baseUrl, imageCandidate),
+            thumbnailVersion,
+        );
         addRemoteCameraListItem(camera, deployment, markerId, openUrl, imageUrl);
 
         const lat = camera.lat != null ? parseFloat(camera.lat) : null;
@@ -413,6 +442,7 @@ function integrateRemoteDeployment(deployment, remoteData) {
 
 function refreshLinkedDeployments(linkedDeployments) {
     const generation = ++remoteFetchGeneration;
+    const thumbnailVersion = Date.now();
     clearRemoteCameraItems();
     if (!Array.isArray(linkedDeployments) || linkedDeployments.length === 0) {
         return;
@@ -423,7 +453,7 @@ function refreshLinkedDeployments(linkedDeployments) {
         if (!baseUrl) {
             return;
         }
-        const displayName = deployment.name || baseUrl;
+        const displayName = getDeploymentDisplayName(deployment);
         let key = slugify(displayName, `deployment-${index}`);
         while (seenKeys.has(key)) {
             key = `${key}-${index}`;
@@ -437,6 +467,7 @@ function refreshLinkedDeployments(linkedDeployments) {
             displayName,
             baseUrl,
             camerasUrl,
+            useRemoteName: deployment.use_remote_name !== false,
         };
 
         fetch(normalizedDeployment.camerasUrl)
@@ -450,12 +481,18 @@ function refreshLinkedDeployments(linkedDeployments) {
                 if (generation !== remoteFetchGeneration) {
                     return;
                 }
-                const resolvedName = remoteData?.global?.deployment_name;
+                const remoteName = remoteData?.global?.deployment_name;
                 const deploymentForIntegration = {
                     ...normalizedDeployment,
-                    displayName: resolvedName || normalizedDeployment.displayName,
+                    displayName: normalizedDeployment.useRemoteName && remoteName
+                        ? remoteName
+                        : normalizedDeployment.displayName,
                 };
-                integrateRemoteDeployment(deploymentForIntegration, remoteData);
+                integrateRemoteDeployment(
+                    deploymentForIntegration,
+                    remoteData,
+                    thumbnailVersion,
+                );
             })
             .catch((error) => {
                 if (generation !== remoteFetchGeneration) {

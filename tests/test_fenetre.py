@@ -11,11 +11,44 @@ from fenetre.fenetre import (
     cleanup_frequent_timelapse_artifacts,
     get_pic_from_url,
     get_ssim_for_area,
+    run_camera_unavailable_command,
 )
 from fenetre.picamera import Picamera2Capture
 
 
 class TestFenetre(unittest.TestCase):
+    @patch("fenetre.fenetre.subprocess.run")
+    def test_run_camera_unavailable_command(self, mock_subprocess_run):
+        mock_subprocess_run.return_value.returncode = 0
+        mock_subprocess_run.return_value.stdout = ""
+        mock_subprocess_run.return_value.stderr = ""
+
+        run_camera_unavailable_command(
+            "cam1",
+            {
+                "unavailable_command": "printf hello >> /tmp/cam1-unavailable",
+                "unavailable_command_timeout_s": 7,
+            },
+            "thread stopped",
+        )
+
+        args, kwargs = mock_subprocess_run.call_args
+        self.assertEqual(args[0], "printf hello >> /tmp/cam1-unavailable")
+        self.assertTrue(kwargs["shell"])
+        self.assertEqual(kwargs["timeout"], 7)
+        self.assertEqual(kwargs["env"]["FENETRE_CAMERA_NAME"], "cam1")
+        self.assertEqual(kwargs["env"]["FENETRE_UNAVAILABLE_REASON"], "thread stopped")
+        self.assertTrue(kwargs["capture_output"])
+        self.assertTrue(kwargs["text"])
+
+    @patch("fenetre.fenetre.subprocess.run")
+    def test_run_camera_unavailable_command_noop_without_config(
+        self, mock_subprocess_run
+    ):
+        run_camera_unavailable_command("cam1", {}, "thread stopped")
+
+        mock_subprocess_run.assert_not_called()
+
     @patch("fenetre.fenetre.requests.get")
     @patch("fenetre.fenetre.time.time", return_value=1234567890)
     def test_get_pic_from_url_cache_bust(self, mock_time, mock_requests_get):
@@ -434,8 +467,10 @@ class TestFenetre(unittest.TestCase):
             hls_paths = [
                 os.path.join(day_dir, "2026-05-02.m3u8"),
                 os.path.join(day_dir, ".2026-05-02.hls-manifest.json"),
+                os.path.join(day_dir, "init.mp4"),
                 os.path.join(day_dir, "segment-000000.ts"),
                 os.path.join(day_dir, "segment-000002.ts"),
+                os.path.join(day_dir, "segment-000003.m4s"),
                 os.path.join(legacy_segment_dir, "segment-legacy.ts"),
             ]
             preserved_paths = [
@@ -458,10 +493,12 @@ class TestFenetre(unittest.TestCase):
             )
             self.assertFalse(os.path.exists(os.path.join(day_dir, "segment-000000.ts")))
             self.assertFalse(os.path.exists(os.path.join(day_dir, "segment-000002.ts")))
+            self.assertFalse(os.path.exists(os.path.join(day_dir, "segment-000003.m4s")))
+            self.assertFalse(os.path.exists(os.path.join(day_dir, "init.mp4")))
             self.assertFalse(os.path.exists(legacy_segment_dir))
             for path in preserved_paths:
                 self.assertTrue(os.path.exists(path))
-            self.assertEqual(len(deleted_paths), 5)
+            self.assertEqual(len(deleted_paths), 7)
 
     def test_cleanup_frequent_timelapse_artifacts_removes_file_output(self):
         with tempfile.TemporaryDirectory() as tmp_dir:

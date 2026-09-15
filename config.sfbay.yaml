@@ -61,8 +61,6 @@ global:
     show_main_website_icon: true
     show_map_by_default: true
     show_github_icon: true
-    map_privacy_radius_m: 500 # 1km circle shown instead of a pin; set to 0 to disable
-    map_privacy_jitter_m: 100 # optional center jitter in meters (clamped to the radius)
   work_dir: /srv/sfbay/data
   mqtt:
     enabled: true
@@ -75,6 +73,10 @@ global:
 http_server:
   enabled: true
   listen: 0.0.0.0:8888
+  cors_allow_origin: https://fenetre.cam
+  cors_allow_origins:
+    - https://fenetre.cam
+    - https://dev.fenetre.cam
 timelapse:
  daily_timelapse:
    enabled: true
