@@ -80,5 +80,7 @@ timelapse:
   frequent_timelapse:
     ffmpeg_2pass: false
     file_extension: mp4
+    ffmpeg_options: -c:v h264_v4l2m2m -b:v 10M -movflags +faststart
+    output_format: hls
     framerate: 30
     interval_s: 1200
