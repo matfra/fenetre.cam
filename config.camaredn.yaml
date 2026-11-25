@@ -1,6 +1,7 @@
 admin_server:
   enabled: true
   listen: 0.0.0.0:5804 [::]:5804
+secret_file: secret.yaml
 cameras:
   k6pvj-sweeney-ridge:
     lat: 37.60898

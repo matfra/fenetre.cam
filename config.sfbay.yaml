@@ -1,6 +1,7 @@
 admin_server:
   enabled: true
   listen: 0.0.0.0:8889
+secret_file: secret.yaml
 cameras:
   alertcal-axis-mttamalpaiseast:
     url: https://cameras.alertcalifornia.org/public-camera-data/Axis-TamEast/latest-frame.jpg?
