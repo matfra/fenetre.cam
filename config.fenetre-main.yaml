@@ -1,5 +1,6 @@
 admin_server:
   enabled: false
+secret_file: secret.yaml
 global:
   logging_level: INFO
   logging_levels:

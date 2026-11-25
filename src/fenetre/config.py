@@ -13,8 +13,33 @@ class ConfigError(Exception):
     pass
 
 
+def _redact_config_secrets(value):
+    if isinstance(value, dict):
+        return {
+            key: (
+                "<redacted>" if key == "carto_api_key" else _redact_config_secrets(item)
+            )
+            for key, item in value.items()
+        }
+    if isinstance(value, list):
+        return [_redact_config_secrets(item) for item in value]
+    return value
+
+
+def _merge_config(base: Dict, override: Dict) -> Dict:
+    merged = dict(base)
+    for key, value in override.items():
+        if isinstance(value, dict) and isinstance(merged.get(key), dict):
+            merged[key] = _merge_config(merged[key], value)
+        else:
+            merged[key] = value
+    return merged
+
+
 def _log_config_diff(section_name: str, before: Dict, after: Dict):
     """Logs the difference between two configuration dictionaries using YAML."""
+    before = _redact_config_secrets(before)
+    after = _redact_config_secrets(after)
     before_str = yaml.dump(before, sort_keys=True, default_flow_style=False, indent=2)
     after_str = yaml.dump(after, sort_keys=True, default_flow_style=False, indent=2)
 
@@ -247,6 +272,7 @@ def _validate_global(cfg: Dict, errors) -> Dict:
             "show_github_icon",
             "show_map_by_default",
             "linked_deployments",
+            "carto_api_key",
             "map_privacy_radius_m",
             "map_privacy_jitter_m",
         },
@@ -286,6 +312,12 @@ def _validate_global(cfg: Dict, errors) -> Dict:
         "global.ui.show_map_by_default",
         errors,
         default=False,
+    )
+    ui_out["carto_api_key"] = _str(
+        ui_cfg.get("carto_api_key"),
+        "global.ui.carto_api_key",
+        errors,
+        default=None,
     )
     ui_out["map_privacy_radius_m"] = _float(
         ui_cfg.get("map_privacy_radius_m"),
@@ -962,6 +994,28 @@ def config_load(config_file_path: str) -> Tuple[Dict, Dict, Dict, Dict, Dict]:
     except yaml.YAMLError as e:
         logger.error(f"Error parsing YAML configuration file {config_file_path}: {e}")
         raise
+
+    secret_file = raw.pop("secret_file", None)
+    if secret_file is not None:
+        if not isinstance(secret_file, str):
+            raise ConfigError("Invalid configuration:\n - secret_file: expected str")
+        secret_path = secret_file
+        if not os.path.isabs(secret_path):
+            secret_path = os.path.join(os.path.dirname(config_file_path), secret_path)
+        try:
+            with open(secret_path, "r") as f:
+                secret_config = yaml.safe_load(f) or {}
+        except FileNotFoundError:
+            logger.error(f"Secret configuration file {secret_path} not found.")
+            raise
+        except yaml.YAMLError as e:
+            logger.error(f"Error parsing secret configuration file {secret_path}: {e}")
+            raise
+        if not isinstance(secret_config, dict):
+            raise ConfigError(
+                "Invalid configuration:\n - secret_file: expected a YAML mapping"
+            )
+        raw = _merge_config(raw, secret_config)
 
     http_cfg, cameras_cfg, global_cfg, admin_cfg, timelapse_cfg = _extract_sections(raw)
 

@@ -252,9 +252,7 @@ class FenetreConfigTestCase(unittest.TestCase):
 
         _, _, global_conf, _, _ = config_load(config_path)
 
-        self.assertTrue(
-            global_conf["ui"]["linked_deployments"][0]["use_remote_name"]
-        )
+        self.assertTrue(global_conf["ui"]["linked_deployments"][0]["use_remote_name"])
 
     def test_remote_deployment_name_can_be_disabled(self):
         test_data = {
@@ -275,9 +273,29 @@ class FenetreConfigTestCase(unittest.TestCase):
 
         _, _, global_conf, _, _ = config_load(config_path)
 
-        self.assertFalse(
-            global_conf["ui"]["linked_deployments"][0]["use_remote_name"]
-        )
+        self.assertFalse(global_conf["ui"]["linked_deployments"][0]["use_remote_name"])
+
+    def test_secret_file_overlays_carto_api_key(self):
+        secret_path = os.path.join(self.temp_dir.name, "secret.yaml")
+        with open(secret_path, "w") as f:
+            yaml.safe_dump(
+                {"global": {"ui": {"carto_api_key": "test-carto-key"}}},
+                f,
+            )
+        test_data = {
+            "secret_file": "secret.yaml",
+            "global": {
+                "work_dir": self.mock_work_dir,
+                "timezone": "UTC",
+                "ui": {"show_map_by_default": True},
+            },
+        }
+        config_path = self._create_temp_config_file(test_data)
+
+        _, _, global_conf, _, _ = config_load(config_path)
+
+        self.assertTrue(global_conf["ui"]["show_map_by_default"])
+        self.assertEqual(global_conf["ui"]["carto_api_key"], "test-carto-key")
 
     def test_config_load_picamera2_controls(self):
         test_data = {

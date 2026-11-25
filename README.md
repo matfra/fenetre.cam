@@ -95,6 +95,14 @@ You must provide the path to a configuration file using the `--config` flag. A s
 
 The application will start, and based on your configuration, it will begin capturing images.
 
+An optional top-level `secret_file` setting loads a second YAML file relative to the
+main configuration file. Its values recursively override the main configuration, so
+credentials can be kept in an ignored file:
+
+```yaml
+secret_file: secret.yaml
+```
+
 ## Running with systemd
 
 For a long-running deployment, create one systemd service per config file. The service should run the `fenetre` executable from the virtual environment, set the repository as the working directory, and pass the deployment-specific config with `--config`.

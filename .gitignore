@@ -1,5 +1,6 @@
 data
 config.yaml
+secret.yaml
 .venv
 venv
 venv-*
