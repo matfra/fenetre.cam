@@ -187,6 +187,11 @@ body.dark-mode #controls a {
     color: #e0e0e0;
 }
 
+#map-toggle:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
 body.dark-mode #github-link svg {
     fill: #e0e0e0;
 }

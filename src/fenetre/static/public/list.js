@@ -31,46 +31,142 @@ const mapPanel = document.getElementById('map-panel');
 const listPanel = document.getElementById('list-panel');
 const mapElement = document.getElementById('map');
 
-const lightTileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 18,
-    minZoom: 0,
-    attribution: '&copy; OpenStreetMap contributors'
-});
-
-const darkTileLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-    maxZoom: 18,
-    minZoom: 0,
-    subdomains: 'abcd',
-    attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
-});
-
-const initialTileLayer = body.classList.contains('dark-mode') ? darkTileLayer : lightTileLayer;
-const map = L.map('map', {
-    layers: [initialTileLayer]
-}).setView([0, 0], 2);
-let activeTileLayer = initialTileLayer;
+const cartoTileUrl = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+let map = null;
+let mapReady = false;
+let lightTileLayer;
+let darkTileLayer;
+let activeTileLayer;
+let markerCluster;
+let circleLayerGroup;
+let configuredCartoApiKey;
 let latestMarkerBounds = null;
 const markerBoundsFitOptions = { padding: [50, 50] };
 let mapVisible = false;
 let mapVisibilityInitialized = false;
 let remoteFetchGeneration = 0;
+let cameraMarkers = {};
 
-function applyMapTheme(isDark) {
-    const desiredLayer = isDark ? darkTileLayer : lightTileLayer;
-    if (desiredLayer === activeTileLayer) {
-        return;
+function disableMap(error) {
+    mapReady = false;
+    closeMap();
+    mapToggleButton.disabled = true;
+    mapToggleButton.title = 'Map unavailable';
+    mapToggleButton.setAttribute('aria-label', 'Map unavailable');
+    if (map) {
+        try {
+            map.remove();
+        } catch (cleanupError) {
+            console.warn('Could not clean up map:', cleanupError);
+        }
+        map = null;
     }
-    map.addLayer(desiredLayer);
-    map.removeLayer(activeTileLayer);
-    activeTileLayer = desiredLayer;
+    console.warn('Map unavailable; camera list remains available:', error);
 }
 
-var markerCluster = L.markerClusterGroup();
-var circleLayerGroup = L.layerGroup();
-map.addLayer(markerCluster);
-map.addLayer(circleLayerGroup);
+function runMapAction(action) {
+    if (!mapReady) {
+        return;
+    }
+    try {
+        return action();
+    } catch (error) {
+        disableMap(error);
+    }
+}
 
-var cameraMarkers = {}; // To store references to map markers or circles
+function loadMapAsset(url, stylesheet = false) {
+    return new Promise((resolve, reject) => {
+        const element = document.createElement(stylesheet ? 'link' : 'script');
+        const timer = setTimeout(() => finish(new Error(`Map asset timed out: ${url}`)), 10000);
+        function finish(error) {
+            clearTimeout(timer);
+            element.onload = null;
+            element.onerror = null;
+            if (error) {
+                element.remove();
+                reject(error);
+            } else {
+                resolve();
+            }
+        }
+        element.onload = () => finish();
+        element.onerror = () => finish(new Error(`Could not load map asset: ${url}`));
+        if (stylesheet) {
+            element.rel = 'stylesheet';
+            element.href = url;
+        } else {
+            element.src = url;
+        }
+        document.head.appendChild(element);
+    });
+}
+
+async function initializeMap() {
+    try {
+        const leafletBase = 'https://unpkg.com/leaflet@1.9.4/dist/';
+        const clusterBase = 'https://unpkg.com/leaflet.markercluster@1.5.3/dist/';
+        await Promise.all([
+            loadMapAsset(`${leafletBase}leaflet.css`, true),
+            loadMapAsset(`${clusterBase}MarkerCluster.css`, true),
+            loadMapAsset(`${clusterBase}MarkerCluster.Default.css`, true),
+            loadMapAsset(`${leafletBase}leaflet.js`)
+                .then(() => loadMapAsset(`${clusterBase}leaflet.markercluster.js`)),
+        ]);
+        if (!window.L || typeof L.map !== 'function' || typeof L.markerClusterGroup !== 'function') {
+            throw new Error('Map libraries are missing or incompatible');
+        }
+        lightTileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 18,
+            minZoom: 0,
+            attribution: '&copy; OpenStreetMap contributors'
+        });
+        darkTileLayer = L.tileLayer(cartoTileUrl, {
+            maxZoom: 18,
+            minZoom: 0,
+            subdomains: 'abcd',
+            attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
+        });
+        activeTileLayer = lightTileLayer;
+        map = L.map('map', { layers: [activeTileLayer] });
+        map.setView([0, 0], 2);
+        markerCluster = L.markerClusterGroup();
+        circleLayerGroup = L.layerGroup();
+        map.addLayer(markerCluster);
+        map.addLayer(circleLayerGroup);
+        mapReady = true;
+        mapToggleButton.disabled = false;
+        mapToggleButton.title = 'Toggle map visibility';
+        mapToggleButton.setAttribute('aria-label', 'Toggle map visibility');
+        updateAllCameras();
+    } catch (error) {
+        disableMap(error);
+    }
+}
+
+function configureCartoApiKey(apiKey) {
+    runMapAction(() => {
+        if (apiKey === configuredCartoApiKey) {
+            return;
+        }
+        configuredCartoApiKey = apiKey;
+        const keyQuery = apiKey ? `?key=${encodeURIComponent(apiKey)}` : '';
+        darkTileLayer.setUrl(`${cartoTileUrl}${keyQuery}`);
+        applyMapTheme(body.classList.contains('dark-mode'));
+    });
+}
+
+function applyMapTheme(isDark) {
+    runMapAction(() => {
+        const desiredLayer = isDark && configuredCartoApiKey ? darkTileLayer : lightTileLayer;
+        if (desiredLayer === activeTileLayer) {
+            return;
+        }
+        map.addLayer(desiredLayer);
+        map.removeLayer(activeTileLayer);
+        activeTileLayer = desiredLayer;
+    });
+}
 
 function getLayerBounds(layer) {
     if (!layer) {
@@ -100,50 +196,54 @@ function extendBoundsWithLayer(layer) {
 }
 
 function focusCameraLayer(layer) {
-    if (!layer) {
-        return;
-    }
-    if (layer instanceof L.Marker && markerCluster.hasLayer(layer)) {
-        markerCluster.zoomToShowLayer(layer, () => layer.openPopup());
-        return;
-    }
-    const bounds = getLayerBounds(layer);
-    if (bounds) {
-        map.fitBounds(bounds, markerBoundsFitOptions);
-        if (typeof layer.openPopup === 'function') {
-            layer.openPopup();
+    return runMapAction(() => {
+        if (!layer) {
+            return;
         }
-    }
+        if (layer instanceof L.Marker && markerCluster.hasLayer(layer)) {
+            markerCluster.zoomToShowLayer(layer, () => layer.openPopup());
+            return;
+        }
+        const bounds = getLayerBounds(layer);
+        if (bounds) {
+            map.fitBounds(bounds, markerBoundsFitOptions);
+            if (typeof layer.openPopup === 'function') {
+                layer.openPopup();
+            }
+        }
+    });
 }
 
 function addCameraLayer(lat, lon, radiusMeters, popupHtml) {
-    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
-        return null;
-    }
-    const coords = L.latLng(lat, lon);
-    const radius = Number.isFinite(radiusMeters) ? radiusMeters : 0;
-    let layer;
-    if (radius > 0) {
-        layer = L.circle(coords, {
-            radius,
-            color: '#3388ff',
-            fillColor: '#3388ff',
-            fillOpacity: 0.15,
-            weight: 1,
-        });
-    } else {
-        layer = L.marker(coords);
-    }
-    if (popupHtml) {
-        layer.bindPopup(popupHtml);
-    }
-    if (layer instanceof L.Marker) {
-        markerCluster.addLayer(layer);
-    } else {
-        circleLayerGroup.addLayer(layer);
-    }
-    extendBoundsWithLayer(layer);
-    return layer;
+    return runMapAction(() => {
+        if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+            return null;
+        }
+        const coords = L.latLng(lat, lon);
+        const radius = Number.isFinite(radiusMeters) ? radiusMeters : 0;
+        let layer;
+        if (radius > 0) {
+            layer = L.circle(coords, {
+                radius,
+                color: '#3388ff',
+                fillColor: '#3388ff',
+                fillOpacity: 0.15,
+                weight: 1,
+            });
+        } else {
+            layer = L.marker(coords);
+        }
+        if (popupHtml) {
+            layer.bindPopup(popupHtml);
+        }
+        if (layer instanceof L.Marker) {
+            markerCluster.addLayer(layer);
+        } else {
+            circleLayerGroup.addLayer(layer);
+        }
+        extendBoundsWithLayer(layer);
+        return layer;
+    });
 }
 
 function slugify(value, fallback) {
@@ -227,20 +327,22 @@ function buildRemoteCameraUrl(baseUrl, remoteCameraUrl, cameraSlug) {
 }
 
 function openMap() {
-    if (mapVisible) {
-        return;
-    }
-    mapVisible = true;
-    mapPanel.style.width = '50%';
-    listPanel.style.width = '50%';
-    mapElement.style.visibility = 'visible';
-    mapToggleButton.classList.add('map-open');
-    setTimeout(() => {
-        map.invalidateSize();
-        if (latestMarkerBounds) {
-            map.fitBounds(latestMarkerBounds, markerBoundsFitOptions);
+    return runMapAction(() => {
+        if (mapVisible) {
+            return;
         }
-    }, 500);
+        mapVisible = true;
+        mapPanel.style.width = '50%';
+        listPanel.style.width = '50%';
+        mapElement.style.visibility = 'visible';
+        mapToggleButton.classList.add('map-open');
+        setTimeout(() => runMapAction(() => {
+            map.invalidateSize();
+            if (latestMarkerBounds) {
+                map.fitBounds(latestMarkerBounds, markerBoundsFitOptions);
+            }
+        }), 500);
+    });
 }
 
 function closeMap() {
@@ -435,9 +537,11 @@ function integrateRemoteDeployment(deployment, remoteData, thumbnailVersion) {
             newLayers.push(layer);
         }
     });
-    if (newLayers.length > 0 && latestMarkerBounds) {
-        map.fitBounds(latestMarkerBounds, markerBoundsFitOptions);
-    }
+    runMapAction(() => {
+        if (newLayers.length > 0 && latestMarkerBounds) {
+            map.fitBounds(latestMarkerBounds, markerBoundsFitOptions);
+        }
+    });
 }
 
 function refreshLinkedDeployments(linkedDeployments) {
@@ -637,6 +741,7 @@ function updateAllCameras() {
             const mainWebsiteLink = document.getElementById('main-website-link');
             const githubLink = document.getElementById('github-link');
             const uiConfig = data.global.ui || {};
+            configureCartoApiKey(uiConfig.carto_api_key);
 
             // Main Website Icon
             if (uiConfig.show_main_website_icon === false || !uiConfig.main_website_url) {
@@ -652,7 +757,7 @@ function updateAllCameras() {
             } else {
                 githubLink.style.display = 'none';
             }
-            if (!mapVisibilityInitialized) {
+            if (mapReady && !mapVisibilityInitialized) {
                 if (uiConfig.show_map_by_default) {
                     openMap();
                 }
@@ -664,26 +769,28 @@ function updateAllCameras() {
 
             cameras.forEach(camera => updateCamera(camera, data));
 
-            // Map marker logic
-            markerCluster.clearLayers();
-            circleLayerGroup.clearLayers();
-            cameraMarkers = {};
-            latestMarkerBounds = null;
+            runMapAction(() => {
+                // Map marker logic
+                markerCluster.clearLayers();
+                circleLayerGroup.clearLayers();
+                cameraMarkers = {};
+                latestMarkerBounds = null;
 
-            cameras.forEach(camera => {
-                const lat = camera.lat != null ? parseFloat(camera.lat) : null;
-                const lon = camera.lon != null ? parseFloat(camera.lon) : null;
-                const radius = camera.map_radius_m != null ? parseFloat(camera.map_radius_m) : 0;
-                const markerId = `camera-${camera.title.replace(/\s+/g, '-')}`;
-                const layer = addCameraLayer(lat, lon, radius, createPopupContent(camera));
-                if (layer) {
-                    cameraMarkers[markerId] = layer;
+                cameras.forEach(camera => {
+                    const lat = camera.lat != null ? parseFloat(camera.lat) : null;
+                    const lon = camera.lon != null ? parseFloat(camera.lon) : null;
+                    const radius = camera.map_radius_m != null ? parseFloat(camera.map_radius_m) : 0;
+                    const markerId = `camera-${camera.title.replace(/\s+/g, '-')}`;
+                    const layer = addCameraLayer(lat, lon, radius, createPopupContent(camera));
+                    if (layer) {
+                        cameraMarkers[markerId] = layer;
+                    }
+                });
+
+                if (latestMarkerBounds) {
+                    map.fitBounds(latestMarkerBounds, markerBoundsFitOptions);
                 }
             });
-
-            if (latestMarkerBounds) {
-                map.fitBounds(latestMarkerBounds, markerBoundsFitOptions);
-            }
 
             // Auto-expand camera from URL param
             if (!initialCameraExpanded && cameras.length > 0) {
@@ -711,4 +818,5 @@ function updateAllCameras() {
 }
 
 updateAllCameras();
+initializeMap();
 setInterval(updateAllCameras, 60000); // Refresh every 60 seconds
